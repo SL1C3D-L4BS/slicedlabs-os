@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# cockpitctl — drive the Cockpit (Quickshell HUD) from niri keybinds.
+# NOTE: distinct from `cockpit` (the workspace-scene realizer). Modal toggles go
+# over Quickshell IPC; theme toggle regenerates Theme.qml (the cockpit hot-reloads).
+set -euo pipefail
+
+cmd="${1:-}"; arg="${2:-}"
+
+case "$cmd" in
+    modal)
+        [ -n "$arg" ] || { echo "cockpitctl modal <context|media|net|ai|agenda|system>" >&2; exit 2; }
+        exec qs -c cockpit ipc call cockpit toggle "$arg" ;;
+    open)
+        exec qs -c cockpit ipc call cockpit open "$arg" ;;
+    close)
+        exec qs -c cockpit ipc call cockpit close ;;
+    control)
+        exec qs -c cockpit ipc call cockpit control ;;
+    theme)
+        f="${XDG_CACHE_HOME:-$HOME/.cache}/cockpit-theme"
+        cur=$(cat "$f" 2>/dev/null || echo dark)
+        case "${arg:-toggle}" in
+            dark|light) new="$arg" ;;
+            *) [ "$cur" = dark ] && new=light || new=dark ;;
+        esac
+        printf %s "$new" > "$f"
+        # also keep the legacy waybar-theme file coherent for any readers
+        printf %s "$new" > "${XDG_CACHE_HOME:-$HOME/.cache}/waybar-theme" 2>/dev/null || true
+        exec render-quickshell --variant="$new" ;;
+    *)
+        echo "usage: cockpitctl {modal <name>|open <name>|close|control|theme [toggle|dark|light]}" >&2
+        exit 2 ;;
+esac

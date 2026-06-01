@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# engine-status — snapshot the [ENGINE] repo's working state into a JSON
+# sidecar consumed by waybar (workspace status chip) and OBS overlays
+# (browser-source status panel). Cheap; safe to run on a 2-5s timer.
+#
+# Output: /tmp/engine-status.json
+#   { branch, sha, dirty_files, last_commit_unix, crate, build_ok }
+#
+# `crate` is best-effort: the deepest `crates/*/` ancestor of the most
+# recently modified tracked file. `build_ok` is `true` if the last on-disk
+# `target/.rustc_info.json` is newer than the latest committed source file.
+set -euo pipefail
+
+REPO="${ENGINE_REPO:-${HOME}/Projects/engine}"
+OUT="${ENGINE_STATUS_OUT:-/tmp/engine-status.json}"
+
+emit() {
+    cat > "${OUT}" <<EOF
+{
+  "branch": "${1}",
+  "sha": "${2}",
+  "dirty_files": ${3},
+  "last_commit_unix": ${4},
+  "crate": "${5}",
+  "build_ok": ${6}
+}
+EOF
+}
+
+if [ ! -d "${REPO}/.git" ]; then
+    emit "" "" 0 0 "" false
+    exit 0
+fi
+
+cd "${REPO}"
+
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
+sha="$(git rev-parse --short=8 HEAD 2>/dev/null || echo)"
+last_commit_unix="$(git log -1 --format=%ct 2>/dev/null || echo 0)"
+
+dirty_files=0
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    dirty_files="$(git status --porcelain 2>/dev/null | wc -l)"
+fi
+
+# Recent crate: most-recently-modified tracked file under crates/*, take the
+# first path segment after "crates/". Falls back to empty if no crates dir.
+crate=""
+if [ -d crates ]; then
+    crate="$(git ls-files -z 'crates/*' 2>/dev/null \
+        | xargs -0 -I{} stat -c '%Y {}' {} 2>/dev/null \
+        | sort -nr | head -1 \
+        | awk '{print $2}' \
+        | awk -F/ '{print $2}')"
+fi
+
+# Build freshness: rustc_info.json mtime vs latest tracked source mtime.
+build_ok=false
+rustc_info="target/debug/.fingerprint/.rustc_info.json"
+if [ -f "${rustc_info}" ]; then
+    rustc_mtime="$(stat -c %Y "${rustc_info}" 2>/dev/null || echo 0)"
+    src_mtime="$(git ls-files -z 2>/dev/null \
+        | xargs -0 -I{} stat -c %Y {} 2>/dev/null \
+        | sort -nr | head -1)"
+    if [ "${rustc_mtime:-0}" -ge "${src_mtime:-0}" ]; then
+        build_ok=true
+    fi
+fi
+
+emit "${branch}" "${sha}" "${dirty_files}" "${last_commit_unix}" "${crate}" "${build_ok}"

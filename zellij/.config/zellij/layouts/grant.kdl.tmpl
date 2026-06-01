@@ -1,0 +1,24 @@
+// [ENGINE] platform — zjstatus permission GRANT helper (run once per machine).
+//   zj grant
+// zjstatus is a third-party zellij plugin, so on first use zellij asks to grant it
+// ReadApplicationState (to read tabs/mode). In the always-on 1-row bar that prompt has
+// no room — so this layout loads zjstatus in a FULL, focusable pane where the prompt is
+// visible: press `y` to grant (it persists to ~/.cache/zellij/permissions), then close
+// this window (Mod+Q). Every terminal's pill bar then renders. One time only.
+layout {
+    pane size="78%" focus=true borderless=false {
+        plugin location="zjstatus" {
+            format_left  " {mode}  {tabs}"
+            format_right "#[fg={{color.secondary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.secondary}},bold] {{icon.clock}} {datetime} #[fg={{color.secondary}},bg={{color.bg}}]{{powerline.round_right}} "
+            format_space "#[bg={{color.bg}}]"
+            tab_active   "#[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.primary}},bold] {{powerline.dot}} {name} #[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_right}}"
+            tab_normal   "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+            mode_normal  "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+            datetime        "{format}"
+            datetime_format "%H:%M"
+        }
+    }
+    pane size="22%" command="bash" {
+        args "-lc" "printf '\\n  zjstatus permission grant (one time)\\n  ─────────────────────────────────\\n  1. Focus the pane ABOVE (Mod+↑) or click it\\n  2. Press  y  to grant ReadApplicationState\\n  3. Close this window (Mod+Q)\\n\\n  The pill bar then renders in every terminal.\\n\\n'; exec fish"
+    }
+}

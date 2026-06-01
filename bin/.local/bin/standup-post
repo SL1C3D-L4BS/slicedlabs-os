@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# standup-post — post the daily standup. Uses `slicedlabs standup` when present;
+# otherwise notifies that the poster is unconfigured. Wired to the agenda HUD
+# standup chip's on-click.
+set -u
+if command -v slicedlabs >/dev/null 2>&1; then
+    exec ghostty -e slicedlabs standup
+elif command -v notify-send >/dev/null 2>&1; then
+    notify-send "Standup" "slicedlabs CLI not found — point standup-post at your poster (Discord MCP / pm agent)."
+else
+    printf 'standup-post: no slicedlabs CLI and no notify-send\n' >&2
+fi

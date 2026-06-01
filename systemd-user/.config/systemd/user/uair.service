@@ -1,0 +1,13 @@
+[Unit]
+Description=uair Pomodoro daemon
+Documentation=https://github.com/methericin/uair
+After=default.target
+
+[Service]
+ExecStart=/usr/bin/uair --config %h/.config/uair/uair.toml
+Restart=on-failure
+RestartSec=2
+Environment=PATH=/usr/local/bin:/usr/bin
+
+[Install]
+WantedBy=default.target

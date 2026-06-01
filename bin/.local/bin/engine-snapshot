@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# engine-snapshot — daily reminder to commit or stash long-lived dirty WIP.
+# Designed to be run by a systemd --user timer (every few hours). Looks at
+# /tmp/engine-status.json (produced by `engine-status`) and counts dirty
+# files; if non-empty for more than 24h, fires a notify-send.
+#
+# State file:
+#   /tmp/engine-dirty-since   — Unix timestamp of first detection
+#
+# Thresholds (override via env):
+#   ENGINE_NAG_AFTER_SECONDS  — default 86400 (24h)
+set -euo pipefail
+
+NAG_AFTER="${ENGINE_NAG_AFTER_SECONDS:-86400}"
+STATE_FILE="/tmp/engine-dirty-since"
+STATUS_FILE="/tmp/engine-status.json"
+
+# Refresh status, then read dirty count.
+if command -v engine-status >/dev/null 2>&1; then
+    engine-status >/dev/null
+fi
+
+if [ ! -f "${STATUS_FILE}" ]; then
+    exit 0
+fi
+
+dirty="$(jq -r '.dirty_files' "${STATUS_FILE}" 2>/dev/null || echo 0)"
+branch="$(jq -r '.branch' "${STATUS_FILE}" 2>/dev/null || echo)"
+
+if [ "${dirty:-0}" -eq 0 ]; then
+    rm -f "${STATE_FILE}"
+    exit 0
+fi
+
+now="$(date +%s)"
+if [ -f "${STATE_FILE}" ]; then
+    since="$(cat "${STATE_FILE}")"
+else
+    echo "${now}" > "${STATE_FILE}"
+    exit 0
+fi
+
+age=$((now - since))
+if [ "${age}" -ge "${NAG_AFTER}" ]; then
+    hours=$((age / 3600))
+    notify-send -u low -a "[ENGINE]" \
+        "[ENGINE] dirty for ${hours}h" \
+        "${dirty} uncommitted file(s) on ${branch}. Commit or stash to clear this reminder."
+fi

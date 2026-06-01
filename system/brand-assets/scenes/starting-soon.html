@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>[ENGINE] · starting soon</title>
+<link rel="stylesheet" href="brand.css">
+<style>
+body {
+    background: radial-gradient(ellipse at 70% 30%,
+        rgba(124, 92, 191, 0.18) 0%,
+        rgba(232, 160, 32, 0.06) 45%,
+        var(--bg) 90%);
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    font-family: var(--font-display);
+}
+
+.title {
+    font-size: 144px;
+    color: var(--fg);
+    letter-spacing: 0.02em;
+    text-shadow: var(--shadow-glow);
+}
+
+.title .bracket { color: var(--primary); }
+
+.subtitle {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    color: var(--fg-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.timer {
+    font-size: 96px;
+    color: var(--tertiary);
+    margin-top: 24px;
+    font-variant-numeric: tabular-nums;
+}
+
+.bar {
+    margin-top: 32px;
+    width: 480px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--tertiary));
+    border-radius: 2px;
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: pulse-bar 3s ease-in-out infinite;
+}
+
+@keyframes pulse-bar {
+    0%, 100% { transform: scaleX(0); opacity: 0.4; }
+    50%      { transform: scaleX(1); opacity: 1.0; }
+}
+</style>
+</head>
+<body>
+<div class="title"><span class="bracket">[</span>ENGINE<span class="bracket">]</span></div>
+<div class="subtitle">starting soon</div>
+<div class="timer" id="timer">5:00</div>
+<div class="bar"></div>
+
+<script>
+// Countdown timer. Default 5 min; URL ?secs=N overrides.
+const params = new URLSearchParams(location.search);
+let remaining = parseInt(params.get('secs') || '300', 10);
+const el = document.getElementById('timer');
+function fmt(s) {
+    const m = Math.floor(s / 60), r = s % 60;
+    return `${m}:${r.toString().padStart(2, '0')}`;
+}
+el.textContent = fmt(remaining);
+setInterval(() => {
+    if (remaining <= 0) return;
+    remaining--;
+    el.textContent = fmt(remaining);
+    if (remaining === 0) el.style.color = 'var(--secondary)';
+}, 1000);
+</script>
+</body>
+</html>

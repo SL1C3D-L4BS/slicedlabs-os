@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Render `.tmpl` files in the dotfiles tree against system/tokens.toml.
+
+Convention:
+  Tokens are flat-keyed: tokens.toml [color] bg → `{{color.bg}}`.
+  Every `<path>.tmpl` is rendered to `<path>` (same dir), overwriting.
+  Rendered outputs are gitignored; the .tmpl is the tracked source.
+
+Variants:
+  Pass `--variant=light` to substitute [color_light] / [color_raw_light] /
+  [color_css_light] / [color_rgba_light] in place of their dark counterparts.
+  Templates always reference `{{color.bg}}` — the renderer chooses which
+  source block to bind that placeholder to. Default variant is `dark`.
+
+Idempotent: rerunning produces identical output. Exits non-zero on any
+unresolved placeholder so silent token drift can't ship.
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+ROOT = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+TOKENS_FILE = ROOT / "system" / "tokens.toml"
+PLACEHOLDER = re.compile(r"\{\{\s*([a-z_]+)\.([a-z_]+)\s*\}\}")
+
+# Sections that have a `_light` companion for the light variant.
+VARIANT_SECTIONS = ("color", "color_css", "color_raw", "color_rgba")
+
+
+def load_tokens() -> dict[str, dict[str, object]]:
+    with TOKENS_FILE.open("rb") as f:
+        return tomllib.load(f)
+
+
+def apply_variant(tokens: dict[str, dict[str, object]], variant: str) -> dict[str, dict[str, object]]:
+    """For variant=light, overlay [color_light]/[color_raw_light]/etc on the
+    dark default keys so templates see the same `{{color.bg}}` placeholder."""
+    if variant == "dark":
+        return tokens
+    merged = dict(tokens)
+    for section in VARIANT_SECTIONS:
+        light = tokens.get(f"{section}_light")
+        if light:
+            merged[section] = {**tokens.get(section, {}), **light}
+    return merged
+
+
+def render(text: str, tokens: dict[str, dict[str, object]], path: Path) -> str:
+    unresolved: list[str] = []
+
+    def sub(m: re.Match[str]) -> str:
+        section, key = m.group(1), m.group(2)
+        try:
+            return str(tokens[section][key])
+        except KeyError:
+            unresolved.append(f"{section}.{key}")
+            return m.group(0)
+
+    rendered = PLACEHOLDER.sub(sub, text)
+    if unresolved:
+        raise SystemExit(
+            f"render-templates: unresolved tokens in {path}: {sorted(set(unresolved))}"
+        )
+    return rendered
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Render dotfiles .tmpl files against tokens.toml")
+    parser.add_argument(
+        "--variant",
+        choices=("dark", "light"),
+        default="dark",
+        help="Color variant (default: dark)",
+    )
+    args = parser.parse_args()
+
+    if not TOKENS_FILE.is_file():
+        print(f"render-templates: tokens file missing: {TOKENS_FILE}", file=sys.stderr)
+        return 2
+
+    tokens = apply_variant(load_tokens(), args.variant)
+    # _retired/ is a graveyard of decommissioned configs and snapshots/ is inert —
+    # never render templates living there (they'd resurrect as stray byproducts).
+    skip = {"_retired", "snapshots", ".git"}
+    templates = sorted(p for p in ROOT.rglob("*.tmpl") if skip.isdisjoint(p.parts))
+    if not templates:
+        print("render-templates: no .tmpl files found")
+        return 0
+
+    rendered_count = 0
+    for tmpl in templates:
+        out = tmpl.with_suffix("")
+        original = tmpl.read_text()
+        new = render(original, tokens, tmpl)
+        if out.is_file() and out.read_text() == new:
+            continue
+        out.write_text(new)
+        rendered_count += 1
+        print(f"  rendered  {out.relative_to(ROOT)}")
+    print(f"render-templates: variant={args.variant}, {rendered_count} file(s) updated, {len(templates)} scanned")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

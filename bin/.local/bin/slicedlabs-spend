@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+"""slicedlabs-spend — print "<today_spend> <soft_cap>" for the Cockpit AI pill.
+
+Cheap single-shot the cockpit's Spend service execs on a timer; reuses the cost-cap
+hook (which sums today's cost from the audit ledger) so the bar and the agent
+runtime agree on the number.
+"""
+
+from __future__ import annotations
+
+from slicedlabs_team.hooks import cost_cap
+
+
+def main() -> int:
+    print(f"{cost_cap.daily_spend_so_far():.2f} {cost_cap.soft_cap():.2f}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

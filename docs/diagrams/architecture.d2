@@ -1,0 +1,44 @@
+# Workstation architecture — `d2 architecture.d2 architecture.svg`
+
+direction: down
+
+workstation: engine-workstation (Arch+Niri+Wayland) {
+  niri: Niri + Waybar {
+    workspaces: "engine · comms · stream · monitoring · gaming · coding · browser"
+  }
+
+  L0: Layer 0 — baseline (Arch, fish, ghostty, nvim, starship)
+  L1: Layer 1 — languages (Rust, Go, Node, Ruby, Zig, mise)
+  L2: Layer 2 — cross-compile (mingw, wasm, osxcross)
+  L3: Layer 3 — MacBook Air client (mutagen, remmina)
+  L4: Layer 4 — Rust tooling (nextest, deny, audit, bacon)
+  L5: Layer 5 — containers (podman, distrobox)
+  L6: Layer 6 — A/V (OBS, EasyEffects, Wave XLR)
+  L7: Layer 7 — appearance (mako, wofi, swaylock)
+  L8: Layer 8 — creator (imagemagick, inkscape, yt-dlp)
+
+  B: Layer B — Python ecosystem (uv, ruff, mypy, manim, torch, langchain)
+  C: Layer C — Data tier (PG17, Valkey, Qdrant, Meili, ClickHouse, DuckDB)
+  D: Layer D — Observability (Vector, Prom, Grafana, Loki, Tempo, OTel)
+  E: Layer E — Container orch (k3d, kubectl, helm, kustomize)
+  F: Layer F — Networking (Tailscale, WG, Caddy, xh, Bruno, Hurl)
+  G: Layer G — Frontend/Web (Bun, Deno, Biome, Vite, Playwright)
+  H: Layer H — Local AI (Vulkan primary, ROCm fallback, Ollama, llama.cpp)
+  I: Layer I — Security/TUI (semgrep, trivy, atuin, lazygit, btm)
+  J: Layer J — Pomodoro/Niri/Waybar (uair, zen, waybar tabs)
+  K: Layer K — Book recommendations
+  L: Layer L — Knowledge ingestion (Marker → Qdrant)
+  M: Layer M — Long-term memory (Mem0)
+  N: Layer N — Agent observability (Langfuse, Phoenix)
+  O: Layer O — SlicedLabs Agent Team (13 roles)
+  P: Layer P — Automation (n8n)
+  Q: Layer Q — Visualization (Obsidian, Cognee, D2)
+  R: Layer R — Context engineering & prompt CI
+}
+
+dotfiles: ~/.dotfiles (Stow + render-templates + sops) {
+  bootstrap: "bootstrap.sh — idempotent layered installer"
+  tokens: "system/tokens.toml — single source of design tokens"
+}
+
+dotfiles -> workstation: "stow + render + bootstrap"

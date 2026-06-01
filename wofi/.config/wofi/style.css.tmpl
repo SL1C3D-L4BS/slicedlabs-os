@@ -1,0 +1,84 @@
+/* [ENGINE] platform — Wofi style · design tokens from system/tokens.toml
+ *
+ * Wofi uses GTK3 CSS. GTK does not parse 8-digit hex (#RRGGBBAA) so any
+ * alpha-bearing colors must use the rgba() form (see color_css tokens). */
+
+* {
+    font-family: "{{font.mono}}", monospace;
+    font-size: {{font.mono_size}}px;
+}
+
+window {
+    background-color: {{color_css.backdrop}};
+    border: {{geom.border}}px solid {{color.primary}};
+    border-radius: {{geom.radius_lg}}px;
+    padding: 16px;
+    /* Soft purple glow behind the chip — niri's layer-rule contributes the
+     * actual drop shadow; this gives an extra inner-bleed at the seam. */
+    box-shadow: 0 0 24px {{color_css.overlay_dim}};
+}
+
+#input {
+    background-color: {{color.bg_alt}};
+    color: {{color.fg}};
+    border: none;
+    border-bottom: {{geom.border}}px solid {{color.primary}};
+    border-radius: {{geom.radius}}px {{geom.radius}}px 0 0;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    outline: none;
+    caret-color: {{color.tertiary}};
+}
+
+#input image {
+    color: {{color.primary}};
+}
+
+#inner-box,
+#outer-box,
+#scroll {
+    background-color: transparent;
+}
+
+#text {
+    color: {{color.fg}};
+    margin-left: 10px;
+}
+
+#entry {
+    padding: 8px 12px;
+    border-radius: {{geom.radius}}px;
+    background-color: transparent;
+    margin: 2px 0;
+    /* Subtle left edge that fills in on hover/select — accentuates the
+     * focused row without shouting. */
+    border-left: 3px solid transparent;
+}
+
+#entry:hover {
+    background-color: {{color_css.chip}};
+    border-left-color: {{color.tertiary}};
+}
+
+#entry:selected {
+    background-color: {{color.selection}};
+    border-left-color: {{color.primary}};
+}
+
+#entry:selected #text {
+    color: {{color.fg}};
+    font-weight: bold;
+}
+
+#entry image {
+    margin-right: 10px;
+    -gtk-icon-shadow: 0 1px 2px {{color_css.overlay_dim}};
+}
+
+/* Highlight the fuzzy-matched substring within an entry's text — wofi
+ * renders matches in `#text-match`. The primary accent makes the typed
+ * substring jump out without changing the row's chrome. */
+#text-match {
+    color: {{color.primary}};
+    font-weight: bold;
+}

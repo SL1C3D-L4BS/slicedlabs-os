@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# verify-public-clean — guarantee #4 (ownership): nothing secret or proprietary can
+# reach the PUBLIC showcase repo. Run as the public repo's prepublish gate + in its
+# CI. Scans a target tree (default $DOTFILES) for:
+#   1. gitleaks findings (using system/.gitleaks.toml if present),
+#   2. the proprietary `slicedlabs` package/submodule + the secret-split host files.
+# Exit 1 on any hit.
+#
+# NB: run against the PUBLIC subtree. Run against the PRIVATE ~/.dotfiles it SHOULD
+# fail (the proprietary slicedlabs-team submodule is tracked there) — that is the
+# gate proving the private tree must never be published verbatim.
+set -euo pipefail
+ROOT="${1:-${DOTFILES_ROOT:-$HOME/.dotfiles}}"
+cd "$ROOT"
+fail=0
+
+# 1) gitleaks — the real secret scanner
+if command -v gitleaks >/dev/null 2>&1; then
+    cfg=(); [[ -f system/.gitleaks.toml ]] && cfg=(--config system/.gitleaks.toml)
+    if ! gitleaks detect --no-banner --redact "${cfg[@]}" >/dev/null 2>&1; then
+        echo "public-clean: ✗ gitleaks found secrets (run: gitleaks detect)" >&2
+        fail=1
+    fi
+else
+    echo "public-clean: ✗ gitleaks not installed — cannot scan" >&2
+    fail=1
+fi
+
+# 2) proprietary / secret-split paths must not be tracked in a public tree
+proprietary=$(git ls-files 2>/dev/null \
+    | grep -nE '(^|/)(slicedlabs-team|\.secret$|keys\.env$|env\.git)' || true)
+if [[ -n "$proprietary" ]]; then
+    echo "public-clean: ✗ proprietary/secret paths are tracked here:" >&2
+    echo "$proprietary" | sed 's/^/    /' >&2
+    fail=1
+fi
+
+[[ $fail -eq 0 ]] && echo "public-clean: no secrets, no proprietary paths — safe to publish ✓"
+exit $fail

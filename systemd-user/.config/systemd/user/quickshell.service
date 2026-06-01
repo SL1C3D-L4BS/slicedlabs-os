@@ -1,0 +1,22 @@
+[Unit]
+Description=The Cockpit — Quickshell GPU HUD (single instance on DP-2)
+Documentation=https://quickshell.org
+PartOf=graphical-session.target
+After=graphical-session.target
+# Never stop trying to bring the HUD back.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Wait until niri actually exposes an output before launching. Otherwise a restart
+# during a transient DP-2 drop (4K@30 over DisplayPort flaps) starts qs against a
+# placeholder screen, the pills never anchor, and the bar "disappears" — quickshell
+# cannot reliably re-anchor a PanelWindow null→valid. Up to 15s, then proceed anyway.
+ExecStartPre=/usr/bin/bash -c 'for i in $(seq 60); do niri msg outputs 2>/dev/null | grep -q "^Output " && break; sleep 0.25; done'
+# `qs -c cockpit` runs ~/.config/quickshell/cockpit/shell.qml in the foreground.
+ExecStart=/usr/bin/qs -c cockpit
+Restart=on-failure
+RestartSec=1
+
+[Install]
+WantedBy=graphical-session.target

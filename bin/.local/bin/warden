@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""warden — manual control plane for the local AI-governance Penalty Box.
+
+Until the async monitor lands, this is how an agent gets benched or reinstated:
+it edits the live status file the Warden ledger will own (~/.cache/warden/status.json)
+and re-bakes the Cockpit contract via render-governance. The Penalty Box modal +
+the bar `agents · N benched` pill reflect it within ~2.5s.
+
+  warden status                          show the roster + Penalty Box
+  warden suspend <agent> <reason...>     bench an agent  [--severity yellow|orange|red]
+  warden probation <agent> <reason...>   put an agent on probation (orange)
+  warden rehab <agent>                   reinstate to clean
+  warden retire <agent>                  retire (off the active roster)
+  warden evidence <agent>                print the agent's evidence pointer
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+CACHE = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "warden"
+STATUS = CACHE / "status.json"
+SEV_DEFAULT = {"suspend": "red", "probation": "orange"}
+
+
+def load() -> dict:
+    try:
+        return json.loads(STATUS.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save(d: dict) -> None:
+    CACHE.mkdir(parents=True, exist_ok=True)
+    STATUS.write_text(json.dumps(d, indent=2) + "\n")
+
+
+def rebake() -> None:
+    """Re-emit the cockpit contract (best-effort; the cockpit hot-reads it)."""
+    subprocess.run(["render-governance"], check=False)
+
+
+def evidence_ref(agent: str, reason: str) -> str:
+    h = hashlib.sha256(f"{agent}|{reason}|{time.time()}".encode()).hexdigest()[:6]
+    return f"ledger:0x{h}"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(prog="warden", add_help=True)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    for c in ("suspend", "probation"):
+        p = sub.add_parser(c)
+        p.add_argument("agent")
+        p.add_argument("reason", nargs="+")
+        p.add_argument("--severity", default=None)
+    for c in ("rehab", "retire", "evidence"):
+        p = sub.add_parser(c)
+        p.add_argument("agent")
+    sub.add_parser("status")
+    sub.add_parser("daemon")
+    sub.add_parser("verify")
+    pe = sub.add_parser("run-eval")
+    pe.add_argument("agent")
+    pe.add_argument("--fail", action="store_true", help="the probation run failed")
+    rv = sub.add_parser("review-evidence")
+    rv.add_argument("agent")
+    rv.add_argument("--n", type=int, default=10)
+    args = ap.parse_args()
+
+    st = load()
+
+    if args.cmd in ("suspend", "probation"):
+        reason = " ".join(args.reason)
+        st[args.agent] = {
+            "status": "suspended" if args.cmd == "suspend" else "probation",
+            "severity": args.severity or SEV_DEFAULT[args.cmd],
+            "reason": reason,
+            "evidence_ref": evidence_ref(args.agent, reason),
+            "version": st.get(args.agent, {}).get("version", "v0.3"),
+        }
+        save(st)
+        rebake()
+        print(f"warden: {args.agent} → {st[args.agent]['status']} ({reason})")
+        return 0
+
+    if args.cmd == "retire":
+        st[args.agent] = {"status": "retired", "severity": None,
+                          "reason": "retired by operator", "evidence_ref": None}
+        save(st)
+        rebake()
+        print(f"warden: {args.agent} retired")
+        return 0
+
+    if args.cmd == "rehab":
+        st.pop(args.agent, None)   # absence ⇒ clean
+        save(st)
+        rebake()
+        print(f"warden: {args.agent} reinstated → clean")
+        return 0
+
+    if args.cmd == "evidence":
+        ev = st.get(args.agent, {})
+        print(json.dumps(ev, indent=2) if ev else f"warden: {args.agent} is clean (no evidence)")
+        return 0
+
+    if args.cmd == "status":
+        rebake()
+        for aid, s in (load().items() or []):
+            print(f"  {aid:<28} {s.get('status'):<10} {s.get('reason','')}")
+        if not load():
+            print("  (all agents clean)")
+        return 0
+
+    if args.cmd == "verify":
+        from slicedlabs_team.warden import Ledger
+
+        ok, broken = Ledger().verify_chain()
+        if ok:
+            print("warden: ledger intact — hash chain + Ed25519 signatures verify")
+            return 0
+        print(f"warden: ledger BROKEN at row {broken}")
+        return 1
+
+    if args.cmd == "run-eval":
+        from slicedlabs_team.warden import PenaltyBox
+
+        new = PenaltyBox().record_run(args.agent, ok=not args.fail)
+        rebake()
+        print(f"warden: {args.agent} → {new}")
+        return 0
+
+    if args.cmd == "review-evidence":
+        from slicedlabs_team.warden import Ledger
+
+        rows = Ledger().tail(args.n, agent=args.agent)
+        if not rows:
+            print(f"warden: no ledger entries for {args.agent}")
+            return 0
+        for r in rows:
+            print(f"  0x{r.hash[:6]} {r.kind:<8} {json.dumps(r.payload)}")
+        return 0
+
+    if args.cmd == "daemon":
+        # Lightweight freshness daemon (warden.service): bake on start, then re-bake
+        # only when the ledger status file actually changes. Near-zero CPU at rest.
+        rebake()
+        last = STATUS.stat().st_mtime if STATUS.exists() else 0.0
+        while True:
+            time.sleep(5)
+            cur = STATUS.stat().st_mtime if STATUS.exists() else 0.0
+            if cur != last:
+                last = cur
+                rebake()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

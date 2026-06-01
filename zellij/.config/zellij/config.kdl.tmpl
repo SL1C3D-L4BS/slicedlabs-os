@@ -1,0 +1,170 @@
+// [ENGINE] platform — Zellij config
+// Spec XVIII.7 · design tokens from system/tokens.toml. Rendered by
+// render-templates; theme values follow the active dark/light variant.
+
+// Every plain terminal opens the `default` layout: a shell + Claude Code attached
+// on the right (Track 9.2). Cockpits pass their own layout (`zj coding` etc.).
+default_layout "default"
+theme "engine"
+
+// Frameless: niri provides rounded corners + shadow + frost, so per-pane frames
+// would be visual noise. Keep mouse; hide the session name in the status ribbon.
+pane_frames false
+mouse_mode true
+ui {
+    pane_frames {
+        rounded_corners false
+        hide_session_name true
+    }
+}
+
+// New-session-per-window (ghostty `command = zj`): don't persist/resurrect
+// sessions, so closed windows don't pile up in `zellij ls`.
+session_serialization false
+
+// Suppress the tips/release-notes popups — a fresh session per window means
+// they'd otherwise greet every new terminal.
+show_startup_tips false
+show_release_notes false
+
+// zjstatus — the Liquid-Glass pill tab/status bar (Track 9.1). Aliased here so
+// every layout references `location="zjstatus"` (portable; no hardcoded $HOME).
+// The .wasm is fetched by bootstrap; its config (the pills) lives per-layout,
+// generated from tokens.toml [powerline]/[semantic]/[color].
+plugins {
+    zjstatus location="file:~/.config/zellij/plugins/zjstatus.wasm"
+}
+
+// Componentized theme (zellij 0.40+) — every UI surface mapped to a design
+// token so the tab/mode ribbon, panes, tables and lists all carry the brand
+// hues. `engine` is rendered per-variant: royal/sky/golden on charcoal (dark),
+// darkened on warm paper (light). Emphasis order is consistent everywhere:
+// 0=golden 1=sky 2=lime 3=wisteria.
+themes {
+    engine {
+        text_unselected {
+            base "{{color.fg}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        text_selected {
+            base "{{color.fg}}"
+            background "{{color.selection}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        ribbon_unselected {
+            base "{{color.fg_muted}}"
+            background "{{color.bg_alt}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        ribbon_selected {
+            base "{{color.bg}}"
+            background "{{color.primary}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.mist}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        table_title {
+            base "{{color.secondary}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        table_cell_unselected {
+            base "{{color.fg}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        table_cell_selected {
+            base "{{color.fg}}"
+            background "{{color.selection}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        list_unselected {
+            base "{{color.fg}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        list_selected {
+            base "{{color.fg}}"
+            background "{{color.selection}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        frame_unselected {
+            base "{{color.inactive}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        frame_selected {
+            base "{{color.primary}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        frame_highlight {
+            base "{{color.tertiary}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        exit_code_success {
+            base "{{color.success}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        exit_code_error {
+            base "{{color.error}}"
+            background "{{color.bg}}"
+            emphasis_0 "{{color.tertiary}}"
+            emphasis_1 "{{color.secondary}}"
+            emphasis_2 "{{color.success}}"
+            emphasis_3 "{{ansi.magenta}}"
+        }
+        multiplayer_user_colors {
+            player_1 "{{color.primary}}"
+            player_2 "{{color.tertiary}}"
+            player_3 "{{color.success}}"
+            player_4 "{{ansi.magenta}}"
+            player_5 "{{color.secondary}}"
+            player_6 "{{color.coding}}"
+            player_7 "{{color.error}}"
+            player_8 "{{color.browser}}"
+            player_9 "{{color.mist}}"
+            player_10 "{{color.sand}}"
+        }
+    }
+}

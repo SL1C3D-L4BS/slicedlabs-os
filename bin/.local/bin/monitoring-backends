@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# monitoring-backends — start/stop the HOST observability units on demand.
+#
+# Daily monitoring is the native `slicedlabs monitor` cockpit (Mod+5 / monitoring-stack),
+# which reads host vitals + service health DIRECTLY and needs NONE of these units. The
+# host stack below — Grafana dashboards, Prometheus TSDB + node-exporter scraper,
+# Pyroscope profiles, Grafana Alloy eBPF feeder, Vector journald→Loki shipper — backs
+# only the occasional deep manual dive (e.g. browsing Grafana). It is therefore DISABLED
+# at boot (see the bootstrap system-hardening layer) and brought up here when actually
+# wanted. Fully reversible: `down` stops them again; nothing is masked.
+#
+# The podman observability compose stack (Loki/Tempo/OTel/ClickHouse) is separate and
+# stays on-demand via the monitoring scene's `services=["dev-stack-obs"]` choreography.
+set -euo pipefail
+
+UNITS=(grafana.service prometheus.service prometheus-node-exporter.service \
+       pyroscope.service grafana-alloy.service vector.service)
+
+case "${1:-status}" in
+  up)
+    sudo systemctl start "${UNITS[@]}"
+    echo "host observability backends: up  (Grafana → http://localhost:3000)"
+    ;;
+  down)
+    sudo systemctl stop "${UNITS[@]}"
+    echo "host observability backends: down"
+    ;;
+  status)
+    for u in "${UNITS[@]}"; do printf '%-34s %s\n' "$u" "$(systemctl is-active "$u")"; done
+    ;;
+  *)
+    echo "usage: monitoring-backends {up|down|status}" >&2
+    exit 2
+    ;;
+esac

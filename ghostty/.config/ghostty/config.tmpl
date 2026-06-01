@@ -1,0 +1,96 @@
+# [ENGINE] platform — Ghostty config
+# Spec XVIII.7 · design tokens from system/tokens.toml
+
+font-family = {{font.mono}}
+font-size = {{font.mono_size}}
+font-feature = +zero
+font-feature = +calt
+font-feature = +liga
+font-feature = +ss01
+font-thicken = true
+
+# Tighter line for terminal-density, slightly looser cell for breathing room.
+adjust-cell-height = 6%
+adjust-cell-width = 0%
+
+window-padding-x = 16
+window-padding-y = 12
+window-padding-balance = true
+window-padding-color = background
+window-decoration = none
+window-save-state = always
+shell-integration = fish
+shell-integration-features = cursor,sudo,title
+copy-on-select = clipboard
+clipboard-trim-trailing-spaces = true
+mouse-hide-while-typing = true
+mouse-scroll-multiplier = 1.5
+confirm-close-surface = false
+quick-terminal-screen = mouse
+link-url = true
+
+# Multiplexer. Launch every window into its own fresh zellij session
+# (new-session-per-window). `zj` guards against nesting and falls back to the
+# login shell if zellij is absent. Panes/tabs/sessions are zellij's job — ghostty
+# stays a lean host. Surfaces spawned with `-e <cmd>` (niri-workspace-launcher,
+# the ssh-mac monitoring pane) override this, so they're unaffected.
+command = /home/doodlebob/.local/bin/zj
+
+# Per-process windows (NOT single-instance): each `ghostty --class=… -e …` is its
+# own process so its app-id (--class) actually sticks. The scene system + niri
+# open-on-workspace identify workspace cockpits by app-id — under gtk-single-instance
+# only the FIRST ghostty keeps its --class (the rest collapse to com.mitchellh.ghostty),
+# silently breaking placement for the 2nd+ cockpit (research/engine). Worth the RAM.
+gtk-single-instance = false
+
+cursor-style = block
+cursor-style-blink = true
+cursor-click-to-move = true
+
+background = {{color_raw.bg}}
+foreground = {{color_raw.fg}}
+cursor-color = {{color_raw.primary}}
+selection-background = {{color_raw.selection}}
+selection-foreground = {{color_raw.fg}}
+bold-is-bright = false
+
+# Full 16-color ANSI palette from tokens [ansi] (0-7) + [ansi_bright] (8-15) —
+# so the entire system speaks one palette instead of ghostty's built-in defaults.
+palette = 0={{ansi.black}}
+palette = 1={{ansi.red}}
+palette = 2={{ansi.green}}
+palette = 3={{ansi.yellow}}
+palette = 4={{ansi.blue}}
+palette = 5={{ansi.magenta}}
+palette = 6={{ansi.cyan}}
+palette = 7={{ansi.white}}
+palette = 8={{ansi_bright.bright_black}}
+palette = 9={{ansi_bright.bright_red}}
+palette = 10={{ansi_bright.bright_green}}
+palette = 11={{ansi_bright.bright_yellow}}
+palette = 12={{ansi_bright.bright_blue}}
+palette = 13={{ansi_bright.bright_magenta}}
+palette = 14={{ansi_bright.bright_cyan}}
+palette = 15={{ansi_bright.bright_white}}
+
+# Translucency. Ghostty composites against the compositor backdrop; niri
+# renders that as the wallpaper or window below. niri 26.04 frosts this surface
+# via a window-rule `background-effect { blur true; xray true }` (see niri config)
+# — the real blur now lives compositor-side. `background-blur-radius` below is the
+# KWin-only protocol, kept for portability on other compositors.
+# `background-opacity-cells = false` (default) keeps the cell text opaque
+# even when the surface background is translucent — critical for legibility.
+background-opacity = {{opacity.ghostty_bg}}
+background-opacity-cells = false
+background-blur-radius = {{blur.backdrop_md}}
+unfocused-split-opacity = {{opacity.ghostty_inactive}}
+unfocused-split-fill = {{color_raw.bg_alt}}
+
+# Per-split divider runs in the tertiary accent — matches the focus-ring
+# gradient endpoint, so a split's active edge speaks the same language.
+split-divider-color = {{color_raw.tertiary}}
+
+# === Keybinds — minimal by design; zellij owns panes/tabs/sessions. ==========
+# (font-size, copy/paste, scrollback use ghostty's defaults.)
+keybind = ctrl+shift+r=reload_config
+keybind = ctrl+shift+n=new_window

@@ -1,0 +1,101 @@
+// GENERAL coding dev-cockpit (zj coding) — col1 of the 3-column coding desktop (the docs
+// Firefox + the `agent` side-column are separate niri windows). A complete full-stack dev
+// environment for ANY project idea, with GitHub + monitoring built in. Launched by the
+// `coding` scene (ghostty -e zj coding, cwd ~/Projects). zjstatus pill bar from tokens.toml.
+//
+// Tabs:
+//   code    — nvim (primary) │ run/REPL + test-watch shells (AI lives in the side column)
+//   run     — build/run/test (any stack) │ lazygit │ gh-dash         ← GitHub
+//   debug   — runtime/debugger console │ logs tail + scratch
+//   data    — dbshell (dev-postgres) │ sqlite3 (scratch)
+//   obs     — lazydocker (dev-stack containers) │ btop (host)         ← monitoring
+//   mac     — ssh into the LAN MacBook Air build/test/sign node
+//   scratch — two free shells for notes / quick commands
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {tabs}"
+                format_center ""
+                format_right  "{mode}#[bg={{color.bg}}]  #[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.coding}},bold] {{icon.clock}} {datetime} #[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.coding}},bold] {{powerline.dot}} {index} {name} #[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal       "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked       "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_pane         "#[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.coding}},bold] PANE #[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tab          "#[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.coding}},bold] TAB #[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_resize       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RESIZE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_move         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] MOVE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_scroll       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SCROLL #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_search       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_enter_search "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_tab   "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_pane  "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_session      "#[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.wisteria}},bold] SESSION #[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tmux         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] TMUX #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    // col1 of the coding desktop — editor-centric; persistent AI is the `agent` side-column.
+    tab name="code" focus=true {
+        pane split_direction="vertical" {
+            pane size="65%" command="nvim"
+            pane size="35%" split_direction="horizontal" {
+                pane                               // run / REPL
+                pane                               // test-watch
+            }
+        }
+    }
+    tab name="run" {
+        pane split_direction="vertical" {
+            pane                                   // build / run / test (any stack)
+            pane command="lazygit"
+            pane command="gh-dash"                 // GitHub
+        }
+    }
+    tab name="debug" {
+        pane split_direction="vertical" {
+            pane                                   // runtime / debugger console
+            pane split_direction="horizontal" {
+                pane                               // logs tail
+                pane                               // scratch
+            }
+        }
+    }
+    tab name="data" {
+        pane split_direction="vertical" {
+            pane command="dbshell"
+            pane command="sqlite3"
+        }
+    }
+    tab name="obs" {
+        pane split_direction="vertical" {
+            pane command="lazydocker"
+            pane command="btop"
+        }
+    }
+    tab name="mac" {
+        pane command="ssh" {
+            args "mac"
+        }
+    }
+    tab name="scratch" {
+        pane split_direction="vertical" {
+            pane
+            pane
+        }
+    }
+}

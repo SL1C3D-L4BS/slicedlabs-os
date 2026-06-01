@@ -1,0 +1,696 @@
+// [ENGINE] platform — Niri compositor config
+// Spec Part XVIII.6 · design tokens from system/tokens.toml
+
+input {
+    keyboard {
+        xkb {
+            layout "us"
+        }
+    }
+    touchpad {
+        tap
+        natural-scroll
+    }
+    mouse {}
+    focus-follows-mouse
+}
+
+output "DP-2" {
+    // DP link on this panel advertises 4K only at 30 Hz (the old HDMI-A-1 cord did
+    // 60). niri falls back to preferred if a configured mode is unavailable anyway.
+    mode "3840x2160@30.000"
+    scale 1.5
+    transform "normal"
+    position x=0 y=0
+}
+
+// ONN 24" — portrait, 90° clockwise. Logical size becomes 1080x1920.
+output "DP-3" {
+    mode "1920x1080@60.000"
+    scale 1.0
+    transform "90"
+    position x=2560 y=0
+}
+
+// Named workspaces — semantic identity per output. DP-2 holds the work cockpits
+// (coding/research/engine/browser/monitoring/streaming/gaming/media); the portrait
+// DP-3 holds `desk`, a blank general workspace.
+workspace "coding" {
+    open-on-output "DP-2"
+}
+workspace "research" {
+    open-on-output "DP-2"
+}
+workspace "engine" {
+    open-on-output "DP-2"
+}
+workspace "browser" {
+    open-on-output "DP-2"
+}
+workspace "monitoring" {
+    open-on-output "DP-2"
+}
+workspace "streaming" {
+    open-on-output "DP-2"
+}
+workspace "gaming" {
+    open-on-output "DP-2"
+}
+workspace "media" {
+    open-on-output "DP-2"
+}
+// desk — the blank general workspace on the portrait DP-3 (freed when monitoring
+// migrated to its own DP-2 cockpit). Nothing auto-stages here; throw any window
+// onto the tall second screen. Focus with Mod+9.
+workspace "desk" {
+    open-on-output "DP-3"
+}
+
+layout {
+    // Transparent so the wallpaper shows through gaps AND fills the overview
+    // backdrop (with the awww-daemon place-within-backdrop rule). Also lets
+    // background-effect xray blur the real wallpaper behind translucent windows.
+    background-color "transparent"
+    gaps {{geom.gap}}
+    // Reserve the top edge for the floating Cockpit pills (= bar_height + gap).
+    // SSOT for the reserve: the pills set exclusiveZone:0, so struts is the ONLY
+    // claimant (no double-count). niri's gaps then inset the first window, so
+    // tiled windows land one gap below the pills — never occluded.
+    struts {
+        top {{geom.bar_reserve}}
+    }
+    center-focused-column "on-overflow"
+    // AUTO-TILE (niri-autotile daemon, Track 9.3): a lone window opens FULL-WIDTH
+    // (default-column-width 1.0 below). When a 2nd window opens on the workspace the
+    // daemon transitions BOTH to half (50/50); every further window stays half and
+    // scrolls endlessly — 50% is the floor, never thirds. The daemon honours each
+    // workspace's `tiling` field in workspaces.toml (research=manual keeps 58/42).
+    // The presets below remain for manual Mod+R cycling.
+    preset-column-widths {
+        proportion 0.25       // 4-up — four columns across DP-2 (~630px @ 2560 logical)
+        proportion 0.33333    // 3-up
+        proportion 0.5        // half — the auto-tile floor (workspace holds 2+ windows)
+        proportion 0.66667    // 2/3 — focal pane
+    }
+    // Lone window opens FULL; niri-autotile demotes to 0.5 the moment a partner
+    // arrives (niri's 200ms window-resize curve animates the transition).
+    default-column-width {
+        proportion 1.0
+    }
+    // Colored ring OUTSIDE the focused window only. focus-ring is drawn around
+    // the window, never inset into it — so window transparency / frosted glass
+    // is completely untouched. This is the ONLY window-edge decoration.
+    focus-ring {
+        width {{geom.border_lg}}
+        // Active-window ring: solid vanilla white (Soft White) — calm, neutral focus.
+        active-color "{{color.fg}}"
+        inactive-color "{{color.inactive}}"
+    }
+    // Border stays OFF — a border insets/frames the window body; we want only
+    // the ring outside it.
+    border {
+        off
+    }
+
+    // Tab indicator runs along the LEFT edge of a tabbed column. Active tab keeps
+    // the primary→tertiary identity gradient (the focus-ring itself is now plain
+    // white, so the gradient lives on the tab indicator as the brand accent).
+    tab-indicator {
+        width {{geom.radius_sm}}
+        gap {{geom.gap}}
+        gaps-between-tabs 4
+        position "left"
+        place-within-column true
+        active-gradient from="{{color.primary}}" to="{{color.tertiary}}" angle=180
+        inactive-color "{{color.inactive}}"
+    }
+}
+
+// === Compositor blur (niri 26.04) ==========================================
+// Global dual-kawase blur parameters. Blur is only *applied* where a window-
+// or layer-rule opts in via `background-effect { blur true }`, and only shows
+// through semitransparent surfaces. Tuned LIGHT in system/tokens.toml [blur];
+// `blur { off }` is the global kill switch.
+blur {
+    passes {{blur.passes}}
+    offset {{blur.offset}}
+    noise {{blur.noise}}
+    saturation {{blur.saturation}}
+}
+
+// Overview (Mod+? show-hotkey-overlay; pinch-out gesture on touchpad).
+// The wallpaper itself fills the backdrop (awww-daemon layer-rule with
+// place-within-backdrop, below) so the overview steps back onto the real
+// wallpaper — not the flat grey panel it used to be. backdrop-color is only a
+// fallback tint behind it; workspace-shadow lifts each tile with the primary tint.
+overview {
+    backdrop-color "{{color.bg}}"
+    workspace-shadow {
+        on
+        softness {{shadow.softness_xl}}
+        spread {{shadow.spread_xl}}
+        offset x=0 y={{shadow.offset_y_xl}}
+        color "{{color_rgba.shadow_lifted}}"
+    }
+}
+
+// Two-wallpaper overview backdrop (world-class frosted transition):
+//   • awww-daemon → the CRISP desktop wallpaper (no rule; default background layer)
+//   • swaybg      → a pre-BLURRED copy, shown ONLY in the overview backdrop via
+//                   place-within-backdrop, spawned by `engine-backdrop`. swaybg's
+//                   layer-shell namespace is "wallpaper" (verified: niri msg layers),
+//                   anchored so it never matches awww-daemon's desktop surface.
+// So the desktop stays sharp, but entering the overview / switching workspaces
+// drops the crisp window tiles onto a soft blurred wallpaper — no grey panel.
+// Pairs with layout { background-color "transparent" } above.
+layer-rule {
+    match namespace="^wallpaper$"
+    place-within-backdrop true
+}
+
+cursor {
+    xcursor-theme "Bibata-Modern-Classic"
+    xcursor-size 24
+}
+
+prefer-no-csd
+
+screenshot-path "~/Pictures/Screenshots/screenshot-%Y%m%d-%H%M%S.png"
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+// Motion vocabulary — tuned to the [ENGINE] design tokens. Tweak via
+// system/tokens.toml [motion] + [spring] then `render-templates`.
+//
+// Two motion families:
+//   - `curve "ease-out-..."` — duration-based, deterministic. Used for
+//     things that should land at a known time (workspace transitions).
+//   - `spring damping-ratio stiffness epsilon` — physics-based, tactile.
+//     Overshoots/settles. Used for window-open + overview to feel
+//     "alive". Same parameters niri's own GNOME-inspired defaults use.
+animations {
+    window-open {
+        spring damping-ratio={{spring.window_open_damping}} \
+            stiffness={{spring.window_open_stiffness}} \
+            epsilon={{spring.window_open_epsilon}}
+    }
+    window-close {
+        duration-ms {{motion.quick_ms}}
+        curve "ease-out-cubic"
+    }
+    horizontal-view-movement {
+        duration-ms {{motion.slow_ms}}
+        curve "ease-out-expo"
+    }
+    workspace-switch {
+        duration-ms {{motion.slow_ms}}
+        curve "ease-out-expo"
+    }
+    window-movement {
+        duration-ms {{motion.normal_ms}}
+        curve "ease-out-expo"
+    }
+    window-resize {
+        duration-ms {{motion.normal_ms}}
+        curve "ease-out-expo"
+    }
+    config-notification-open-close {
+        duration-ms {{motion.quick_ms}}
+        curve "ease-out-cubic"
+    }
+    overview-open-close {
+        spring damping-ratio={{spring.overview_damping}} \
+            stiffness={{spring.overview_stiffness}} \
+            epsilon={{spring.overview_epsilon}}
+    }
+}
+
+// Touchpad gestures + hot-corners.
+// 3-finger swipe-up enters overview; pinch in/out also toggles.
+gestures {
+    dnd-edge-view-scroll {
+        trigger-width 30
+        max-speed 1200
+    }
+    hot-corners {
+        off
+    }
+}
+
+// Privacy: keep wofi out of screen captures (stream overlays etc.).
+layer-rule {
+    match namespace="wofi"
+    block-out-from "screencast"
+    background-effect {
+        blur true
+        xray true
+    }
+    shadow {
+        on
+        softness {{shadow.softness_lg}}
+        spread {{shadow.spread_lg}}
+        offset x=0 y={{shadow.offset_y_xl}}
+        color "{{color_rgba.shadow_primary}}"
+    }
+}
+
+// Mako (notifications) — soft accented shadow so toasts feel attached.
+layer-rule {
+    match namespace="notifications"
+    background-effect {
+        blur true
+        xray true
+    }
+    shadow {
+        on
+        softness {{shadow.softness_md}}
+        spread {{shadow.spread_md}}
+        offset x=0 y={{shadow.offset_y}}
+        color "{{color_rgba.shadow_primary}}"
+    }
+}
+
+// wlogout — power menu. Block from screencast (privacy), drop a heavy
+// shadow so the buttons read as raised tiles over the dimmed backdrop.
+layer-rule {
+    match namespace="wlogout"
+    block-out-from "screencast"
+    background-effect {
+        blur true
+        xray true
+    }
+    shadow {
+        on
+        softness {{shadow.softness_xl}}
+        spread {{shadow.spread_xl}}
+        offset x=0 y={{shadow.offset_y_xl}}
+        color "{{color_rgba.shadow_lifted}}"
+    }
+}
+
+// === Cockpit (Quickshell HUD) =============================================
+// The three floating pills (namespace "cockpit") read as frosted glass over the
+// transparent bar — real Niri backdrop blur + rounded corners + a brand-tinted
+// shadow. The gaps between pills are genuinely empty (separate layer surfaces),
+// so the desktop shows crisp between them.
+layer-rule {
+    match namespace="^cockpit$"
+    geometry-corner-radius {{geom.radius_lg}}
+    background-effect {
+        blur true
+        xray true
+    }
+    shadow {
+        off
+    }
+}
+
+// Cockpit inspector modals (namespace "cockpit-modal") — full-screen overlay:
+// blur the desktop behind the dim scrim, and block from screencast (privacy).
+layer-rule {
+    match namespace="cockpit-modal"
+    block-out-from "screencast"
+    background-effect {
+        blur true
+        xray true
+    }
+}
+
+// === Window appearance baseline ============================================
+// Every window: rounded corners + clipped content + a soft drop shadow. Inactive
+// windows dim to reinforce focus. niri 26.04 also frosts the background of every
+// *semitransparent* window via background-effect (blur+xray): translucent
+// surfaces (ghostty, the slicedlabs TUI) become frosted glass over the wallpaper,
+// while opaque apps (firefox/obs/mpv/zoom at opacity 1.0 below) stay sharp and
+// cheap. xray = blur the wallpaper directly, ignoring windows below (one pass).
+window-rule {
+    geometry-corner-radius {{geom.radius_lg}}
+    clip-to-geometry true
+
+    background-effect {
+        blur true
+        xray true
+    }
+
+    shadow {
+        on
+        softness {{shadow.softness_md}}
+        spread {{shadow.spread_md}}
+        offset x=0 y={{shadow.offset_y}}
+        color "{{color_rgba.shadow_dim}}"
+    }
+
+    opacity {{opacity.window_focused}}
+
+    // Draw the focus-ring as a pure OUTLINE — do NOT fill a transparent window's
+    // background with the ring colour. Without this, niri paints the ring colour
+    // BEHIND CSD/semitransparent windows (ghostty, the TUI), which reads as a
+    // solid tint and kills the frosted glass. This is the line that keeps the
+    // ring outside the window and the window see-through.
+    draw-border-with-background false
+}
+
+// Windows stay uniform frosted glass (same opacity/blur/shadow, active==inactive).
+// The ONLY focus signal is the colored focus-RING outside the window (layout{}),
+// which never tints the window body — see draw-border-with-background false above.
+
+// Per-app overrides: media + fullscreen apps stay opaque. Multiple `match`
+// nodes in one rule are OR'd, so this hits any of the listed app-ids.
+window-rule {
+    match app-id="firefox"
+    match app-id="mpv"
+    match app-id="zoom"
+    match app-id="obs"
+    match app-id="com.slicedlabs.netflix"
+    match app-id="com.slicedlabs.youtube"
+    match app-id="com.slicedlabs.cinema"
+    opacity 1.0
+}
+
+// Zoom — meeting and webinar windows open floating (call windows are
+// inherently modal-ish, tiling them disrupts attention). Niri lacks a
+// `center` relative-to; offset from top-left lands the call window in the
+// middle of an DP-2 effective 2560×1440 workspace.
+window-rule {
+    match app-id="zoom" title="(Meeting|Webinar|Zoom Workplace)"
+    open-floating true
+    default-floating-position x=560 y=240 relative-to="top-left"
+}
+
+// OBS: no shadow (cleaner in screen captures and overlay scenes).
+window-rule {
+    match app-id="obs"
+    shadow {
+        off
+    }
+}
+
+// Floating windows feel "lifted": deeper offset, larger softness, primary-
+// tinted at higher intensity so they read as physically above the tiling
+// surface. Slightly more opaque than baseline focused windows so they
+// don't look ghostlike on the lift.
+window-rule {
+    match is-floating=true
+    geometry-corner-radius {{geom.radius_lg}}
+    opacity {{opacity.window_floating}}
+    shadow {
+        on
+        softness {{shadow.softness_xl}}
+        spread {{shadow.spread_xl}}
+        offset x=0 y={{shadow.offset_y_xl}}
+        color "{{color_rgba.shadow_lifted}}"
+    }
+}
+
+// Auto-float utility windows — calculator, pavucontrol, file pickers,
+// transient dialogs. Tiling these is more annoying than helpful since
+// they're short-lived modal-ish surfaces.
+window-rule {
+    match app-id="org.pulseaudio.pavucontrol"
+    match app-id="org.gnome.Calculator"
+    match app-id="qalculate-gtk"
+    match app-id="gnome-disk-utility"
+    match app-id="blueman-manager"
+    match app-id="nm-connection-editor"
+    open-floating true
+    default-floating-position x=200 y=200 relative-to="top-right"
+}
+
+// Firefox Picture-in-Picture — title comes through as "Picture-in-Picture".
+// Float it, pin it top-right, give it the tertiary-tinted shadow so it
+// reads as a stream/creator surface rather than a primary work surface.
+window-rule {
+    match title="Picture-in-Picture"
+    open-floating true
+    default-floating-position x=24 y=24 relative-to="top-right"
+    default-column-width { fixed 480; }
+    shadow {
+        on
+        softness {{shadow.softness_xl}}
+        spread {{shadow.spread_xl}}
+        offset x=0 y={{shadow.offset_y_xl}}
+        color "{{color_rgba.shadow_tertiary}}"
+    }
+}
+
+// Ghostty splits — when more than one ghostty surface lives in a column,
+// the unfocused one fades a bit further than the global unfocused rule so
+// the active terminal pops. Matches `com.slicedlabs.*` reverse-DNS class.
+window-rule {
+    match app-id="com.slicedlabs.mac-node"
+    match app-id="com.mitchellh.ghostty"
+    geometry-corner-radius {{geom.radius_lg}}
+}
+
+// SlicedLabs mission-control TUI (Mod+Alt+S). A summoned cockpit: floating,
+// near-centered on DP-2, frosted glass (inherits blur+xray), lifted
+// primary-tinted shadow so it reads as raised above the work surface.
+window-rule {
+    match app-id="com.slicedlabs.tui"
+    open-floating true
+    default-column-width { proportion 0.7; }
+    default-floating-position x=384 y=180 relative-to="top-left"
+    geometry-corner-radius {{geom.radius_lg}}
+    background-effect {
+        blur true
+        xray true
+    }
+    shadow {
+        on
+        softness {{shadow.softness_xl}}
+        spread {{shadow.spread_xl}}
+        offset x=0 y={{shadow.offset_y_xl}}
+        color "{{color_rgba.shadow_lifted}}"
+    }
+}
+
+// Session startup. The Cockpit bar is the systemd user unit quickshell.service
+// (graphical-session.target), so it is NOT spawned here. Below: wallpaper +
+// backdrop, notifications, idle/lock, the mic chain, and the workspace-scene
+// launcher (first-focus staging of apps + services). Monitoring is NO LONGER
+// auto-spawned here — it's an on-demand DP-2 cockpit (Mod+5 / `cockpit monitoring`).
+spawn-at-startup "engine-wallpaper" "/home/doodlebob/Pictures/rubricmelts.jpg"
+spawn-at-startup "engine-backdrop" "/home/doodlebob/Pictures/rubricmelts.jpg"
+spawn-at-startup "mako"
+spawn-at-startup "mako-workspace-mode"
+spawn-at-startup "swayidle" "-w"
+spawn-at-startup "sh" "-c" "easyeffects --service-mode & sleep 2 && easyeffects -l WaveXLR-Pro"
+// Coding + browser + research workspaces eager-stage their canonical surfaces at
+// login (staggered) and re-stage on first focus; the watcher exits once all are up.
+spawn-at-startup "niri-workspace-launcher"
+// Dynamic auto-tile: lone window full → 2+ windows half (50/50), endless scroll.
+// Event-driven (idle until a window opens/closes); honours per-workspace `tiling`.
+spawn-at-startup "niri-autotile"
+// Self-heal net: once the eager-staged auto scenes SETTLE (their windows are mapped)
+// or a 25s cap elapses, idempotently realize any auto stack whose window failed to
+// materialize (slow cold boot, a lost Firefox race). Adaptive — was a blind `sleep 30`;
+// now fires as soon as staging settles (~15s sooner on a warm boot). `cockpit` skips
+// every surface already present, so this only ever FILLS GAPS. See bin/cockpit-selfheal.
+spawn-at-startup "cockpit-selfheal"
+
+// Observability cockpit — the NATIVE `slicedlabs monitor` TUI (com.slicedlabs.monitoring,
+// 65%) + a side column (com.slicedlabs.monitor-side: lazydocker · btop · logs, 35%), both
+// routed to `monitoring` on DP-2; tiling=manual keeps the 65/35. dev-stack-obs boots on
+// demand with this scene (no longer at login). (Replaced the DP-3 webstack; DP-3 is `desk`.)
+window-rule {
+    match app-id="^com.slicedlabs.monitoring$"
+    open-on-workspace "monitoring"
+    default-column-width { proportion 0.65; }
+}
+window-rule {
+    match app-id="com.slicedlabs.monitor-side"
+    open-on-workspace "monitoring"
+    default-column-width { proportion 0.35; }
+}
+
+// === Canonical app → workspace routing + sizing (declarative; no focus-steal) ==
+// Launch any of these from anywhere and they land on their home workspace AT their
+// column width — "open Firefox from engine" shoots it to `browser`, half-width.
+// This is the placement AUTHORITY; lib/scene.sh only spawns + runs an idempotent
+// move-backstop. It no longer focuses windows to size them (which used to yank the
+// view across workspaces during login). Widths mirror the `width` fields in
+// workspaces.toml. app_ids MUST be real (verify: `niri msg windows`) — a wrong one
+// silently breaks routing (the zen `app.zen_browser.zen`→`zen` bug, fixed 2026-05-30).
+// (monitoring's native cockpit app-id is com.slicedlabs.monitoring — routed above.)
+window-rule {
+    match app-id="zen"
+    match app-id="app.zen_browser.zen"
+    match app-id="firefox"
+    open-on-workspace "browser"
+    default-column-width { proportion 0.5; }
+}
+window-rule {
+    match app-id="com.slicedlabs.research"
+    open-on-workspace "research"
+    default-column-width { proportion 0.58; }
+}
+window-rule {
+    match app-id="research-web"
+    open-on-workspace "research"
+    default-column-width { proportion 0.42; }
+}
+// Obsidian rides the research workspace as a third (scrollable) column — the deep-work
+// vault alongside the cockpit + research-web pair. research is tiling=manual, so the
+// autotiler leaves these widths alone. Reach it with Mod+L / the overview.
+window-rule {
+    match app-id="obsidian"
+    open-on-workspace "research"
+    default-column-width { proportion 0.5; }
+}
+// coding desktop: cockpit (60%) + reference-docs Firefox (coding-web, 22%) + agent/notes
+// (coding-side, 18%). The cockpit id is ANCHORED (^…$) so it never also matches the
+// coding-side window (whose id contains "com.slicedlabs.coding"). tiling=manual → 60/22/18.
+window-rule {
+    match app-id="^com.slicedlabs.coding$"
+    open-on-workspace "coding"
+    default-column-width { proportion 0.6; }
+}
+window-rule {
+    match app-id="coding-web"
+    open-on-workspace "coding"
+    default-column-width { proportion 0.22; }
+}
+window-rule {
+    match app-id="com.slicedlabs.coding-side"
+    open-on-workspace "coding"
+    default-column-width { proportion 0.18; }
+}
+// engine desktop mirrors coding: cockpit engine-dev (60%) + docs engine-web (22%) + agent
+// engine-side (18%). Replaces the old broad "com.slicedlabs.engine-" match with explicit ids.
+window-rule {
+    match app-id="^com.slicedlabs.engine-dev$"
+    open-on-workspace "engine"
+    default-column-width { proportion 0.6; }
+}
+window-rule {
+    match app-id="engine-web"
+    open-on-workspace "engine"
+    default-column-width { proportion 0.22; }
+}
+window-rule {
+    match app-id="com.slicedlabs.engine-side"
+    open-on-workspace "engine"
+    default-column-width { proportion 0.18; }
+}
+// media desktop: Spotify (tunes, 60%) beside a cava visualizer (40%); tiling=manual keeps
+// the 60/40. Netflix/YouTube/cinema stay full-width (opaque video, separate app-ids).
+window-rule {
+    match app-id="com.slicedlabs.tunes"
+    open-on-workspace "media"
+    default-column-width { proportion 0.6; }
+}
+window-rule {
+    match app-id="com.slicedlabs.cava"
+    open-on-workspace "media"
+    default-column-width { proportion 0.4; }
+}
+window-rule {
+    match app-id="com.slicedlabs.netflix"
+    match app-id="com.slicedlabs.youtube"
+    match app-id="com.slicedlabs.cinema"
+    open-on-workspace "media"
+    default-column-width { proportion 1.0; }
+}
+window-rule {
+    match app-id="obs"
+    open-on-workspace "streaming"
+}
+window-rule {
+    match app-id="steam"
+    open-on-workspace "gaming"
+}
+
+binds {
+    // >>> generated: keys (render-keys) — do not edit by hand
+    Mod+Return { spawn "ghostty"; }
+    Mod+Space { spawn "wofi" "--show" "drun"; }
+    Mod+Alt+Space { spawn "sh" "-c" "$HOME/.local/bin/sliced-menu"; }
+    Mod+Alt+S { spawn "ghostty" "--class=com.slicedlabs.tui" "-e" "slicedlabs"; }
+    Mod+Alt+E { spawn "sh" "-c" "ghostty --working-directory=$HOME/Projects/engine"; }
+    Mod+Alt+P { spawn "ghostty" "--class=com.slicedlabs.music" "-e" "music"; }
+    Mod+H { focus-column-left; }
+    Mod+L { focus-column-right; }
+    Mod+J { focus-window-down; }
+    Mod+K { focus-window-up; }
+    Mod+Tab { focus-window-down-or-column-right; }
+    Mod+Shift+Tab { focus-window-up-or-column-left; }
+    Mod+Shift+H { move-column-left; }
+    Mod+Shift+L { move-column-right; }
+    Mod+Shift+J { move-window-down; }
+    Mod+Shift+K { move-window-up; }
+    Mod+Q { close-window; }
+    Mod+F { fullscreen-window; }
+    Mod+Shift+F { maximize-column; }
+    Mod+W { toggle-window-floating; }
+    Mod+R { switch-preset-column-width; }
+    Mod+Comma { consume-window-into-column; }
+    Mod+Period { expel-window-from-column; }
+    Mod+1 { focus-workspace "coding"; }
+    Mod+2 { focus-workspace "research"; }
+    Mod+3 { focus-workspace "engine"; }
+    Mod+4 { focus-workspace "browser"; }
+    Mod+5 { focus-workspace "monitoring"; }
+    Mod+6 { focus-workspace "streaming"; }
+    Mod+7 { focus-workspace "gaming"; }
+    Mod+8 { focus-workspace "media"; }
+    Mod+9 { focus-workspace "desk"; }
+    Mod+E { focus-workspace "engine"; }
+    Mod+C { focus-workspace "research"; }
+    Mod+M { focus-workspace "monitoring"; }
+    Mod+D { focus-workspace "coding"; }
+    Mod+B { focus-workspace "browser"; }
+    Mod+V { focus-workspace "media"; }
+    Mod+G { spawn "sh" "-c" "$HOME/.local/bin/workspace-gaming-action"; }
+    Mod+Shift+1 { move-column-to-workspace "coding"; }
+    Mod+Shift+2 { move-column-to-workspace "research"; }
+    Mod+Shift+3 { move-column-to-workspace "engine"; }
+    Mod+Shift+4 { move-column-to-workspace "browser"; }
+    Mod+Shift+5 { move-column-to-workspace "monitoring"; }
+    Mod+Shift+6 { move-column-to-workspace "streaming"; }
+    Mod+Shift+7 { move-column-to-workspace "gaming"; }
+    Mod+Shift+8 { move-column-to-workspace "media"; }
+    Mod+Shift+9 { move-column-to-workspace "desk"; }
+    Mod+Shift+E { move-column-to-workspace "engine"; }
+    Mod+Shift+C { move-column-to-workspace "research"; }
+    Mod+Shift+M { move-column-to-workspace "monitoring"; }
+    Mod+Shift+D { move-column-to-workspace "coding"; }
+    Mod+Shift+B { move-column-to-workspace "browser"; }
+    Mod+Ctrl+E { spawn "sh" "-c" "niri msg action focus-workspace engine;     cockpit engine"; }
+    Mod+Ctrl+D { spawn "sh" "-c" "niri msg action focus-workspace coding;     cockpit coding"; }
+    Mod+Ctrl+C { spawn "sh" "-c" "niri msg action focus-workspace research;   cockpit research"; }
+    Mod+Ctrl+B { spawn "sh" "-c" "niri msg action focus-workspace browser;    cockpit browser"; }
+    Mod+Shift+V { move-column-to-workspace "media"; }
+    Mod+Ctrl+V { spawn "sh" "-c" "niri msg action focus-workspace media;      cockpit media"; }
+    Mod+Ctrl+M { spawn "sh" "-c" "niri msg action focus-workspace monitoring; cockpit monitoring"; }
+    Mod+Ctrl+S { spawn "sh" "-c" "niri msg action focus-workspace streaming;  cockpit streaming"; }
+    Mod+Ctrl+Shift+G { spawn "sh" "-c" "niri msg action focus-workspace gaming;     cockpit gaming"; }
+    Mod+Slash { spawn "sh" "-c" "qs -c cockpit ipc call cockpit menu"; }
+    Mod+Alt+K { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal keys"; }
+    Mod+Alt+C { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl control"; }
+    Mod+Alt+I { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal context"; }
+    Mod+Alt+M { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal media"; }
+    Mod+Alt+N { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal net"; }
+    Mod+Alt+A { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal ai"; }
+    Mod+Alt+T { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal agenda"; }
+    Mod+Alt+Y { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal system"; }
+    Mod+Alt+L { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl theme toggle"; }
+    Mod+Shift+W { spawn "engine-wallpaper" "--random"; }
+    Print { screenshot; }
+    Shift+Print { screenshot-screen; }
+    Mod+Shift+S { screenshot; }
+    Mod+Escape { spawn "swaylock" "-f"; }
+    Mod+Shift+Escape { spawn "wlogout" "-p" "layer-shell"; }
+    Mod+BackSpace { spawn "makoctl" "dismiss" "--all"; }
+    Mod+Shift+Q { quit; }
+    Mod+Shift+Slash { show-hotkey-overlay; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%+"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
+    XF86AudioMute allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+    XF86AudioMicMute allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
+    Mod+Shift+G { spawn "sh" "-c" "$HOME/.config/gaming/menu.sh"; }
+    Mod+Ctrl+G { spawn "sh" "-c" "$HOME/.config/gaming/gamemode-toggle.sh"; }
+    Mod+F12 { spawn "ydotool" "key" "88"; }
+    // <<< generated: keys
+}

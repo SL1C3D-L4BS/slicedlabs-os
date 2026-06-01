@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# slicedlabs-os — the SlicedLabs OS front door: doctor (health) + install (bootstrap).
+#
+#   slicedlabs-os doctor          # every verify-* gate + service health (the green check)
+#   slicedlabs-os install [args]  # drive the idempotent bootstrap.sh layers (args passthrough)
+#   slicedlabs-os layers          # list the bootstrap layers
+set -euo pipefail
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+
+case "${1:-doctor}" in
+    doctor)
+        verify-all || true   # verify-all already prints pass/fail per gate
+        echo
+        echo "── services ──"
+        for u in quickshell.service warden.service slicedlabs-observability.target; do
+            printf '  %-34s %s\n' "$u" "$(systemctl --user is-active "$u" 2>/dev/null || echo unknown)"
+        done
+        ;;
+    install)
+        shift
+        exec bash "$ROOT/bootstrap.sh" "$@"
+        ;;
+    layers)
+        exec bash "$ROOT/bootstrap.sh" --list
+        ;;
+    clean)
+        shift
+        exec "$ROOT/bin/.local/bin/slicedlabs-clean" "$@"
+        ;;
+    *)
+        echo "usage: slicedlabs-os {doctor|install [bootstrap args]|layers|clean [--apply|--heavy]}" >&2
+        exit 2
+        ;;
+esac

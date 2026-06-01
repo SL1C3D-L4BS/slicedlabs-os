@@ -1,0 +1,10 @@
+[Unit]
+Description=[ENGINE] dirty-state check; nags after 24h of uncommitted WIP
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/engine-snapshot
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# discord-mcp-publish — one-shot helper to push ~/discord-mcp/ to a private
+# SL1C3D-L4BS/discord-mcp repo. Run *after* you've authenticated `gh`:
+#   gh auth login   (web flow, GitHub.com, HTTPS)
+#
+# Creates the repo if it doesn't exist (private, no description spam) then
+# wires the local main → origin/main and pushes. Idempotent — safe to rerun.
+set -euo pipefail
+
+REPO_DIR="${HOME}/discord-mcp"
+GH_SLUG="SL1C3D-L4BS/discord-mcp"
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "discord-mcp-publish: gh not installed (pacman -S github-cli)" >&2
+    exit 1
+fi
+if ! gh auth status >/dev/null 2>&1; then
+    echo "discord-mcp-publish: not authenticated — run \`gh auth login\` first" >&2
+    exit 2
+fi
+
+cd "${REPO_DIR}"
+
+# Create the repo on GitHub if absent (private, no clone).
+if ! gh repo view "${GH_SLUG}" >/dev/null 2>&1; then
+    echo "  creating ${GH_SLUG} (private, source remote only)"
+    gh repo create "${GH_SLUG}" --private --source=. --remote=origin --push
+    exit 0
+fi
+
+# Repo exists — make sure origin points there and push.
+if git remote get-url origin >/dev/null 2>&1; then
+    git remote set-url origin "git@github.com:${GH_SLUG}.git"
+else
+    git remote add origin "git@github.com:${GH_SLUG}.git"
+fi
+
+git push --set-upstream origin main
+echo "discord-mcp-publish: pushed to ${GH_SLUG}"

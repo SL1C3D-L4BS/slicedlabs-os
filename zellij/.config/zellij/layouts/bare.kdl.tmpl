@@ -1,0 +1,46 @@
+// [ENGINE] platform — BARE zellij layout: a single shell + the zjstatus pill bar,
+// NO Claude pane. The opt-out for the default (Claude-attached) layout — `zj bare`,
+// or set SL_NO_CLAUDE=1 so every new terminal uses this instead. Bar is identical to
+// the default layout (generated from system/tokens.toml).
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {tabs}"
+                format_center ""
+                format_right  "{mode}#[bg={{color.bg}}]  #[fg={{color.secondary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.secondary}},bold] {{icon.clock}} {datetime} #[fg={{color.secondary}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.primary}},bold] {{powerline.dot}} {index} {name} #[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal       "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked       "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_pane         "#[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.primary}},bold] PANE #[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tab          "#[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.primary}},bold] TAB #[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_resize       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RESIZE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_move         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] MOVE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_scroll       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SCROLL #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_search       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_enter_search "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_tab   "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_pane  "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_session      "#[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.wisteria}},bold] SESSION #[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tmux         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] TMUX #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="shell" focus=true {
+        pane
+    }
+}

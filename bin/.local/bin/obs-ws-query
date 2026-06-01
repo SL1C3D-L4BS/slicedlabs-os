@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""obs-ws-query — one-shot OBS WebSocket v5 request.
+
+Usage:
+    obs-ws-query <RequestType> [json_request_data]
+
+Reads ~/.config/obs-studio/plugin_config/obs-websocket/config.json for port
+and password. Performs the v5 Hello→Identify auth dance, sends one Request,
+prints `responseData` as JSON on stdout.
+
+Exit codes:
+    0  success
+    2  OBS not running, websocket disabled, or connect failed
+    3  protocol/auth error
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+CONFIG = Path.home() / ".config/obs-studio/plugin_config/obs-websocket/config.json"
+
+
+def auth_string(password: str, salt: str, challenge: str) -> str:
+    secret = base64.b64encode(
+        hashlib.sha256((password + salt).encode()).digest()
+    ).decode()
+    return base64.b64encode(
+        hashlib.sha256((secret + challenge).encode()).digest()
+    ).decode()
+
+
+async def query(request_type: str, request_data: dict) -> dict:
+    import websockets
+
+    try:
+        cfg = json.loads(CONFIG.read_text())
+    except FileNotFoundError:
+        print("obs-ws-query: websocket config missing", file=sys.stderr)
+        sys.exit(2)
+
+    if not cfg.get("server_enabled"):
+        print("obs-ws-query: server_enabled=false", file=sys.stderr)
+        sys.exit(2)
+
+    port = cfg.get("server_port", 4455)
+    password = cfg.get("server_password", "")
+    url = f"ws://127.0.0.1:{port}"
+
+    try:
+        async with websockets.connect(url, open_timeout=1, close_timeout=1) as ws:
+            hello = json.loads(await asyncio.wait_for(ws.recv(), timeout=1))
+            if hello.get("op") != 0:
+                print("obs-ws-query: expected Hello", file=sys.stderr)
+                sys.exit(3)
+
+            identify = {"op": 1, "d": {"rpcVersion": 1, "eventSubscriptions": 0}}
+            auth = hello.get("d", {}).get("authentication")
+            if auth:
+                identify["d"]["authentication"] = auth_string(
+                    password, auth["salt"], auth["challenge"]
+                )
+            await ws.send(json.dumps(identify))
+            identified = json.loads(await asyncio.wait_for(ws.recv(), timeout=1))
+            if identified.get("op") != 2:
+                print(f"obs-ws-query: identify failed: {identified}", file=sys.stderr)
+                sys.exit(3)
+
+            req = {
+                "op": 6,
+                "d": {
+                    "requestType": request_type,
+                    "requestId": "wb1",
+                    "requestData": request_data,
+                },
+            }
+            await ws.send(json.dumps(req))
+            resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=1))
+
+            if resp.get("op") != 7:
+                print(f"obs-ws-query: unexpected: {resp}", file=sys.stderr)
+                sys.exit(3)
+
+            d = resp["d"]
+            if not d.get("requestStatus", {}).get("result"):
+                print(f"obs-ws-query: request failed: {d}", file=sys.stderr)
+                sys.exit(3)
+            return d.get("responseData", {})
+
+    except (OSError, asyncio.TimeoutError, ConnectionRefusedError):
+        print("obs-ws-query: connect failed", file=sys.stderr)
+        sys.exit(2)
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print(f"usage: {sys.argv[0]} <RequestType> [json_args]", file=sys.stderr)
+        sys.exit(1)
+    request_type = sys.argv[1]
+    request_data = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
+    resp = asyncio.run(query(request_type, request_data))
+    print(json.dumps(resp))
+
+
+if __name__ == "__main__":
+    main()

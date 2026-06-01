@@ -1,0 +1,29 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "sensitive-files"
+spec:
+  kprobes:
+    # Flag any access to the credential/privilege files — the canonical
+    # "someone is poking at the keys to the kingdom" signal for a solo box.
+    - call: "security_file_permission"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "file"
+        - index: 1
+          type: "int"
+      returnArg:
+        index: 0
+        type: "int"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Prefix"
+              values:
+                - "/etc/shadow"
+                - "/etc/sudoers"
+                - "/etc/ssh/sshd_config"
+          matchActions:
+            - action: Post

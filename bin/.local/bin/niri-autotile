@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""niri-autotile — dynamic "full → halves, endless" tiling for niri.
+
+The behaviour (Track 9.3, user-specified):
+    • a LONE window on a workspace is FULL-WIDTH (100%);
+    • the moment a 2nd window opens, BOTH transition to half (50/50);
+    • every further window stays at half and scrolls endlessly — 50% is the
+      FLOOR, never thirds/quarters.
+
+niri is scrollable-tiling with fixed-width columns and has no native "1 full → 2
+tile" rebalance, so this tiny event daemon supplies it. It is the sibling of
+`niri-workspace-launcher`: it listens to `niri msg --json event-stream` and is
+idle (0 CPU) until a window opens/closes or the focused workspace changes.
+
+Per-workspace policy lives in workspaces.toml as `[workspaces.<name>].tiling`
+("auto" | "manual"); `manual` workspaces (e.g. research's declared 58/42) are left
+untouched. Only the GLOBALLY-focused workspace is rebalanced (set-column-width acts
+on the focused column); other workspaces are reconciled when you focus them.
+
+Loop-safe: only a genuine window OPEN (new id), CLOSE, workspace MOVE, or a change
+of focused workspace triggers a rebalance. The daemon's own focus sweeps emit only
+focus/geometry changes (no new id, no ws change) and are ignored — it cannot feed
+itself. Bursts are debounced (~120ms) so a multi-event open animates once.
+"""
+from __future__ import annotations
+
+import json
+import os
+import select
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+SCENE_REG = Path(os.environ.get("SCENE_REG") or (Path.home() / ".config/sliced-engine/workspaces.toml"))
+DEBOUNCE_S = 0.12
+
+
+def load_tiling_policy() -> dict[str, str]:
+    """workspace name → 'auto' | 'manual' (default 'auto')."""
+    try:
+        with SCENE_REG.open("rb") as f:
+            d = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    out: dict[str, str] = {}
+    for name, w in d.get("workspaces", {}).items():
+        out[name] = str(w.get("tiling", "auto")).lower()
+    return out
+
+
+def niri_json(kind: str) -> list | dict:
+    try:
+        out = subprocess.run(
+            ["niri", "msg", "--json", kind], capture_output=True, text=True, check=True
+        ).stdout
+        return json.loads(out)
+    except (subprocess.CalledProcessError, json.JSONDecodeError, FileNotFoundError):
+        return []
+
+
+def act(*args: str) -> None:
+    subprocess.run(["niri", "msg", "action", *args],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+class AutoTiler:
+    def __init__(self) -> None:
+        self.policy = load_tiling_policy()
+        self.win_ws: dict[int, int] = {}      # window id → workspace id
+        self.focused_ws: int | None = None     # globally-focused workspace id
+
+    def reconcile(self) -> None:
+        """Bring the globally-focused workspace to the full↔halves invariant."""
+        workspaces = niri_json("workspaces")
+        ws = next((w for w in workspaces if w.get("is_focused")), None)
+        if not ws:
+            return
+        # named workspaces carry a policy; unnamed default to auto. manual → leave it.
+        if self.policy.get(ws.get("name") or "", "auto") == "manual":
+            return
+
+        windows = niri_json("windows")
+        tiled = [w for w in windows if w.get("workspace_id") == ws["id"] and not w.get("is_floating")]
+        n = len(tiled)
+        if n == 0:
+            return
+
+        if n == 1:
+            # lone window → full width (it is the focused column on the focused ws)
+            act("set-column-width", "100%")
+            return
+
+        # n >= 2 → every column to 50%, then restore exact focus. Walk from the
+        # first column rightwards; over-iteration is a harmless no-op at the edge.
+        focused = next((w for w in windows if w.get("is_focused")), None)
+        act("focus-column-first")
+        for _ in range(n):
+            act("set-column-width", "50%")
+            act("focus-column-right")
+        if focused:
+            act("focus-window", "--id", str(focused["id"]))
+
+    # ---- event handling -------------------------------------------------------
+    def handle(self, ev: dict) -> bool:
+        """Update state from one event; return True if a rebalance is warranted."""
+        (typ, data), = ev.items()
+
+        if typ == "WindowOpenedOrChanged":
+            w = data["window"]
+            wid, ws = w["id"], w.get("workspace_id")
+            opened = wid not in self.win_ws
+            moved = (not opened) and self.win_ws.get(wid) != ws
+            self.win_ws[wid] = ws
+            return opened or moved
+
+        if typ == "WindowClosed":
+            self.win_ws.pop(data["id"], None)
+            return True
+
+        if typ == "WindowsChanged":          # full snapshot (startup / bulk)
+            self.win_ws = {w["id"]: w.get("workspace_id") for w in data["windows"]}
+            return True
+
+        if typ == "WorkspaceActivated":
+            return True
+
+        if typ == "WorkspacesChanged":       # rebalance only on focused-ws change
+            newf = next((x["id"] for x in data["workspaces"] if x.get("is_focused")), None)
+            if newf != self.focused_ws:
+                self.focused_ws = newf
+                return True
+            return False
+
+        return False
+
+    def run(self) -> int:
+        try:
+            proc = subprocess.Popen(
+                ["niri", "msg", "--json", "event-stream"],
+                stdout=subprocess.PIPE, text=True, bufsize=1,
+            )
+        except FileNotFoundError:
+            print("niri-autotile: niri not found", file=sys.stderr)
+            return 1
+        assert proc.stdout is not None
+
+        dirty = False
+        while True:
+            timeout = DEBOUNCE_S if dirty else None
+            rlist, _, _ = select.select([proc.stdout], [], [], timeout)
+            if rlist:
+                line = proc.stdout.readline()
+                if not line:
+                    break                     # stream closed → niri gone
+                try:
+                    ev = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if self.handle(ev):
+                    dirty = True
+            elif dirty:                       # quiet for DEBOUNCE_S with work pending
+                self.reconcile()
+                dirty = False
+        return 0
+
+
+def main() -> int:
+    # single-instance guard (niri config-reload could re-spawn; a stray double is benign
+    # but wasteful) — an flock on a runtime file, released on exit.
+    import fcntl
+    run_dir = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
+    lock = (run_dir / "niri-autotile.lock").open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0                              # another instance owns it
+    return AutoTiler().run()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

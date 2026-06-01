@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# verify-boot-contract — the login boot contract holds (Track 9.4): the working
+# stacks (coding · browser · research) EAGER-STAGE at login; everything else (incl.
+# monitoring) is on-demand via `cockpit <ws>`; the scene launcher + autotiler are
+# spawned by niri; and every auto workspace declares its scene + services.
+# Folded into verify-all. SSOT: workspaces.toml + niri config.
+set -uo pipefail
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+REG="$ROOT/sliced-engine/.config/sliced-engine/workspaces.toml"
+NIRI="$ROOT/niri/.config/niri/config.kdl"
+[ -f "$NIRI" ] || NIRI="$ROOT/niri/.config/niri/config.kdl.tmpl"
+fail=0
+ok() { echo "  ✓ $1"; }
+no() { echo "  ✗ $1" >&2; fail=1; }
+
+py() { python3 -c "$1" 2>/dev/null; }
+
+# 1) [meta].auto eager-stages coding, browser, research
+auto=$(py "import tomllib;print(' '.join(tomllib.load(open('$REG','rb'))['meta']['auto']))")
+for ws in coding browser research; do
+    echo " $auto " | grep -q " $ws " && ok "eager-stages '$ws' at login" \
+        || no "'$ws' missing from [meta].auto ($auto)"
+done
+
+# 2) niri spawns the scene launcher + autotiler at startup. monitoring is NOT eager —
+#    the webstack/monitoring-stack era ended 2026-05-31; it's an on-demand DP-2 cockpit.
+for s in niri-workspace-launcher niri-autotile; do
+    grep -q "spawn-at-startup \"$s\"" "$NIRI" && ok "niri spawn-at-startup $s" \
+        || no "niri missing spawn-at-startup $s"
+done
+echo " $auto " | grep -q " monitoring " && no "monitoring must NOT be eager (should be on-demand)" \
+    || ok "monitoring is on-demand (not in [meta].auto)"
+
+# 3) every auto workspace declares a scene (apps or a delegate)
+for ws in coding browser research; do
+    n=$(py "import tomllib;w=tomllib.load(open('$REG','rb'))['workspaces'].get('$ws',{});print(len(w.get('apps',[])) or (1 if w.get('delegate') else 0))")
+    [ "${n:-0}" -ge 1 ] && ok "'$ws' declares its scene (${n} surface/s)" \
+        || no "'$ws' declares no scene"
+done
+
+# 4) coding stack starts its backing services; monitoring is a DP-2 cockpit that boots
+#    the observability stack ON DEMAND (dev-stack-obs in its scene services, not at login).
+csvc=$(py "import tomllib;print(' '.join(tomllib.load(open('$REG','rb'))['workspaces']['coding'].get('services',[])))")
+echo " $csvc " | grep -q " dev-stack-data " && ok "coding stack starts dev-stack-data" \
+    || no "coding missing dev-stack-data service ($csvc)"
+mon=$(py "import tomllib;print(tomllib.load(open('$REG','rb'))['workspaces'].get('monitoring',{}).get('output',''))")
+[ "$mon" = "DP-2" ] && ok "monitoring scene on DP-2" || no "monitoring scene not on DP-2 ($mon)"
+msvc=$(py "import tomllib;print(' '.join(tomllib.load(open('$REG','rb'))['workspaces'].get('monitoring',{}).get('services',[])))")
+echo " $msvc " | grep -q " dev-stack-obs " && ok "monitoring boots dev-stack-obs on demand" \
+    || no "monitoring missing dev-stack-obs service ($msvc)"
+if systemctl --user list-dependencies default.target 2>/dev/null | grep -q dev-stack-obs; then
+    no "dev-stack-obs still in default.target (autostarts at login)"
+else
+    ok "dev-stack-obs NOT autostarted at login (lean boot)"
+fi
+
+[ $fail -eq 0 ] && echo "boot-contract: stacks eager-stage at login + services declared ✓"
+exit $fail

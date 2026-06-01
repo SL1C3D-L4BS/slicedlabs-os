@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# ai-stack-up — bring up the personal AI team mesh (Mem0/Neo4j, Langfuse,
+# Phoenix, n8n, Cognee).
+#
+# Sources the runtime secrets that compose env-substitutes:
+#   POSTGRES_PASSWORD   — ~/.config/postgres/dev.password
+#   NEXTAUTH_SECRET     — ~/.config/langfuse/nextauth_secret
+#   LANGFUSE_SALT       — ~/.config/langfuse/salt
+#   NEO4J_AUTH          — ~/.config/neo4j/auth          (neo4j/<password>)
+#
+# Default profile selection: obs + auto (langfuse + phoenix + n8n).
+# Pass extra args (e.g. --profile memory) to enable Mem0 + Neo4j.
+set -euo pipefail
+
+export POSTGRES_PASSWORD="$(cat "$HOME/.config/postgres/dev.password" 2>/dev/null || true)"
+export NEXTAUTH_SECRET="$(cat "$HOME/.config/langfuse/nextauth_secret" 2>/dev/null || true)"
+export LANGFUSE_SALT="$(cat "$HOME/.config/langfuse/salt"           2>/dev/null || true)"
+export NEO4J_AUTH="$(cat "$HOME/.config/neo4j/auth"                 2>/dev/null || true)"
+
+if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
+    echo "ai-stack-up: $HOME/.config/postgres/dev.password is missing — run dev-stack-up first" >&2
+    exit 1
+fi
+
+podman compose -f "$HOME/.dotfiles/podman-compose/ai-stack.yaml" \
+    --profile obs --profile auto "$@" up -d

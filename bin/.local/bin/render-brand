@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# render-brand — rasterize SVGs across the brand surfaces. Substitutes
+# tokens first (render-templates handles .tmpl) then Inkscape exports PNG.
+#
+# Outputs:
+#   system/wallpapers/<name>.png          from system/wallpapers/templates/<name>.svg
+#   system/brand-assets/logo/<name>-<size>.png  from system/brand-assets/logo/<name>.svg
+#   system/brand-assets/thumbnails/preview.png  from thumbnails/*.svg (first only)
+#
+# Logo is rasterized at 16/32/64/128/256/512/1024 px (favicons → channel art).
+set -euo pipefail
+
+ROOT="${DOTFILES_ROOT:-${HOME}/.dotfiles}"
+WALL_SRC="${ROOT}/system/wallpapers/templates"
+WALL_OUT="${ROOT}/system/wallpapers"
+LOGO_DIR="${ROOT}/system/brand-assets/logo"
+THUMB_DIR="${ROOT}/system/brand-assets/thumbnails"
+
+if ! command -v render-templates >/dev/null 2>&1; then
+    echo "render-brand: render-templates not on PATH" >&2
+    exit 1
+fi
+if ! command -v inkscape >/dev/null 2>&1; then
+    echo "render-brand: inkscape not installed (pacman -S inkscape)" >&2
+    exit 1
+fi
+
+render-templates >/dev/null
+
+count=0
+
+# Wallpapers — full SVG → full PNG at canvas size.
+if [ -d "${WALL_SRC}" ]; then
+    for svg in "${WALL_SRC}"/*.svg; do
+        [ -f "${svg}" ] || continue
+        base="$(basename "${svg}" .svg)"
+        png="${WALL_OUT}/${base}.png"
+        inkscape "${svg}" --export-type=png --export-filename="${png}" \
+            --export-background-opacity=1.0 2>/dev/null
+        count=$((count + 1))
+        echo "  rendered  ${png#${ROOT}/}"
+    done
+fi
+
+# Logo — fan out across favicon → channel-art sizes.
+if [ -d "${LOGO_DIR}" ]; then
+    for svg in "${LOGO_DIR}"/*.svg; do
+        [ -f "${svg}" ] || continue
+        base="$(basename "${svg}" .svg)"
+        for size in 16 32 64 128 256 512 1024; do
+            png="${LOGO_DIR}/${base}-${size}.png"
+            inkscape "${svg}" --export-type=png --export-filename="${png}" \
+                --export-width="${size}" --export-background-opacity=0.0 2>/dev/null
+            count=$((count + 1))
+        done
+        echo "  rendered  ${base} × 7 sizes"
+    done
+fi
+
+# Thumbnails — single preview render at the SVG's native 1920×1080.
+if [ -d "${THUMB_DIR}" ]; then
+    for svg in "${THUMB_DIR}"/*.svg; do
+        [ -f "${svg}" ] || continue
+        base="$(basename "${svg}" .svg)"
+        png="${THUMB_DIR}/${base}-preview.png"
+        inkscape "${svg}" --export-type=png --export-filename="${png}" 2>/dev/null
+        count=$((count + 1))
+        echo "  rendered  ${png#${ROOT}/}"
+    done
+fi
+
+echo "render-brand: ${count} asset(s) rendered"

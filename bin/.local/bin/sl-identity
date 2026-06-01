@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""sl-identity <workspace> — print that workspace's identity hex (#RRGGBB).
+
+The focused-workspace accent for the tooling cascade: scene.sh exports it as
+$SL_IDENTITY when spawning a workspace's terminal, and fzf / nvim tint their accent
+to it — so each workspace's terminal breathes its own hue. Reads [color_raw] (the
+baked sRGB of the OKLCH identity ramp) from the tokens SSOT.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import tomllib
+from pathlib import Path
+
+DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+
+
+def main() -> int:
+    raw = tomllib.loads((DOTFILES / "system/tokens.toml").read_text()).get("color_raw", {})
+    ws = sys.argv[1] if len(sys.argv) > 1 else ""
+    print("#" + str(raw.get(ws, raw.get("primary", "2961B1"))))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

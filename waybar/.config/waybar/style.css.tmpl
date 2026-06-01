@@ -1,0 +1,545 @@
+/* [ENGINE] platform — Waybar style · design tokens from system/tokens.toml
+ *
+ * Mathematically-derived layout; every value derives from the 4px atomic unit.
+ * The CENTER is the active tab's FUSED instrument cluster: a brand-capped pill
+ * whose supporting modules are segmented (no inter-gap, thin dividers, shared
+ * brand under-border, rounded ends) — the same technique as the cpu|mem|temp
+ * cluster, generalised per tab. Motion is signal-only (breathe/glow on live
+ * states, hover-lift, tab-in).
+ *
+ * The GENERATED:* regions below are produced by `render-waybar` from tabs.toml
+ * — do not hand-edit between the markers. Pipeline: render-waybar && render-templates
+ */
+
+* {
+    font-family: "{{font.mono}}", monospace;
+    font-size: {{font.ui_size}}px;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+}
+
+/* Bar surface transparent — every chip carries its own fill, so the bar reads
+   as floating pills over the wallpaper. */
+window#waybar {
+    background: transparent;
+    color: {{color.fg}};
+}
+
+/* ============================================================================
+ * Center placement — modules-center is a GTK center-widget: Waybar centers the
+ * active tab's fused pill AS A GROUP in the bar automatically. DO NOT put a
+ * min-width on .modules-left: a center-widget's usable width is (bar − 2×left),
+ * so reserving ~half the bar on the left clips the centre to ~320px and makes
+ * every tab cluster invisible (the 2026-05-29 regression). The window title is
+ * already bounded by niri/window "max-length" (config.jsonc), so the left
+ * cluster can't balloon and squeeze the centre. The brand word sits left-of-
+ * centre within the centred pill — by design; see render-waybar (cap margin).
+ * ========================================================================== */
+
+/* ============================================================================
+ * Workspaces (left) — container pill enclosing the named workspace tiles
+ * ========================================================================== */
+#workspaces {
+    background: {{color.bg_alt_light}};
+    border-radius: {{geom.radius_lg}}px;
+    margin: 4px 4px 4px {{geom.gap}}px;
+    padding: 3px;
+}
+
+#workspaces button {
+    min-height: 22px;
+    padding: 0 8px;
+    margin: 0 2px;
+    color: {{color.fg_muted}};
+    background: transparent;
+    border-radius: {{geom.radius_sm}}px;
+    transition: background-color {{motion.quick_ms}}ms {{motion.ease}},
+                color {{motion.quick_ms}}ms {{motion.ease}};
+}
+
+#workspaces button:first-child { margin-left: 0; }
+#workspaces button:last-child  { margin-right: 0; }
+
+/* Collapse Niri's unnamed scratch workspaces to zero width. */
+#workspaces button:not(#niri-workspace-engine):not(#niri-workspace-comms):not(#niri-workspace-stream):not(#niri-workspace-monitoring):not(#niri-workspace-gaming):not(#niri-workspace-coding):not(#niri-workspace-browser) {
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: transparent;
+}
+
+/* Resting identity — each workspace carries its brand hue at rest. */
+#niri-workspace-engine     { color: {{color.secondary}}; }
+#niri-workspace-comms      { color: {{color.mist}}; }
+#niri-workspace-stream     { color: {{color.tertiary}}; }
+#niri-workspace-monitoring { color: {{color.error}}; }
+#niri-workspace-gaming     { color: {{color.success}}; }
+#niri-workspace-coding     { color: {{color.coding}}; }
+#niri-workspace-browser    { color: {{color.browser}}; }
+
+#workspaces button:hover {
+    background-color: {{color.bg_alt}};
+    color: {{color.fg}};
+}
+
+#workspaces button.active {
+    font-weight: bold;
+    border-bottom: {{geom.border}}px solid transparent;
+}
+#niri-workspace-engine.active     { color: {{color.fg}}; background-color: {{color.primary}};   border-bottom-color: {{color.primary}}; }
+#niri-workspace-comms.active      { color: {{color.bg}}; background-color: {{color.secondary}}; border-bottom-color: {{color.secondary}}; }
+#niri-workspace-stream.active     { color: {{color.bg}}; background-color: {{color.tertiary}};  border-bottom-color: {{color.tertiary}}; }
+#niri-workspace-monitoring.active { color: {{color.fg}}; background-color: {{color.error}};     border-bottom-color: {{color.error}}; }
+#niri-workspace-gaming.active     { color: {{color.bg}}; background-color: {{color.success}};   border-bottom-color: {{color.success}}; }
+#niri-workspace-coding.active     { color: {{color.fg}}; background-color: {{color.coding}};    border-bottom-color: {{color.coding}}; }
+#niri-workspace-browser.active    { color: {{color.bg}}; background-color: {{color.browser}};   border-bottom-color: {{color.browser}}; }
+
+#workspaces button.urgent {
+    color: {{color.error}};
+    border-bottom: {{geom.border}}px solid {{color.error}};
+}
+
+/* Window title — text only, no chip surface. */
+#window {
+    color: {{color.sand}};
+    padding: 0 {{geom.gap}}px;
+}
+
+/* ============================================================================
+ * Common chip vocabulary — every floating pill shares chip height, margin,
+ * background, rounding, transition. Selector list generated from the registry.
+ * ========================================================================== */
+/* >>> GENERATED:base-selectors (render-waybar) >>> */
+#clock,
+#cpu,
+#memory,
+#temperature,
+#network,
+#pulseaudio,
+#tray,
+#custom-workstation,
+#custom-alerts,
+#custom-tab-engine-header,
+#custom-tab-comms-header,
+#custom-tab-stream-header,
+#custom-tab-monitoring-header,
+#custom-tab-gaming-header,
+#custom-tab-coding-header,
+#custom-tab-browser-header,
+#custom-tab-media-header,
+#custom-tab-net-header,
+#custom-tab-ai-header,
+#custom-tab-agenda-header,
+#custom-engine-build,
+#custom-engine-target,
+#custom-engine-tests,
+#custom-comms-discord,
+#custom-comms-matrix,
+#custom-comms-zoom,
+#custom-comms-mail,
+#custom-comms-notifs,
+#custom-stream-obs,
+#custom-stream-scene,
+#custom-stream-mic,
+#custom-stream-bitrate,
+#custom-stream-uptime,
+#custom-mon-top-cpu,
+#custom-mon-top-mem,
+#custom-mon-disk-pressure,
+#custom-mon-failed-units,
+#custom-mon-net-io,
+#custom-gaming-status,
+#custom-gpu-stats,
+#custom-cpu-temp,
+#custom-gamemode,
+#custom-ds4-battery,
+#custom-coding-git,
+#custom-coding-build,
+#custom-coding-team,
+#custom-coding-corpus,
+#custom-coding-pomo,
+#custom-browser-status,
+#custom-media-now,
+#custom-media-ee,
+#custom-media-sink,
+#custom-net-vpn,
+#custom-net-fw,
+#custom-net-route,
+#custom-net-link,
+#custom-ai-spend,
+#custom-ai-agents,
+#custom-ai-pomo,
+#custom-agenda-next,
+#custom-agenda-standup
+/* <<< GENERATED:base-selectors <<< */
+{
+    margin: 4px 4px;
+    min-height: {{geom.chip_height}}px;
+    background: {{color.bg_alt}};
+    border-radius: {{geom.radius}}px;
+    color: {{color.fg_muted}};
+    transition: background-color {{motion.quick_ms}}ms {{motion.ease}},
+                color {{motion.quick_ms}}ms {{motion.ease}},
+                box-shadow {{motion.lift_ms}}ms {{motion.ease}};
+}
+
+/* Hover-lift — module + select system chips gain a soft shadow + lighter
+   surface. Caps and the segmented cpu|mem|temp trio are excluded. */
+/* >>> GENERATED:lift (render-waybar) >>> */
+#clock:hover,
+#network:hover,
+#pulseaudio:hover,
+#custom-workstation:hover,
+#custom-engine-build:hover,
+#custom-engine-target:hover,
+#custom-engine-tests:hover,
+#custom-comms-discord:hover,
+#custom-comms-matrix:hover,
+#custom-comms-zoom:hover,
+#custom-comms-mail:hover,
+#custom-comms-notifs:hover,
+#custom-stream-obs:hover,
+#custom-stream-scene:hover,
+#custom-stream-mic:hover,
+#custom-stream-bitrate:hover,
+#custom-stream-uptime:hover,
+#custom-mon-top-cpu:hover,
+#custom-mon-top-mem:hover,
+#custom-mon-disk-pressure:hover,
+#custom-mon-failed-units:hover,
+#custom-mon-net-io:hover,
+#custom-gaming-status:hover,
+#custom-gpu-stats:hover,
+#custom-cpu-temp:hover,
+#custom-gamemode:hover,
+#custom-ds4-battery:hover,
+#custom-coding-git:hover,
+#custom-coding-build:hover,
+#custom-coding-team:hover,
+#custom-coding-corpus:hover,
+#custom-coding-pomo:hover,
+#custom-browser-status:hover,
+#custom-media-now:hover,
+#custom-media-ee:hover,
+#custom-media-sink:hover,
+#custom-net-vpn:hover,
+#custom-net-fw:hover,
+#custom-net-route:hover,
+#custom-net-link:hover,
+#custom-ai-spend:hover,
+#custom-ai-agents:hover,
+#custom-ai-pomo:hover,
+#custom-agenda-next:hover,
+#custom-agenda-standup:hover
+/* <<< GENERATED:lift <<< */
+{
+    background: {{color.bg_alt_light}};
+    box-shadow: 0 {{geom.pad_y}}px 6px {{color_css.shadow_dim}};
+}
+
+/* === Clock (now right cluster) === */
+#clock {
+    color: {{color.fg}};
+    padding: 0 14px;
+}
+
+/* === Right cluster: cpu / memory / temperature — segmented single pill === */
+#cpu, #memory, #temperature {
+    padding: 0 10px;
+    margin: 4px 0;
+}
+#cpu         { border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin-left: 4px; }
+#memory      { border-left: 1px solid {{color.inactive}}; border-right: 1px solid {{color.inactive}}; }
+#temperature { border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; margin-right: 4px; }
+
+#network, #pulseaudio { padding: 0 10px; }
+#tray                 { padding: 0 {{geom.gap}}px; margin-right: {{geom.gap}}px; }
+
+#cpu:hover, #memory:hover, #temperature:hover, #network:hover, #pulseaudio:hover {
+    color: {{color.fg}};
+}
+#temperature.critical, #network.disconnected, #pulseaudio.muted {
+    color: {{color.error}};
+    font-weight: bold;
+}
+#tray > .needs-attention { color: {{color.tertiary}}; }
+
+/* ============================================================================
+ * Motion system — signal-only. Keyframes are colour-literal (GTK3 has no CSS
+ * variables); each living state pairs a breathe (opacity) with a brand glow
+ * (box-shadow). No CSS transforms in GTK3, so spinners are script-driven.
+ * ========================================================================== */
+/* Per-state keyframes combine opacity + box-shadow in one animation (GTK3 is
+   unreliable with comma-listed multi-animations and rejects comma-grouped
+   keyframe selectors, so stops are written out individually). */
+@keyframes pulse-build {
+    0%   { opacity: 1;   box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+    50%  { opacity: 0.7; box-shadow: 0 0 8px 0 {{color_css.glow_build}}; }
+    100% { opacity: 1;   box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes pulse-rec {
+    0%   { opacity: 1;   box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+    50%  { opacity: 0.6; box-shadow: 0 0 9px 0 {{color_css.glow_rec}}; }
+    100% { opacity: 1;   box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes pulse-live {
+    0%   { opacity: 1;   box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+    50%  { opacity: 0.6; box-shadow: 0 0 10px 0 {{color_css.glow_live}}; }
+    100% { opacity: 1;   box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes glow-urgent {
+    0%   { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+    50%  { box-shadow: 0 0 10px 0 {{color_css.glow_urgent}}; }
+    100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes tab-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ============================================================================
+ * Tab caps (headers) — shared chrome. Per-tab background / text / rounding /
+ * urgent glow are emitted in GENERATED:fusion below.
+ * ========================================================================== */
+/* >>> GENERATED:header-selectors (render-waybar) >>> */
+#custom-tab-engine-header,
+#custom-tab-comms-header,
+#custom-tab-stream-header,
+#custom-tab-monitoring-header,
+#custom-tab-gaming-header,
+#custom-tab-coding-header,
+#custom-tab-browser-header,
+#custom-tab-media-header,
+#custom-tab-net-header,
+#custom-tab-ai-header,
+#custom-tab-agenda-header
+/* <<< GENERATED:header-selectors <<< */
+{
+    padding: 0 {{geom.pad_x_lg}}px;
+    font-size: {{font.ui_size_lg}}px;
+    font-weight: bold;
+    transition: background-color {{motion.normal_ms}}ms {{motion.ease}},
+                color {{motion.normal_ms}}ms {{motion.ease}};
+    animation: tab-in {{motion.normal_ms}}ms {{motion.ease}};
+}
+
+/* Module chips — denser padding than caps (supporting data, not identity). */
+/* >>> GENERATED:module-padding (render-waybar) >>> */
+#custom-engine-build,
+#custom-engine-target,
+#custom-engine-tests,
+#custom-comms-discord,
+#custom-comms-matrix,
+#custom-comms-zoom,
+#custom-comms-mail,
+#custom-comms-notifs,
+#custom-stream-obs,
+#custom-stream-scene,
+#custom-stream-mic,
+#custom-stream-bitrate,
+#custom-stream-uptime,
+#custom-mon-top-cpu,
+#custom-mon-top-mem,
+#custom-mon-disk-pressure,
+#custom-mon-failed-units,
+#custom-mon-net-io,
+#custom-gaming-status,
+#custom-gpu-stats,
+#custom-cpu-temp,
+#custom-gamemode,
+#custom-ds4-battery,
+#custom-coding-git,
+#custom-coding-build,
+#custom-coding-team,
+#custom-coding-corpus,
+#custom-coding-pomo,
+#custom-browser-status,
+#custom-media-now,
+#custom-media-ee,
+#custom-media-sink,
+#custom-net-vpn,
+#custom-net-fw,
+#custom-net-route,
+#custom-net-link,
+#custom-ai-spend,
+#custom-ai-agents,
+#custom-ai-pomo,
+#custom-agenda-next,
+#custom-agenda-standup
+/* <<< GENERATED:module-padding <<< */
+{
+    padding: 0 10px;
+}
+
+/* ============================================================================
+ * Per-tab fusion — brand cap (rounded-left) + segmented body (dividers, brand
+ * under-border) + rounded-right last segment + per-cap urgent glow.
+ * GENERATED from tabs.toml; do not hand-edit.
+ * ========================================================================== */
+/* >>> GENERATED:fusion (render-waybar) >>> */
+/* engine — [ENGINE] */
+#custom-tab-engine-header { background: {{color.primary}}; color: {{color.fg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 240px; }
+#custom-tab-engine-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-engine-build { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.primary}}; }
+#custom-engine-target { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.primary}}; }
+#custom-engine-tests { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.primary}}; }
+/* comms — COMMS */
+#custom-tab-comms-header { background: {{color.secondary}}; color: {{color.bg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 432px; }
+#custom-tab-comms-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-comms-discord { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.secondary}}; }
+#custom-comms-matrix { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.secondary}}; }
+#custom-comms-zoom { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.secondary}}; }
+#custom-comms-mail { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.secondary}}; }
+#custom-comms-notifs { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.secondary}}; }
+/* stream — STREAM */
+#custom-tab-stream-header { background: {{color.tertiary}}; color: {{color.bg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 254px; }
+#custom-tab-stream-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-stream-obs { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.tertiary}}; }
+#custom-stream-scene { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.tertiary}}; }
+#custom-stream-mic { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.tertiary}}; }
+#custom-stream-bitrate { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.tertiary}}; }
+#custom-stream-uptime { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.tertiary}}; }
+/* monitoring — MONITORING */
+#custom-tab-monitoring-header { background: {{color.error}}; color: {{color.fg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 513px; }
+#custom-tab-monitoring-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-mon-top-cpu { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.error}}; }
+#custom-mon-top-mem { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.error}}; }
+#custom-mon-disk-pressure { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.error}}; }
+#custom-mon-failed-units { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.error}}; }
+#custom-mon-net-io { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.error}}; }
+/* gaming — GAMING */
+#custom-tab-gaming-header { background: {{color.success}}; color: {{color.bg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 322px; }
+#custom-tab-gaming-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-gaming-status { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.success}}; }
+#custom-gpu-stats { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.success}}; }
+#custom-cpu-temp { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.success}}; }
+#custom-gamemode { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.success}}; }
+#custom-ds4-battery { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.success}}; }
+/* coding — CODING */
+#custom-tab-coding-header { background: {{color.coding}}; color: {{color.fg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 520px; }
+#custom-tab-coding-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-coding-git { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.coding}}; }
+#custom-coding-build { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.coding}}; }
+#custom-coding-team { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.coding}}; }
+#custom-coding-corpus { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.coding}}; }
+#custom-coding-pomo { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.coding}}; }
+/* browser — BROWSER */
+#custom-tab-browser-header { background: {{color.browser}}; color: {{color.fg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 109px; }
+#custom-tab-browser-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-browser-status { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.browser}}; }
+/* media — MEDIA */
+#custom-tab-media-header { background: {{color.media}}; color: {{color.fg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 341px; }
+#custom-tab-media-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-media-now { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.media}}; }
+#custom-media-ee { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.media}}; }
+#custom-media-sink { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.media}}; }
+/* net — NET */
+#custom-tab-net-header { background: {{color.net}}; color: {{color.fg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 369px; }
+#custom-tab-net-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-net-vpn { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.net}}; }
+#custom-net-fw { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.net}}; }
+#custom-net-route { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.net}}; }
+#custom-net-link { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.net}}; }
+/* ai — AI */
+#custom-tab-ai-header { background: {{color.ai}}; color: {{color.fg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 295px; }
+#custom-tab-ai-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-ai-spend { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.ai}}; }
+#custom-ai-agents { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.ai}}; }
+#custom-ai-pomo { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.ai}}; }
+/* agenda — AGENDA */
+#custom-tab-agenda-header { background: {{color.agenda}}; color: {{color.bg}}; border-radius: {{geom.radius}}px 0 0 {{geom.radius}}px; margin: {{geom.unit}}px 0 {{geom.unit}}px 178px; }
+#custom-tab-agenda-header.urgent { animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+#custom-agenda-next { margin: {{geom.unit}}px 0; border-radius: 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.agenda}}; }
+#custom-agenda-standup { margin: {{geom.unit}}px {{geom.unit}}px {{geom.unit}}px 0; border-radius: 0 {{geom.radius}}px {{geom.radius}}px 0; border-left: 1px solid {{color.inactive}}; border-bottom: {{geom.border}}px solid {{color.agenda}}; }
+/* <<< GENERATED:fusion <<< */
+
+/* ============================================================================
+ * Liveness motion classes — bare classes so animation/box-shadow apply over
+ * the base id rule (which only sets colour/bg). Colour for these states is set
+ * by the per-module overrides further down.
+ * ========================================================================== */
+.building  { animation: pulse-build {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+.recording { animation: pulse-rec   {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+.live      { animation: pulse-live  {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+
+/* Workstation widget — always-visible left status badge. */
+#custom-workstation {
+    padding: 0 {{geom.pad_x}}px;
+    font-weight: 600;
+    color: {{color.coding}};
+}
+#custom-workstation.active    { color: {{color.success}}; }
+#custom-workstation.warning   { color: {{color.honey}}; }
+#custom-workstation.critical  { color: {{color.error}}; font-weight: bold; }
+
+/* Always-visible urgency badge (left) — glows while any tab is flagged. */
+#custom-alerts        { padding: 0 10px; color: {{color.tertiary}}; }
+#custom-alerts.urgent { color: {{color.tertiary}}; font-weight: bold; animation: glow-urgent {{motion.pulse_ms}}ms {{motion.ease}} infinite; }
+
+/* Pomodoro chips — colour reflects state. */
+#custom-coding-pomo.work,   #custom-ai-pomo.work    { color: {{color.coding}}; }
+#custom-coding-pomo.break,  #custom-ai-pomo.break   { color: {{color.success}}; }
+#custom-coding-pomo.paused, #custom-ai-pomo.paused  { color: {{color.fg_muted}}; }
+
+/* --- Shared state classes — same vocab across all tabs ------------------- */
+.empty    { color: {{color.inactive}}; }
+.ok       { color: {{color.fg_muted}}; }
+.info     { color: {{color.secondary}}; }
+.alert    { color: {{color.tertiary}}; font-weight: bold; }
+.critical { color: {{color.error}}; font-weight: bold; }
+
+/* --- Per-module state-class recolours (higher specificity than base) ----- */
+#custom-gaming-status.idle    { color: {{color.fg_muted}}; }
+#custom-gaming-status.playing {
+    color: {{color.tertiary}};
+    border-left: {{geom.border}}px solid {{color.primary}};
+}
+
+#custom-gpu-stats.critical,
+#custom-cpu-temp.critical {
+    color: {{color.error}};
+    font-weight: bold;
+}
+
+#custom-gamemode.on  { color: {{color.fg}}; background: {{color.selection}}; }
+#custom-gamemode.off { color: {{color.fg_muted}}; }
+#custom-gamemode:hover {
+    color: {{color.secondary}};
+    background: {{color.warm_shadow}};
+}
+
+#custom-ds4-battery.critical { color: {{color.error}}; }
+
+#custom-engine-build.ok        { color: {{color.success}}; }
+#custom-engine-build.critical  { color: {{color.error}}; font-weight: bold; }
+#custom-engine-build.info      { color: {{color.mist}}; }
+#custom-engine-build.building  { color: {{color.mist}}; }
+
+#custom-comms-zoom.alert {
+    color: {{color.secondary}};
+    border-left: {{geom.border}}px solid {{color.success}};
+}
+#custom-comms-matrix.alert { color: {{color.secondary}}; font-weight: bold; }
+
+#custom-stream-obs.recording, #custom-stream-uptime.recording { color: {{color.tertiary}}; font-weight: bold; }
+#custom-stream-obs.live,      #custom-stream-uptime.live      { color: {{color.error}};    font-weight: bold; }
+
+#custom-stream-bitrate.ok       { color: {{color.success}}; }
+#custom-stream-bitrate.alert    { color: {{color.honey}}; }
+#custom-stream-bitrate.critical { color: {{color.error}}; font-weight: bold; }
+
+#custom-mon-disk-pressure.alert    { color: {{color.honey}}; }
+#custom-mon-disk-pressure.critical { color: {{color.error}}; font-weight: bold; }
+
+/* --- New HUD-tab module accents ------------------------------------------ */
+#custom-media-now.playing { color: {{color.media}}; }
+#custom-net-vpn.ok        { color: {{color.success}}; }
+#custom-net-vpn.critical  { color: {{color.error}}; font-weight: bold; }
+#custom-net-fw.ok         { color: {{color.fg_muted}}; }
+#custom-net-fw.critical   { color: {{color.error}}; font-weight: bold; }
+#custom-ai-spend.alert    { color: {{color.honey}}; }
+#custom-ai-spend.critical { color: {{color.error}}; font-weight: bold; }
+#custom-agenda-next.alert { color: {{color.tertiary}}; font-weight: bold; }

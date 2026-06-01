@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# verify-tokens-drift — fail if generated Waybar config has drifted from its SSOT.
+#
+# Regenerates the GENERATED:* regions from tabs.toml (render-waybar) and checks
+# the tracked .tmpl files are unchanged. A non-empty diff means either tabs.toml
+# was edited without re-running render-waybar, or a GENERATED region was
+# hand-edited — both break the "registry is the single source of truth" rule.
+# Run from anywhere; operates on $DOTFILES_ROOT. Exit 1 on drift (CI/pre-commit).
+set -euo pipefail
+
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+cd "$ROOT"
+
+render-waybar >/dev/null
+
+watched=(
+    waybar/.config/waybar/config.jsonc.tmpl
+    waybar/.config/waybar/style.css.tmpl
+    waybar/.config/waybar/scripts/lib/tabs.env
+)
+if ! git diff --quiet -- "${watched[@]}"; then
+    echo "token-drift: Waybar GENERATED regions were STALE — tabs.toml changed" >&2
+    echo "  without render-waybar, or a GENERATED region was hand-edited." >&2
+    echo "  They have now been regenerated; review and stage the diff:" >&2
+    git --no-pager diff --stat -- "${watched[@]}" >&2
+    exit 1
+fi
+echo "token-drift: Waybar generated regions in sync with tabs.toml ✓"

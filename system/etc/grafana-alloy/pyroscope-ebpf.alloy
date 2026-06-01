@@ -1,0 +1,49 @@
+// [ENGINE] platform — eBPF continuous profiling -> Pyroscope (spec XVIII.12)
+
+pyroscope.write "local" {
+  endpoint {
+    url = "http://localhost:4040"
+  }
+}
+
+discovery.process "all" {
+  refresh_interval = "60s"
+}
+
+// Scope + name the eBPF profiling targets.
+discovery.relabel "named" {
+  targets = discovery.process.all.targets
+
+  // Profile ONLY the [ENGINE] workspace binaries (~/Projects/engine/...), not
+  // all ~191 host processes. Profiles appear in Pyroscope once you run the
+  // engine (e.g. `cargo run`); until then the profiler is healthy but idle.
+  // To broaden: widen/duplicate this regex, or delete this rule to profile
+  // everything (named by basename via the rule below).
+  rule {
+    source_labels = ["__meta_process_exe"]
+    regex         = "/home/doodlebob/Projects/engine/.*"
+    action        = "keep"
+  }
+
+  // service_name = executable basename.
+  rule {
+    source_labels = ["__meta_process_exe"]
+    regex         = "(.*/)?([^/]+)"
+    target_label  = "service_name"
+    replacement   = "$2"
+  }
+
+  // Strip the " (deleted)" suffix the kernel reports for a binary that was
+  // rebuilt while still running (common when iterating on the engine).
+  rule {
+    source_labels = ["service_name"]
+    regex         = "(.+?) \\(deleted\\)"
+    target_label  = "service_name"
+    replacement   = "$1"
+  }
+}
+
+pyroscope.ebpf "local" {
+  forward_to = [pyroscope.write.local.receiver]
+  targets    = discovery.relabel.named.output
+}

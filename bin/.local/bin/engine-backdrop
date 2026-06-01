@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# engine-backdrop — render a softly-blurred copy of the wallpaper and show it
+# ONLY inside the niri overview backdrop (a swaybg surface that niri routes via
+# `place-within-backdrop`). Pairs with engine-wallpaper, which sets the CRISP
+# desktop wallpaper through awww.
+#
+# The two-wallpaper trick → crisp desktop, frosted/blurred overview backdrop:
+# switching workspaces / entering the overview drops the sharp window tiles onto
+# a soft blurred wallpaper instead of a flat grey panel.
+#
+# Usage:
+#   engine-backdrop                  # blur the default wallpaper
+#   engine-backdrop <path>           # blur an explicit image (engine-wallpaper passes its target)
+set -euo pipefail
+
+WALL_DIR="${HOME}/.dotfiles/system/wallpapers"
+DEFAULT="${WALL_DIR}/engine-default.png"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/engine-backdrop.png"
+
+src="${1:-$DEFAULT}"
+if [ ! -f "$src" ]; then
+    # Fall back to the brand default if the requested image is gone.
+    src="$DEFAULT"
+fi
+[ -f "$src" ] || { echo "engine-backdrop: no wallpaper found ($src)" >&2; exit 1; }
+
+# Pre-blur: downscale → blur → upscale is a cheap, smooth heavy gaussian. Slight
+# darken + desaturate so the crisp overview tiles pop against the backdrop.
+magick "$src" -resize 20% -blur 0x6 -resize 500% -modulate 92,85 "$CACHE" 2>/dev/null \
+    || convert "$src" -resize 20% -blur 0x6 -resize 500% -modulate 92,85 "$CACHE"
+
+# (Re)launch the single backdrop swaybg instance showing the blurred image.
+pkill -x swaybg 2>/dev/null || true
+sleep 0.2
+nohup swaybg -i "$CACHE" -m fill >/tmp/swaybg-backdrop.log 2>&1 &
+disown 2>/dev/null || true
+echo "engine-backdrop: blurred backdrop set from $(basename "$src")"

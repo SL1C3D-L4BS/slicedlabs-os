@@ -1,0 +1,18 @@
+{
+  "policies": {
+    "Preferences": {
+      "ui.systemUsesDarkTheme": {
+        "Value": 1,
+        "Status": "default"
+      },
+      "layout.css.prefers-color-scheme.content-override": {
+        "Value": 0,
+        "Status": "default"
+      },
+      "browser.theme.dark-private-windows": {
+        "Value": true,
+        "Status": "default"
+      }
+    }
+  }
+}

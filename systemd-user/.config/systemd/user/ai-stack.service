@@ -1,0 +1,16 @@
+[Unit]
+Description=Personal AI team service mesh (Mem0 + Langfuse + Phoenix + n8n)
+Documentation=file://%h/.dotfiles/podman-compose/ai-stack.yaml
+After=dev-stack-data.service
+Requires=dev-stack-data.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/ai-stack-up --profile memory --profile kg
+ExecStop=/usr/bin/podman compose -f %h/.dotfiles/podman-compose/ai-stack.yaml down
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# music — minimal, FOSS, no-distraction music (mpd + rmpc). Local library +
+# internet radio, output through PipeWire; mpd-mpris lights the Waybar media HUD.
+#
+#   music                 ensure mpd is up, open the rmpc cockpit (inline TUI)
+#   music radio [name]    queue + play a stream  (lofi | drone | jazz; default lofi)
+#   music toggle|stop|next|prev|play|pause     transport
+#   music vol <0-100>     set volume
+#   music <anything>      passed straight to mpc
+set -euo pipefail
+
+declare -A STREAMS=(
+    [lofi]="http://ice1.somafm.com/groovesalad-128-mp3"    # SomaFM Groove Salad — downtempo
+    [drone]="http://ice1.somafm.com/dronezone-128-mp3"     # SomaFM Drone Zone — ambient, zero-distraction
+    [jazz]="http://ice1.somafm.com/sonicuniverse-128-mp3"  # SomaFM Sonic Universe — jazz
+)
+
+ensure_mpd() { systemctl --user start mpd.service mpd-mpris.service 2>/dev/null || true; }
+
+case "${1:-tui}" in
+    tui)
+        ensure_mpd
+        exec rmpc
+        ;;
+    radio)
+        ensure_mpd
+        name="${2:-lofi}"; url="${STREAMS[$name]:-}"
+        [[ -z "$url" ]] && { echo "streams: ${!STREAMS[*]}" >&2; exit 1; }
+        mpc -q clear && mpc -q add "$url" && mpc -q play
+        echo "▶ radio: $name"
+        ;;
+    toggle|stop|next|prev|play|pause)
+        mpc -q "$1"
+        ;;
+    vol)
+        mpc -q volume "${2:?usage: music vol 0-100}"
+        ;;
+    *)
+        mpc "$@"
+        ;;
+esac

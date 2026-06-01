@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# dev-stack-up — bring up the local data + observability mesh.
+# Idempotent: re-running is a no-op when containers already exist.
+#
+# Profiles: data (PG/Valkey/Qdrant/Meili/ClickHouse) + obs (Loki/Tempo/OTel).
+# Prometheus + Grafana stay on the host (pacman packages). Override which
+# profiles come up via DEV_STACK_PROFILES (default "data obs"):
+#   dev-stack-obs.service  → "obs"  (boots with the monitoring screen)
+#   dev-stack-data.service → "data" (staged by the coding/engine scene)
+set -euo pipefail
+
+export POSTGRES_PASSWORD="$(cat "$HOME/.config/postgres/dev.password" 2>/dev/null || true)"
+
+profile_args=()
+for p in ${DEV_STACK_PROFILES:-data obs}; do profile_args+=(--profile "$p"); done
+
+# `podman compose up -d` can fail on a cold boot when a service with a
+# `depends_on` (e.g. dev-otel → tempo/loki) tries to create before its deps are
+# ready: the dependent container never gets created and the whole run exits 125,
+# failing the systemd unit. Retry with a short backoff so a cold boot self-heals;
+# once the deps are up the re-run is a near no-op (idempotent either way).
+compose_up() {
+    podman compose -f "$HOME/.dotfiles/podman-compose/dev-stack.yaml" \
+        "${profile_args[@]}" up -d "$@"
+}
+
+tries=1
+max_tries=3
+until compose_up "$@"; do
+    if [ "$tries" -ge "$max_tries" ]; then
+        echo "dev-stack-up: 'compose up' still failing after $tries attempts" >&2
+        exit 1
+    fi
+    echo "dev-stack-up: 'compose up' failed (attempt $tries/$max_tries), retrying in 5s…" >&2
+    sleep 5
+    tries=$((tries + 1))
+done

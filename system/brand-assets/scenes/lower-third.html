@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>[ENGINE] · lower-third</title>
+<link rel="stylesheet" href="brand.css">
+<style>
+.lower-third {
+    position: fixed;
+    left: 48px;
+    bottom: 64px;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: var(--backdrop);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+    transform: translateX(-120%);
+    animation: slide-in var(--slow) var(--ease) forwards 0.4s;
+}
+
+.lower-third .mark {
+    width: 96px;
+    background: linear-gradient(135deg, var(--primary), var(--tertiary));
+    color: var(--bg);
+    font-family: var(--font-display);
+    font-size: 56px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lower-third .content {
+    padding: 18px 28px;
+    min-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lower-third .handle {
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--fg);
+    letter-spacing: 0.02em;
+}
+
+.lower-third .subtitle {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    color: var(--fg-muted);
+}
+
+.lower-third .subtitle .crate {
+    color: var(--tertiary);
+}
+
+@keyframes slide-in {
+    to { transform: translateX(0); }
+}
+</style>
+</head>
+<body>
+<div class="lower-third">
+    <div class="mark">E</div>
+    <div class="content">
+        <div class="handle">SL1C3D-L4BS</div>
+        <div class="subtitle" id="subtitle">
+            building <span class="crate" id="crate">[ENGINE]</span>
+        </div>
+    </div>
+</div>
+
+<script>
+// Poll /tmp/engine-status.json via the local OBS browser-source bridge.
+// Same-origin fetch; OBS must be launched with the local file dir as the
+// scene's HTML base. If the file isn't reachable, fall back to a static
+// caption — the scene still renders rather than going blank.
+async function tick() {
+    try {
+        const res = await fetch('http://127.0.0.1:8765/engine-status.json',
+            { cache: 'no-store' });
+        if (!res.ok) return;
+        const s = await res.json();
+        const sub = document.getElementById('subtitle');
+        const crate = document.getElementById('crate');
+        crate.textContent = s.crate || '[ENGINE]';
+        sub.lastChild.textContent = s.dirty_files
+            ? ` (${s.dirty_files} unstaged) on ${s.branch}@${s.sha.slice(0,7)}`
+            : ` on ${s.branch}@${s.sha.slice(0,7)}`;
+    } catch (e) { /* offline; keep static caption */ }
+}
+tick();
+setInterval(tick, 4000);
+</script>
+</body>
+</html>

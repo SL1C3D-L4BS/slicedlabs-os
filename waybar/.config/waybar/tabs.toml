@@ -1,0 +1,310 @@
+# =============================================================================
+# tabs.toml — declarative registry for the Waybar tab system.
+#
+# SINGLE SOURCE OF TRUTH for tabs. `render-waybar` expands this (+ tokens.toml)
+# into the GENERATED regions of config.jsonc.tmpl and style.css.tmpl, and the
+# same file is read at runtime by waybar-tab-watcher and waybar-hud.
+#
+# Adding a tab = add a [tabs.<id>] block here + drop its module scripts, then
+# run `render-waybar && render-templates`. No hand-editing of config/CSS.
+#
+#   kind = "workspace"  focus-driven; activated by focusing the Niri workspace
+#                       named <id> (the watcher maps focus -> active tab).
+#   kind = "overlay"    summoned HUD; `waybar-hud <id>` toggles it (keybind),
+#                       auto-dismissed on workspace focus-change or `timeout`s.
+#
+#   label  bold cap text in the brand-coloured cap pill
+#   brand  a [color] token key — drives cap fill, segment under-border accent
+#   glyph  an [icon] token key — leads the cap label
+#
+# Each [[tabs.<id>.modules]] becomes a `custom/<module.id>` Waybar module and a
+# fused segment in that tab's instrument-cluster pill, in declaration order.
+# The cap (rounded-left) is the header; the last module is rounded-right.
+# =============================================================================
+
+[meta]
+signal = 8   # single SIGRTMIN+8 fanout for every tab-aware module — never fragment
+order = ["engine", "comms", "stream", "monitoring", "gaming", "coding", "browser", "media", "net", "ai", "agenda"]
+
+# === workspace tabs (focus-driven) ==========================================
+
+[tabs.engine]
+kind = "workspace"
+label = "[ENGINE]"
+brand = "primary"
+glyph = "engine"
+cap_lead_px = 240   # measured chips width → centres the brand word
+  [[tabs.engine.modules]]
+  id = "engine-build"
+  script = "engine/build.sh"
+  interval = 5
+  on_click = "ghostty --working-directory=$HOME/Projects/engine -e bacon"
+  [[tabs.engine.modules]]
+  id = "engine-target"
+  script = "engine/target.sh"
+  interval = 15
+  [[tabs.engine.modules]]
+  id = "engine-tests"
+  script = "engine/tests.sh"
+  interval = 30
+  on_click = "ghostty --working-directory=$HOME/Projects/engine -e cargo test"
+
+[tabs.comms]
+kind = "workspace"
+label = "COMMS"
+brand = "secondary"
+glyph = "comms"
+cap_lead_px = 432   # measured chips width → centres the brand word
+  [[tabs.comms.modules]]
+  id = "comms-discord"
+  script = "comms/discord.sh"
+  interval = 5
+  [[tabs.comms.modules]]
+  id = "comms-matrix"
+  script = "comms/matrix.sh"
+  interval = 10
+  [[tabs.comms.modules]]
+  id = "comms-zoom"
+  script = "comms/zoom.sh"
+  interval = 5
+  [[tabs.comms.modules]]
+  id = "comms-mail"
+  script = "comms/mail.sh"
+  interval = 60
+  [[tabs.comms.modules]]
+  id = "comms-notifs"
+  script = "comms/notifs.sh"
+  interval = 5
+  on_click = "makoctl dismiss --all"
+
+[tabs.stream]
+kind = "workspace"
+label = "STREAM"
+brand = "tertiary"
+glyph = "stream"
+cap_lead_px = 254   # measured chips width → centres the brand word
+  [[tabs.stream.modules]]
+  id = "stream-obs"
+  script = "stream/obs.sh"
+  interval = 3
+  [[tabs.stream.modules]]
+  id = "stream-scene"
+  script = "stream/scene.sh"
+  interval = 5
+  on_scroll_up = "$HOME/.config/waybar/scripts/stream/scene.sh --next"
+  on_scroll_down = "$HOME/.config/waybar/scripts/stream/scene.sh --prev"
+  [[tabs.stream.modules]]
+  id = "stream-mic"
+  script = "stream/mic.sh"
+  interval = 3
+  on_click = "pactl set-source-mute easyeffects_source toggle"
+  on_scroll_up = "pactl set-source-volume easyeffects_source +5%"
+  on_scroll_down = "pactl set-source-volume easyeffects_source -5%"
+  [[tabs.stream.modules]]
+  id = "stream-bitrate"
+  script = "stream/bitrate.sh"
+  interval = 3
+  [[tabs.stream.modules]]
+  id = "stream-uptime"
+  script = "stream/uptime.sh"
+  interval = 1
+
+[tabs.monitoring]
+kind = "workspace"
+label = "MONITORING"
+brand = "error"
+glyph = "monitoring"
+cap_lead_px = 513   # measured chips width → centres the brand word
+  [[tabs.monitoring.modules]]
+  id = "mon-top-cpu"
+  script = "monitoring/top-cpu.sh"
+  interval = 2
+  on_click = "ghostty -e btop"
+  [[tabs.monitoring.modules]]
+  id = "mon-top-mem"
+  script = "monitoring/top-mem.sh"
+  interval = 3
+  on_click = "ghostty -e btop"
+  [[tabs.monitoring.modules]]
+  id = "mon-disk-pressure"
+  script = "monitoring/disk-pressure.sh"
+  interval = 30
+  on_click = "ghostty -e bash -ic 'df -h; echo; read -n1 -r -p \"[enter]\"'"
+  [[tabs.monitoring.modules]]
+  id = "mon-failed-units"
+  script = "monitoring/failed-units.sh"
+  interval = 10
+  on_click = "ghostty -e journalctl -xb -p 3 --no-pager"
+  [[tabs.monitoring.modules]]
+  id = "mon-net-io"
+  script = "monitoring/net-io.sh"
+  interval = 1
+
+[tabs.gaming]
+kind = "workspace"
+label = "GAMING"
+brand = "success"
+glyph = "gaming"
+cap_lead_px = 322   # measured chips width → centres the brand word (ds4=0 when no controller)
+  [[tabs.gaming.modules]]
+  id = "gaming-status"
+  script = "gaming/status.sh"
+  interval = 3
+  [[tabs.gaming.modules]]
+  id = "gpu-stats"
+  script = "gaming/gpu.sh"
+  interval = 2
+  on_click = "ghostty -e btop"
+  [[tabs.gaming.modules]]
+  id = "cpu-temp"
+  script = "gaming/cpu_temp.sh"
+  interval = 3
+  [[tabs.gaming.modules]]
+  id = "gamemode"
+  script = "gaming/gamemode.sh"
+  interval = 5
+  on_click = "$HOME/.config/gaming/gamemode-toggle.sh"
+  [[tabs.gaming.modules]]
+  id = "ds4-battery"
+  script = "gaming/ds4.sh"
+  interval = 30
+
+[tabs.coding]
+kind = "workspace"
+label = "CODING"
+brand = "coding"
+glyph = "coding"
+cap_lead_px = 554   # measured chips width → centres the brand word
+text = "fg"   # design override: light text on mid-cyan cap (vs luminance default)
+  [[tabs.coding.modules]]
+  id = "coding-git"
+  script = "tabs/coding/git.sh"
+  interval = 10
+  [[tabs.coding.modules]]
+  id = "coding-build"
+  script = "tabs/coding/build.sh"
+  interval = 5
+  [[tabs.coding.modules]]
+  id = "coding-team"
+  script = "tabs/coding/team.sh"
+  interval = 15
+  on_click = "ghostty -e slicedlabs cost"
+  [[tabs.coding.modules]]
+  id = "coding-corpus"
+  script = "tabs/coding/corpus.sh"
+  interval = 60
+  on_click = "ghostty -e slicedlabs ingest --status"
+  [[tabs.coding.modules]]
+  id = "coding-pomo"
+  script = "tabs/coding/pomo.sh"
+  interval = 1
+  on_click = "uairctl toggle"
+
+[tabs.browser]
+kind = "workspace"
+label = "BROWSER"
+brand = "browser"
+glyph = "browser"
+cap_lead_px = 109   # measured chips width → centres the brand word
+  [[tabs.browser.modules]]
+  id = "browser-status"
+  script = "tabs/browser/status.sh"
+  interval = 10
+
+# === overlay HUD tabs (keybind-summoned, auto-dismissed) ====================
+
+[tabs.media]
+kind = "overlay"
+label = "MEDIA"
+brand = "media"
+glyph = "media"
+cap_lead_px = 341   # measured chips width → centres the brand word
+keybind = "Mod+Alt+M"
+timeout = 10
+  [[tabs.media.modules]]
+  id = "media-now"
+  script = "media/now.sh"
+  interval = 2
+  on_click = "playerctl play-pause"
+  on_scroll_up = "playerctl next"
+  on_scroll_down = "playerctl previous"
+  [[tabs.media.modules]]
+  id = "media-ee"
+  script = "media/easyeffects.sh"
+  interval = 10
+  [[tabs.media.modules]]
+  id = "media-sink"
+  script = "media/sink.sh"
+  interval = 5
+  on_click = "$HOME/.config/waybar/scripts/media/sink.sh --cycle"
+  on_scroll_up = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
+  on_scroll_down = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+
+[tabs.net]
+kind = "overlay"
+label = "NET"
+brand = "net"
+glyph = "net"
+cap_lead_px = 369   # measured chips width → centres the brand word
+keybind = "Mod+Alt+N"
+timeout = 10
+  [[tabs.net.modules]]
+  id = "net-vpn"
+  script = "net/vpn.sh"
+  interval = 10
+  [[tabs.net.modules]]
+  id = "net-fw"
+  script = "net/firewall.sh"
+  interval = 30
+  [[tabs.net.modules]]
+  id = "net-route"
+  script = "net/route.sh"
+  interval = 30
+  on_click = "ghostty -e bash -ic 'ip -br addr; echo; ip route; echo; read -n1 -r -p \"[enter]\"'"
+  [[tabs.net.modules]]
+  id = "net-link"
+  script = "net/link.sh"
+  interval = 2
+
+[tabs.ai]
+kind = "overlay"
+label = "AI"
+brand = "ai"
+glyph = "ai"
+cap_lead_px = 295   # measured chips width → centres the brand word
+keybind = "Mod+Alt+A"
+timeout = 12
+  [[tabs.ai.modules]]
+  id = "ai-spend"
+  script = "ai/spend.sh"
+  interval = 30
+  on_click = "ghostty -e slicedlabs cost"
+  [[tabs.ai.modules]]
+  id = "ai-agents"
+  script = "ai/agents.sh"
+  interval = 10
+  on_click = "ghostty -e slicedlabs agents"
+  [[tabs.ai.modules]]
+  id = "ai-pomo"
+  script = "ai/pomo.sh"
+  interval = 1
+  on_click = "uairctl toggle"
+
+[tabs.agenda]
+kind = "overlay"
+label = "AGENDA"
+brand = "agenda"
+glyph = "agenda"
+cap_lead_px = 178   # measured chips width → centres the brand word
+keybind = "Mod+Alt+T"
+timeout = 12
+  [[tabs.agenda.modules]]
+  id = "agenda-next"
+  script = "agenda/next.sh"
+  interval = 60
+  on_click = "ghostty -e bash -ic 'khal calendar 2>/dev/null || cal; read -n1 -r -p \"[enter]\"'"
+  [[tabs.agenda.modules]]
+  id = "agenda-standup"
+  script = "agenda/standup.sh"
+  interval = 30
+  on_click = "$HOME/.local/bin/standup-post"

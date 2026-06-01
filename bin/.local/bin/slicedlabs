@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# slicedlabs — thin shim that invokes the Python entry point.
+# After `uv pip install -e ~/.dotfiles/slicedlabs-team`, the `slicedlabs`
+# command shows up on PATH already; this shim is a backup for environments
+# where the package isn't editable-installed yet.
+
+set -eu
+
+if command -v python3 >/dev/null 2>&1; then
+  exec python3 -m slicedlabs_team.cli "$@"
+elif command -v python >/dev/null 2>&1; then
+  exec python -m slicedlabs_team.cli "$@"
+else
+  echo "slicedlabs: no python interpreter found on PATH" >&2
+  exit 127
+fi

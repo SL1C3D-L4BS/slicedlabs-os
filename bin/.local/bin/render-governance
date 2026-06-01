@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""render-governance — bake the Warden Penalty Box contract from the SSOTs.
+
+The THIRD render target of the design language (Cockpit shell + Console TUIs are
+the first two). Mirrors render-quickshell / render-textual:
+
+  system/governance.toml  (policy)  +  slicedlabs-team/.../data/team.toml (roster)
+  +  ~/.cache/warden/status.json    (live status the monitor writes)
+                         │
+                         ▼  render-governance
+  quickshell/.../cockpit/generated/governance.json   the Penalty Box contract,
+  read by the bar `agents · N benched` pill, the Cockpit modal, and the Console
+  Penalty Box screen — ONE source for all three surfaces (the concept contract).
+
+Policy lives in governance.toml; live STATUS (clean | probation | suspended |
+retired), the violation reason, and the evidence pointer come from the hash-chained
+ledger the Warden monitor writes. With no status file every agent reads `clean`.
+"""
+from __future__ import annotations
+
+import json
+import os
+import tomllib
+from pathlib import Path
+
+DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+GOV = DOTFILES / "system/governance.toml"
+TEAM = DOTFILES / "slicedlabs-team/slicedlabs_team/data/team.toml"
+OUT = DOTFILES / "quickshell/.config/quickshell/cockpit/generated/governance.json"
+STATUS = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "warden/status.json"
+
+ACTIVE = ("clean", "probation", "suspended")   # retired agents leave the active roster
+BENCHED = ("probation", "suspended")             # "benched" = not clean, still on the team
+
+
+def load(p: Path) -> dict:
+    try:
+        return tomllib.loads(p.read_text())
+    except FileNotFoundError:
+        return {}
+
+
+def display_name(agent_id: str) -> str:
+    """slicedlabs_engineer_1 → engineer-1 (the friendly passport name)."""
+    return agent_id.removeprefix("slicedlabs_").replace("_", "-")
+
+
+def initials(name: str) -> str:
+    parts = [p for p in name.replace("-", " ").split() if p]
+    if len(parts) >= 2:
+        return (parts[0][0] + parts[1][0]).upper()
+    return (parts[0][:2] if parts else "??").upper()
+
+
+def main() -> int:
+    gov = load(GOV)
+    team = load(TEAM)
+    meta = gov.get("meta", {})
+    agents_policy = gov.get("agent", {})
+    rules = gov.get("rules", {})
+    penalty_box = gov.get("penalty_box", {})
+
+    # Live status the monitor writes (id → {status, severity, reason, evidence_ref}).
+    status_map: dict[str, dict] = {}
+    try:
+        status_map = json.loads(STATUS.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    roster = [r["name"] for r in team.get("role", []) if r.get("name")]
+    # include any governance-only agents not in the roster
+    for a in agents_policy:
+        if a not in roster:
+            roster.append(a)
+
+    default_cost = meta.get("default_max_cost_per_run", 1.0)
+    default_conf = meta.get("default_confidence_floor", 0.55)
+    default_ver = meta.get("default_version", "v1.0")
+
+    agents = []
+    for aid in roster:
+        pol = agents_policy.get(aid, {})
+        st = status_map.get(aid, {})
+        status = st.get("status", "clean")
+        name = display_name(aid)
+        agents.append({
+            "id": aid,
+            "name": name,
+            "initials": initials(name),
+            "version": st.get("version", pol.get("version", default_ver)),
+            "scope": pol.get("scope", "general"),
+            "declared_resources": pol.get("declared_resources", []),
+            "max_cost_per_run": pol.get("max_cost_per_run", default_cost),
+            "confidence_floor": pol.get("confidence_floor", default_conf),
+            "status": status,
+            "severity": st.get("severity"),           # yellow|orange|red|None
+            "reason": st.get("reason"),                # human violation summary
+            "evidence_ref": st.get("evidence_ref"),    # ledger row / id for "review evidence"
+        })
+
+    # Penalty Box first (suspended → probation), then clean; retired drop off.
+    order = {"suspended": 0, "probation": 1, "clean": 2, "retired": 3}
+    agents.sort(key=lambda a: (order.get(a["status"], 9), a["name"]))
+
+    summary = {
+        "clean": sum(a["status"] == "clean" for a in agents),
+        "probation": sum(a["status"] == "probation" for a in agents),
+        "suspended": sum(a["status"] == "suspended" for a in agents),
+        "benched": sum(a["status"] in BENCHED for a in agents),
+        "retired": sum(a["status"] == "retired" for a in agents),
+        "total": sum(a["status"] in ACTIVE for a in agents),
+    }
+
+    contract = {
+        "schema_version": meta.get("schema_version", 1),
+        "summary": summary,
+        "rules": rules,
+        "penalty_box": penalty_box,
+        "agents": agents,
+    }
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(contract, indent=2) + "\n")
+    print(f"render-governance: {OUT.relative_to(DOTFILES)} — "
+          f"{summary['total']} active ({summary['clean']} clean · {summary['benched']} benched), "
+          f"{summary['retired']} retired")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

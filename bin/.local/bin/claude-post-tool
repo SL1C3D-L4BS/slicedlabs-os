@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""claude-post-tool — PostToolUse hook script.
+
+Appends every tool call to ~/.cache/slicedlabs/audit.ndjson. Best-effort —
+hook script must never crash hard.
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+
+DOTFILES_ROOT = os.environ.get("DOTFILES_ROOT", os.path.expanduser("~/.dotfiles"))
+sys.path.insert(0, os.path.join(DOTFILES_ROOT, "slicedlabs-team"))
+
+try:
+    from slicedlabs_team.audit import record
+except Exception:  # noqa: BLE001
+    sys.exit(0)
+
+
+def main() -> int:
+    try:
+        data = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError:
+        return 0
+    record(
+        agent=data.get("agent", "claude-code"),
+        action="tool_use",
+        tool=data.get("tool_name") or data.get("tool"),
+        args=data.get("tool_input") or data.get("input"),
+        result_summary=str(data.get("result", ""))[:280],
+        cost_usd=0.0,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

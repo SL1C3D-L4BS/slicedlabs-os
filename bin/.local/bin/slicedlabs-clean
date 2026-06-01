@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# slicedlabs-clean — reclaim safe, regenerable caches. DRY-RUN by default; pass --apply
+# to execute. The default (SAFE) tier touches only caches that regenerate on demand —
+# nothing forces a rebuild or a re-pull you'll feel. The --heavy tier (opt-in) adds
+# cargo/​podman/​test-browser reclaims that DO force a cold rebuild / re-pull; it always
+# prints what it would do first. Sudo steps are isolated and announced. Wired as
+# `slicedlabs-os clean`.
+#
+#   slicedlabs-clean              # dry-run: show what the safe tier would reclaim
+#   slicedlabs-clean --apply      # execute the safe tier
+#   slicedlabs-clean --heavy      # dry-run incl. the heavy tier
+#   slicedlabs-clean --heavy --apply   # execute safe + heavy
+set -uo pipefail
+
+APPLY=0; HEAVY=0
+for a in "$@"; do case "$a" in
+    --apply) APPLY=1 ;;
+    --heavy) HEAVY=1 ;;
+    -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "slicedlabs-clean: unknown arg '$a' (try --help)" >&2; exit 2 ;;
+esac; done
+
+b=$'\e[1m'; d=$'\e[2m'; g=$'\e[32m'; y=$'\e[33m'; r=$'\e[0m'
+hdr(){ printf '\n%s▶ %s%s\n' "$b" "$1" "$r"; }
+du1(){ du -shc "$@" 2>/dev/null | tail -1 | cut -f1; }
+
+# clean CONTENTS of dirs (keep the dir itself)
+clean_dirs(){ # <label> <dir...>
+    local label="$1"; shift
+    local present=(); local x; for x in "$@"; do [ -e "$x" ] && present+=("$x"); done
+    ((${#present[@]})) || { printf '  %s· %-26s nothing%s\n' "$d" "$label" "$r"; return; }
+    local size; size=$(du1 "${present[@]}")
+    if ((APPLY)); then
+        for x in "${present[@]}"; do rm -rf -- "$x"/* "$x"/.[!.]* 2>/dev/null || true; done
+        printf '  %s✓ %-26s reclaimed ~%s%s\n' "$g" "$label" "$size" "$r"
+    else
+        printf '  • %-26s ~%s\n' "$label" "$size"
+    fi
+}
+
+# run a cleaner command (only if its tool exists)
+clean_cmd(){ # <label> <reclaim-hint|-> <cmd...>
+    local label="$1" hint="$2"; shift 2
+    command -v "$1" >/dev/null 2>&1 || { printf '  %s· %-26s %s not installed%s\n' "$d" "$label" "$1" "$r"; return; }
+    local size="?"; [ "$hint" != "-" ] && [ -e "$hint" ] && size=$(du1 "$hint")
+    if ((APPLY)); then
+        "$@" >/dev/null 2>&1 || true
+        printf '  %s✓ %-26s (~%s)%s\n' "$g" "$label" "$size" "$r"
+    else
+        printf '  • %-26s ~%s  %s(%s)%s\n' "$label" "$size" "$d" "$*" "$r"
+    fi
+}
+
+# sudo step (only runs under --apply; announced)
+sudo_cmd(){ # <label> <reclaim-hint|-> <cmd...>
+    local label="$1" hint="$2"; shift 2
+    local size="?"; [ "$hint" != "-" ] && [ -e "$hint" ] && size=$(sudo du -shc "$hint" 2>/dev/null | tail -1 | cut -f1)
+    if ((APPLY)); then
+        printf '  %s⟳ %-26s sudo: %s%s\n' "$y" "$label" "$*" "$r"
+        sudo "$@" >/dev/null 2>&1 || true
+        printf '  %s✓ %-26s (~%s)%s\n' "$g" "$label" "$size" "$r"
+    else
+        printf '  • %-26s ~%s  %s(sudo %s)%s\n' "$label" "$size" "$d" "$*" "$r"
+    fi
+}
+
+((APPLY)) || printf '%s(dry-run — nothing is deleted. add --apply to execute.)%s\n' "$y" "$r"
+
+hdr "Package-manager caches"
+sudo_cmd "pacman pkg (keep 1)"  /var/cache/pacman/pkg paccache -rk1
+sudo_cmd "pacman uninstalled"   -                      paccache -ruk0
+clean_cmd "paru AUR build cache" "$HOME/.cache/paru"    paru -Sccd --noconfirm
+
+hdr "Language / toolchain caches"
+clean_cmd "uv (prune unused)"    "$HOME/.cache/uv"   uv cache prune
+clean_cmd "pip (purge)"          "$HOME/.cache/pip"  pip cache purge
+clean_cmd "npm (clean)"          "$HOME/.npm"        npm cache clean --force
+clean_cmd "go build cache"       "$HOME/.cache/go-build" go clean -cache
+
+hdr "Browser caches"
+clean_dirs "firefox/zen/ff-research" \
+    "$HOME/.cache/mozilla/firefox" "$HOME/.cache/zen" "$HOME/.cache/ff-research"
+
+hdr "Logs · coredumps · trash"
+sudo_cmd  "journal → 200M"       -  journalctl --vacuum-size=200M
+sudo_cmd  "systemd coredumps"    /var/lib/systemd/coredump  bash -c 'rm -f /var/lib/systemd/coredump/* 2>/dev/null; true'
+clean_dirs "trash"               "$HOME/.local/share/Trash/files" "$HOME/.local/share/Trash/info"
+
+hdr "Dotfiles / session cruft"
+clean_dirs ".ruff_cache"         "$HOME/.dotfiles/.ruff_cache"
+clean_dirs "stale zellij sessions" "$HOME/.cache/zellij/contract_version_1/session_info"
+
+if ((HEAVY)); then
+    hdr "HEAVY tier — forces rebuilds / re-pulls (opt-in)"
+    clean_cmd  "engine target (cargo)" "$HOME/Projects/engine/target" \
+        bash -c 'cd "$HOME/Projects/engine" && cargo clean'
+    clean_cmd  "podman prune -a"   -  podman system prune -a --volumes -f
+    clean_dirs "playwright browsers" "$HOME/.cache/ms-playwright"
+    clean_dirs "puppeteer browsers"  "$HOME/.cache/puppeteer"
+    clean_dirs "cargo-xwin cache"    "$HOME/.cache/cargo-xwin"
+    clean_dirs "datalab/marker models" "$HOME/.cache/datalab"
+else
+    printf '\n%s(heavy tier skipped — pass --heavy to include cargo clean / podman prune / test browsers)%s\n' "$d" "$r"
+fi
+
+hdr "Done"
+if ((APPLY)); then
+    printf '  free now: %s\n' "$(df -h "$HOME" | awk 'NR==2{print $4" free on "$6}')"
+else
+    printf '  %sre-run with --apply to reclaim the above.%s\n' "$y" "$r"
+fi

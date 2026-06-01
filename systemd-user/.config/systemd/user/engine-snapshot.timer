@@ -1,0 +1,10 @@
+[Unit]
+Description=Run engine-snapshot every 3h while logged in
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=3h
+Persistent=false
+
+[Install]
+WantedBy=timers.target

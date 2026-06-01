@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# verify-workspace-remap — guarantee #1 (ownership): the stream→streaming rename and
+# the WS1..8 identity renumber left NO stray old literal in the active SSOT/config,
+# and the canonical order + Mod+1..8 mapping are intact. Pure grep gate; exit 1 on a
+# stray (wire into verify-all / CI / pre-commit). The stream/ chip-SCRIPT dir keeps
+# its name; the retired waybar/ tree and generated/ outputs are out of scope.
+set -euo pipefail
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+cd "$ROOT"
+fail=0
+
+# (1) No old workspace-name literal "stream" anywhere in the active config.
+stray=$(grep -rnoE '"stream"|\[workspaces\.stream\]|\bstream:|focus-workspace stream\b|cockpit stream\b|workspaces\.stream\b' \
+    niri system sliced-engine quickshell bin \
+    --include='*.toml' --include='*.kdl' --include='*.tmpl' --include='*.qml' --include='*.js' --include='niri-workspace-launcher' 2>/dev/null \
+    | grep -v '/generated/' | grep -v 'stream/' || true)
+if [[ -n "$stray" ]]; then
+    echo "workspace-remap: STRAY old 'stream' workspace literal(s):" >&2
+    echo "$stray" >&2
+    fail=1
+fi
+
+# (2) The eight identity workspaces are declared in the niri template, in order.
+# Extra non-identity scratch workspaces (e.g. `desk` on Mod+9, the freed DP-3) may
+# trail them — so assert the first 8 are the canonical identity set, in order.
+want="coding research engine browser monitoring streaming gaming media"
+got=$(grep -oE '^workspace "[a-z]+"' niri/.config/niri/config.kdl.tmpl \
+    | sed -E 's/workspace "([a-z]+)"/\1/' | tr '\n' ' ' | sed 's/ *$//')
+got8=$(echo "$got" | cut -d' ' -f1-8)
+if [[ "$got8" != "$want" ]]; then
+    echo "workspace-remap: niri workspace order drifted" >&2
+    echo "  want (first 8): $want" >&2
+    echo "  got:            $got" >&2
+    fail=1
+fi
+
+# (3) Mod+1..8 focus the eight workspaces in canonical identity order.
+declare -A MAP=( [1]=coding [2]=research [3]=engine [4]=browser [5]=monitoring [6]=streaming [7]=gaming [8]=media )
+for d in 1 2 3 4 5 6 7 8; do
+    ws=${MAP[$d]}
+    grep -qE "Mod\+$d \{ focus-workspace \"$ws\"; \}" niri/.config/niri/config.kdl.tmpl \
+        || { echo "workspace-remap: Mod+$d not bound to \"$ws\" in niri template" >&2; fail=1; }
+done
+
+# (4) The launcher pins the canonical DP-2 order (monitoring lives on DP-3).
+grep -q 'want="coding,research,engine,browser,streaming,gaming,media"' bin/.local/bin/niri-workspace-launcher \
+    || { echo "workspace-remap: launcher reorder guard is not on the canonical order" >&2; fail=1; }
+
+[[ $fail -eq 0 ]] && echo "workspace-remap: rename + WS1..8 renumber clean, no strays ✓"
+exit $fail

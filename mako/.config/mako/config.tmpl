@@ -1,0 +1,67 @@
+# [ENGINE] platform — Mako notifications · tokens from system/tokens.toml
+#
+# Anchored top-right of the focused output. Three urgency tiers (low /
+# normal / high), each with its own border + text styling so a quick
+# glance distinguishes "incoming DM" from "build failed". Mako anchors
+# at the layer-shell level; niri's layer-rule adds a soft primary-tinted
+# shadow on top (see niri config.kdl).
+
+font={{font.mono}} {{font.ui_size}}
+background-color={{color_rgba.backdrop}}
+text-color={{color.fg}}
+border-color={{color.primary}}
+border-size={{geom.border}}
+border-radius={{geom.radius_lg}}
+padding=14,18
+margin={{geom.gap}}
+height=200
+width=400
+icon-path=/usr/share/icons/Tela-circle-purple-dark:/usr/share/icons/hicolor
+max-icon-size=48
+default-timeout=5000
+ignore-timeout=0
+max-visible=5
+sort=-time
+anchor=top-right
+group-by=app-name
+layer=overlay
+progress-color=over {{color_rgba.shadow_primary}}
+format=<b>%a</b>\n%s\n<i>%b</i>
+markup=1
+actions=1
+on-button-left=dismiss
+on-button-middle=invoke-default-action
+on-button-right=dismiss-all
+on-touch=dismiss
+
+[urgency=low]
+text-color={{color.fg_muted}}
+border-color={{color.inactive}}
+background-color={{color_rgba.notify_low}}
+default-timeout=3000
+
+[urgency=normal]
+border-color={{color.primary}}
+
+[urgency=high]
+border-color={{color.error}}
+background-color={{color_rgba.notify_critical}}
+border-size=3
+default-timeout=0
+
+# App-specific styling — Discord pings get the tertiary accent so they're
+# distinguishable from generic high-urgency build/CI failures.
+[app-name=discord]
+border-color={{color.tertiary}}
+
+[app-name=\[ENGINE\]]
+border-color={{color.secondary}}
+
+# Do-Not-Disturb mode — entered by mako-workspace-mode daemon when the user
+# focuses the `engine` workspace (deep-work zone, no pop interruption).
+# Notifications still queue (visible in the comms tab's `notifs` chip count);
+# they just don't render on-screen. Lifted automatically on workspace exit.
+[mode=do-not-disturb]
+invisible=1
+default-timeout=0
+ignore-timeout=1

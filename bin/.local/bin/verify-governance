@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# verify-governance — Warden integrity gate. Proves the three governance promises:
+#   1. the hash-chained ledger is tamper-evident (mutating a row breaks the chain),
+#   2. the monitor AUTO-benches an undeclared-resource action (red → suspended),
+#   3. the live ledger (if any) verifies + the Cockpit governance.json is valid.
+# Exit 1 on any failure (wire into verify-all / CI).
+set -euo pipefail
+
+python3 - <<'PY'
+import json, os, sqlite3, sys, tempfile
+from pathlib import Path
+
+from slicedlabs_team.warden import AgentAction, Ledger, Monitor, PenaltyBox
+from slicedlabs_team.warden.policy import AgentPolicy, Policy
+
+fails: list[str] = []
+
+with tempfile.TemporaryDirectory() as tmp:
+    td = Path(tmp)
+
+    # 1) tamper-evidence
+    led = Ledger(td / "l.db")
+    led.append("eng", "action", {"x": 1})
+    led.append("eng", "penalty", {"behavior": "undeclared_resource"})
+    if not led.verify_chain()[0]:
+        fails.append("ledger: a clean chain failed to verify")
+    led.close()
+    db = sqlite3.connect(td / "l.db")
+    db.execute("UPDATE ledger SET payload=? WHERE id=1", ('{"x":9}',))
+    db.commit(); db.close()
+    if Ledger(td / "l.db").verify_chain()[0]:
+        fails.append("ledger: tampering was NOT detected")
+
+    # 2) auto-bench an undeclared resource
+    pol = Policy(agents={"eng": AgentPolicy(declared_resources=("repo:read",))})
+    mon = Monitor(pol, ledger=Ledger(td / "m.db"), box=PenaltyBox(td / "s.json"), rebake=False)
+    v = mon.check(AgentAction("eng", resources=("repo:read", "s3:secret")))
+    if v.ok or mon.box.status("eng") != "suspended":
+        fails.append("monitor: an undeclared resource did NOT suspend the agent")
+
+# 3) live ledger integrity (if present) + cockpit contract validity
+live = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "warden/ledger.db"
+if live.exists():
+    if not Ledger(live).verify_chain()[0]:
+        fails.append(f"ledger: the LIVE chain is broken ({live})")
+
+contract = Path.home() / ".config/quickshell/cockpit/generated/governance.json"
+try:
+    d = json.loads(contract.read_text())
+    for key in ("summary", "rules", "agents"):
+        if key not in d:
+            fails.append(f"contract: missing '{key}'")
+    if "benched" not in d.get("summary", {}):
+        fails.append("contract: summary missing 'benched'")
+except Exception as exc:  # noqa: BLE001 — report any contract read failure
+    fails.append(f"contract: {exc}")
+
+if fails:
+    print("governance: FAIL")
+    for f in fails:
+        print("  ✗", f)
+    sys.exit(1)
+print("governance: ledger tamper-evident · monitor auto-benches · contract valid ✓")
+PY

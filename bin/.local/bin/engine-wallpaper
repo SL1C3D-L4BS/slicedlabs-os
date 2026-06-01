@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# engine-wallpaper — start the awww-daemon (if needed) and set the current
+# [ENGINE] wallpaper with a token-tuned transition. Idempotent; safe to call
+# from niri spawn-at-startup, swayidle, or interactively to reload.
+#
+# Usage:
+#   engine-wallpaper                 # default: ~/.dotfiles/system/wallpapers/engine-default.png
+#   engine-wallpaper <path>          # explicit image
+#   engine-wallpaper --random        # random from ~/.dotfiles/system/wallpapers/*.png
+set -euo pipefail
+
+WALL_DIR="${HOME}/.dotfiles/system/wallpapers"
+DEFAULT="${WALL_DIR}/engine-default.png"
+
+# Resolve target image.
+if [ "${1:-}" = "--random" ]; then
+    candidates=("${WALL_DIR}"/*.png)
+    target="${candidates[RANDOM % ${#candidates[@]}]}"
+elif [ -n "${1:-}" ]; then
+    target="$1"
+else
+    target="${DEFAULT}"
+fi
+
+if [ ! -f "${target}" ]; then
+    echo "engine-wallpaper: ${target} not found — run render-brand first" >&2
+    exit 1
+fi
+
+# Start daemon if not already running. awww-daemon writes a socket under
+# $XDG_RUNTIME_DIR/awww.<wayland-display>.sock; just check for the process.
+if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+    nohup awww-daemon >/tmp/awww-daemon.log 2>&1 &
+    # Wait for socket — `awww query` succeeds once daemon is ready.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        awww query >/dev/null 2>&1 && break
+        sleep 0.1
+    done
+fi
+
+# Transition vocabulary lives in tokens (motion.normal_ms). Hard-coded here
+# rather than templated since this script also runs on boot before render-
+# templates would touch it.
+awww img "${target}" \
+    --transition-type=grow \
+    --transition-pos=top-right \
+    --transition-duration=1.2 \
+    --transition-fps=60 \
+    --transition-bezier=0.22,1,0.36,1 2>&1
+
+# Keep the blurred overview backdrop (swaybg) in sync with the desktop wallpaper.
+if command -v engine-backdrop >/dev/null 2>&1; then
+    engine-backdrop "${target}" >/dev/null 2>&1 || true
+fi

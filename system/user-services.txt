@@ -1,0 +1,9 @@
+dev-stack-obs.service
+p11-kit-server.socket
+pipewire-pulse.socket
+pipewire.socket
+podman.socket
+quickshell.service
+wireplumber.service
+xdg-user-dirs.service
+ydotool.service

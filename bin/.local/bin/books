@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# books — TUI reader for the ~/Resources/books corpus. fzf-pick a book with a live
+# extracted-text preview, then read it in the terminal. Prefers a real TUI PDF
+# viewer (tdf — `cargo install tdf`) for in-terminal graphical pages; falls back to
+# zathura (GUI), else extracted text (pdftotext) in a pager. Part of the `research`
+# dev-cockpit (zellij layout `research`).
+set -euo pipefail
+
+DIR="${BOOKS_DIR:-$HOME/Resources/books}"
+[ -d "$DIR" ] || { echo "books: $DIR not found" >&2; exit 1; }
+cd "$DIR"
+
+mapfile -t items < <(ls -1 ./*.pdf ./*.epub 2>/dev/null | sed 's|^\./||' | sort)
+((${#items[@]})) || { echo "books: no PDFs/EPUBs in $DIR" >&2; exit 1; }
+
+sel="$(printf '%s\n' "${items[@]}" | fzf \
+    --prompt='books › ' --info=inline --border=rounded --cycle \
+    --preview='pdftotext -q -f 1 -l 4 {} - 2>/dev/null | sed "/^[[:space:]]*$/d" | head -80' \
+    --preview-window='right:58%:wrap' \
+    --header='enter: read · ctrl-g: open in GUI · esc: quit' \
+    --expect=ctrl-g)" || exit 0
+
+key="$(head -1 <<<"$sel")"; book="$(tail -1 <<<"$sel")"
+[ -n "$book" ] || exit 0
+
+if [ "$key" = "ctrl-g" ] && command -v zathura >/dev/null 2>&1; then
+    exec zathura "$book"
+elif command -v tdf >/dev/null 2>&1; then
+    exec tdf "$book"
+elif command -v zathura >/dev/null 2>&1; then
+    exec zathura "$book"
+else
+    pdftotext -q "$book" - 2>/dev/null | ${PAGER:-less -R}
+fi

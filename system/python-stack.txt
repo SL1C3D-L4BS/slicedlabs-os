@@ -1,0 +1,72 @@
+# Python tools installed via `uv tool install <name>` (system-wide, isolated venvs).
+# Source of truth for layer_B_python_ecosystem in bootstrap.sh. One tool per line.
+# Comments begin with '#'. Re-runs are idempotent (uv tool install is a no-op
+# if already installed at the requested version).
+#
+# Grouped by responsibility (group headers are pure comments — the bootstrap
+# layer parses lines stripped of '#' comments and blanks).
+
+# --- Tooling: linters, type checkers, security ---
+ruff
+mypy
+basedpyright
+pre-commit
+bandit
+pip-audit
+
+# --- REPL / notebooks ---
+ipython
+jupyterlab
+marimo
+pretty-traceback
+
+# --- Math / scientific / dataframes ---
+sympy
+numpy
+scipy
+polars
+pandas
+matplotlib
+plotly
+seaborn
+altair
+
+# --- Animation (manim/manimgl). System pkgs (ffmpeg, texlive-most,
+#     texlive-fontsutils, pango) are installed by layer_B (apt/pacman side). ---
+manim
+
+# --- AI / ML (CPU build of torch by default; ROCm install handled by H.6). ---
+torch
+transformers
+sentence-transformers
+datasets
+accelerate
+peft
+optimum
+
+# --- LLM orchestration / SDKs ---
+langchain
+langgraph
+llama-index
+litellm
+instructor
+openai
+anthropic
+
+# --- Dev utilities (HTTP, validation, tests, logging, ergonomics) ---
+httpx
+pydantic
+pytest
+hypothesis
+pytest-bdd
+rich
+typer
+loguru
+pendulum
+
+# --- Database migrations (Alembic — paired with PG17 from layer_C) ---
+alembic
+
+# --- Personal AI Team / RAG (extension phases L-R) ---
+aider-chat
+cognee

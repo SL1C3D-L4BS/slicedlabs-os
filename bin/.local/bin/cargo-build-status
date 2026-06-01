@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# cargo-build-status — thin wrapper around cargo {build,check,test,clippy}
+# that writes a structured JSON status to ~/.cache/engine-build-status, used
+# by the waybar workstation widget + coding-build chip.
+#
+# Usage:
+#   cargo-build-status build [args...]       # cargo build [args]
+#   cargo-build-status check [args...]
+#   cargo-build-status test  [args...]
+#   cargo-build-status clippy [args...]
+#
+# Fish alias `cb` → `cargo-build-status build` (defined in fish/abbrs.fish).
+#
+# Status file schema:
+#   {
+#     "state": "ok|fail|building",
+#     "duration_s": 1.42,
+#     "errors": 0, "warnings": 3,
+#     "target": "debug|release",
+#     "subcommand": "build|check|test|clippy",
+#     "ts": 1733971312
+#   }
+
+set -uo pipefail
+
+STATUS="${XDG_CACHE_HOME:-$HOME/.cache}/engine-build-status"
+mkdir -p "$(dirname "$STATUS")"
+
+sub="${1:?usage: cargo-build-status <build|check|test|clippy> [args]}"; shift
+extra=("$@")
+
+target="debug"
+for a in "${extra[@]}"; do [[ "$a" == "--release" ]] && target="release"; done
+
+# Mark "building" before invoking cargo so the waybar chip animates.
+jq -nc --arg state building --arg target "$target" --arg sub "$sub" \
+      --argjson ts "$(date +%s)" \
+      '{state:$state,target:$target,subcommand:$sub,errors:0,warnings:0,duration_s:0,ts:$ts}' \
+  > "$STATUS"
+pkill -SIGRTMIN+8 waybar 2>/dev/null || true
+
+start=$(date +%s.%N)
+out=$(mktemp)
+trap 'rm -f "$out"' EXIT
+
+# Force JSON diagnostics so we can count errors/warnings without regex.
+RUSTFLAGS="${RUSTFLAGS:-} -D warnings"  # treat warnings as warnings (count them)
+cargo "$sub" --message-format=json "${extra[@]}" > "$out" 2>&1
+rc=$?
+end=$(date +%s.%N)
+dur=$(awk "BEGIN{printf \"%.3f\", $end - $start}")
+
+errors=$(grep -c '"level":"error"' "$out" || true)
+warnings=$(grep -c '"level":"warning"' "$out" || true)
+
+state="ok"
+[[ "$rc" -ne 0 ]] && state="fail"
+
+jq -nc --arg state "$state" --arg target "$target" --arg sub "$sub" \
+      --argjson errs "$errors" --argjson warns "$warnings" \
+      --argjson dur "$dur" \
+      --argjson ts "$(date +%s)" \
+      '{state:$state,target:$target,subcommand:$sub,errors:$errs,warnings:$warns,duration_s:$dur,ts:$ts}' \
+  > "$STATUS"
+pkill -SIGRTMIN+8 waybar 2>/dev/null || true
+
+# Stream the original cargo output through to the terminal too, so the user
+# sees a normal `cargo build` experience.
+cat "$out" | jq -r 'select(.message?.rendered != null) | .message.rendered' 2>/dev/null || cat "$out"
+exit "$rc"

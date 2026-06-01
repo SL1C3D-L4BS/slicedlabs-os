@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+"""render-keys — generate every keybinding artifact from the keys SSOT.
+
+system/keys.toml is the single source of truth for keybindings across SlicedLabs
+OS. This mirrors render-quickshell / render-templates: one registry → generators →
+rendered output. Emits (default run):
+
+  1. quickshell/.../cockpit/generated/keys.json   the searchable Cockpit modal
+  2. docs/keys/<tool>.md  +  docs/keys/SYSTEM-KEYS.md   cheatsheets
+  3. docs/keys/keyboard-poster.typ                 the graphed per-layer poster
+
+With --niri it ALSO rewrites the managed binds region in the niri config template
+(phase 1b — the SSOT flip). That is opt-in so the default run can never break the
+live keyboard. Override roots with DOTFILES_ROOT.
+
+  render-keys                 # json + cheatsheets + poster (safe)
+  render-keys --niri          # also regenerate niri binds (after diff review)
+  render-keys --niri --check  # print the generated niri binds to stdout, write nothing
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import tomllib
+from datetime import UTC, datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import color  # noqa: E402 — local OKLCH→sRGB lib (identity hues are oklch() now)
+
+DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+KEYS = DOTFILES / "system/keys.toml"
+TOKENS = DOTFILES / "system/tokens.toml"
+JSON_OUT = DOTFILES / "quickshell/.config/quickshell/cockpit/generated/keys.json"
+DOCS_DIR = DOTFILES / "docs/keys"
+NIRI_TMPL = DOTFILES / "niri/.config/niri/config.kdl.tmpl"
+
+BEGIN = "    // >>> generated: keys (render-keys) — do not edit by hand"
+END = "    // <<< generated: keys"
+
+# Workspace / HUD identity → [color] token key (for poster tinting + json hue).
+HUE = {
+    "coding": "coding", "research": "research", "engine": "engine",
+    "browser": "browser", "monitoring": "monitoring", "streaming": "streaming",
+    "gaming": "gaming", "media": "media", "net": "net", "ai": "ai",
+    "agenda": "agenda", "context": "primary", "system": "fg_muted",
+}
+
+# Physical keyboard rows for the poster boards (base keys only).
+KB_ROWS = [
+    list("1234567890"),
+    list("QWERTYUIOP"),
+    list("ASDFGHJKL"),
+    list("ZXCVBNM"),
+]
+SPECIAL = {  # niri token → display label
+    "Return": "↵", "Space": "␣", "Tab": "⇥", "Escape": "Esc",
+    "BackSpace": "⌫", "Slash": "/", "Comma": ",", "Period": ".",
+    "Print": "Prt",
+}
+POSTER_LAYERS = ["Mod", "Mod+Shift", "Mod+Ctrl", "Mod+Alt"]
+
+
+def load_toml(p: Path) -> dict:
+    with p.open("rb") as f:
+        return tomllib.load(f)
+
+
+def hue_hex(bind: dict, colors: dict) -> str | None:
+    """Best-effort destination hue for a bind (workspace/HUD identity)."""
+    hay = f"{bind.get('action', '')} {bind.get('desc', '')}".lower()
+    for name, tok in HUE.items():
+        if name in hay:
+            v = colors.get(tok)
+            return (color.to_hex(v) or v) if v else None
+    return None
+
+
+def base_key(key: str, layer: str) -> str | None:
+    """Strip the modifier layer prefix → the base key token (for poster boards)."""
+    if not key.startswith("Mod"):
+        return None
+    rest = key
+    for pfx in ("Mod+Ctrl+Shift+", "Mod+Ctrl+", "Mod+Alt+", "Mod+Shift+", "Mod+"):
+        if rest.startswith(pfx) and pfx.rstrip("+") == layer:
+            return rest[len(pfx):]
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# 1. JSON for the Cockpit modal                                                #
+# --------------------------------------------------------------------------- #
+def build_json(binds: list[dict], colors: dict) -> dict:
+    tools: dict[str, dict[str, list]] = {}
+    for b in binds:
+        cats = tools.setdefault(b["tool"], {})
+        row = {"key": b["key"], "desc": b["desc"], "layer": b.get("layer", "Other")}
+        if (h := hue_hex(b, colors)):
+            row["hue"] = h
+        cats.setdefault(b.get("category", "General"), []).append(row)
+    out_tools = []
+    for tool, cats in tools.items():
+        out_tools.append({
+            "name": tool,
+            "count": sum(len(v) for v in cats.values()),
+            "categories": [{"name": c, "binds": v} for c, v in cats.items()],
+        })
+    return {
+        "version": 1,
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "tools": out_tools,
+        "total": len(binds),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# 2. Markdown cheatsheets                                                      #
+# --------------------------------------------------------------------------- #
+def _tool_md(tool: str, binds: list[dict]) -> str:
+    cats: dict[str, list] = {}
+    for b in binds:
+        cats.setdefault(b.get("category", "General"), []).append(b)
+    lines = [f"## {tool}", ""]
+    for cat, rows in cats.items():
+        lines += [f"### {cat}", "", "| Key | Action |", "|---|---|"]
+        for b in rows:
+            key = b["key"].replace("|", "\\|")
+            desc = b["desc"].replace("|", "\\|")
+            lines.append(f"| `{key}` | {desc} |")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def build_cheatsheets(by_tool: dict[str, list[dict]]) -> dict[Path, str]:
+    banner = "<!-- GENERATED by render-keys from system/keys.toml — do not edit. -->\n"
+    files: dict[Path, str] = {}
+    for tool, binds in by_tool.items():
+        files[DOCS_DIR / f"{tool}.md"] = banner + f"# {tool} — keybindings\n\n" + _tool_md(tool, binds) + "\n"
+    combined = [banner, "# SlicedLabs OS — System Keybindings", "",
+                "Every keybind, every tool. Open the live searchable console with "
+                "`Mod+Alt+K`. Generated from `system/keys.toml`.", "",
+                "## Tools", ""]
+    combined += [f"- [{t}](#{t.replace('+', '')})" for t in by_tool]
+    combined.append("")
+    for tool, binds in by_tool.items():
+        combined.append(_tool_md(tool, binds))
+    files[DOCS_DIR / "SYSTEM-KEYS.md"] = "\n".join(combined) + "\n"
+    return files
+
+
+# --------------------------------------------------------------------------- #
+# 3. typst keyboard poster (graphed per modifier layer)                        #
+# --------------------------------------------------------------------------- #
+def build_poster(binds: list[dict], colors: dict) -> str:
+    niri = [b for b in binds if b["tool"] == "niri"]
+    fg = colors.get("fg", "#F7F6F2")
+    bg = colors.get("bg", "#1E1E1E")
+    bg_alt = colors.get("bg_alt", "#2B2B2B")
+    muted = colors.get("fg_muted", "#B8A789")
+
+    def esc(s: str) -> str:
+        return s.replace("\\", "\\\\").replace('"', '\\"')
+
+    def sub_label(desc: str, limit: int = 16) -> str:
+        # The cap's colour already signals the workspace, so drop that prefix;
+        # then truncate on a word boundary (never mid-word) to fit the cap.
+        s = desc[len("Workspace: "):] if desc.startswith("Workspace: ") else desc
+        if len(s) <= limit:
+            return s
+        head = s[:limit].rsplit(" ", 1)[0]
+        return head or s[:limit]
+
+    out: list[str] = []
+    out.append("// GENERATED by render-keys from system/keys.toml — do not edit.")
+    out.append(f'#set page(width: 420mm, height: 297mm, margin: 18mm, fill: rgb("{bg}"))')
+    out.append(f'#set text(font: "Geist Mono", fill: rgb("{fg}"), size: 9pt)')
+    out.append("")
+    out.append("#let cap(label, sub, fill, ink) = rect(")
+    out.append("  width: 26mm, height: 16mm, inset: 2mm, radius: 3pt, fill: fill,")
+    out.append('  stroke: 0.5pt + rgb("#ffffff22"))[')
+    out.append("  #set text(fill: ink)")
+    out.append("  #text(weight: 700, size: 11pt)[#label] \\")
+    out.append("  #text(size: 6.5pt, fill: ink)[#sub]")
+    out.append("]")
+    out.append("#let blank(label) = rect(width: 26mm, height: 16mm, inset: 2mm, radius: 3pt,")
+    out.append(f'  fill: rgb("{bg_alt}"), stroke: 0.5pt + rgb("#ffffff11"))[')
+    out.append(f'  #text(weight: 400, size: 11pt, fill: rgb("{muted}"))[#label]]')
+    out.append("")
+    out.append('#align(center)[#text(size: 22pt, weight: 800)[SlicedLabs OS — Keyboard Map]]')
+    out.append("#v(4mm)")
+    out.append("")
+
+    for layer in POSTER_LAYERS:
+        # base-key → bind for this layer
+        m: dict[str, dict] = {}
+        for b in niri:
+            if b.get("layer") != layer:
+                continue
+            bk = base_key(b["key"], layer)
+            if bk:
+                m[bk] = b
+        out.append(f'#text(size: 14pt, weight: 700)[{layer}]')
+        out.append("#v(2mm)")
+        for row in KB_ROWS:
+            cells = []
+            for k in row:
+                b = m.get(k)
+                if b:
+                    h = hue_hex(b, colors) or colors.get("primary", "#2961B1")
+                    sub = sub_label(b["desc"])
+                    cells.append(f'cap("{k}", "{esc(sub)}", rgb("{h}"), rgb("{bg}"))')
+                else:
+                    cells.append(f'blank("{k}")')
+            out.append("#stack(dir: ltr, spacing: 2mm, " + ", ".join(cells) + ")")
+            out.append("#v(2mm)")
+        # specials present in this layer (Return/Space/Tab/etc.)
+        spec = []
+        for tok, lbl in SPECIAL.items():
+            b = m.get(tok)
+            if b:
+                h = hue_hex(b, colors) or colors.get("primary", "#2961B1")
+                spec.append(f'cap("{lbl}", "{esc(sub_label(b["desc"]))}", rgb("{h}"), rgb("{bg}"))')
+        if spec:
+            out.append("#stack(dir: ltr, spacing: 2mm, " + ", ".join(spec) + ")")
+            out.append("#v(2mm)")
+        out.append("#v(8mm)")
+        out.append("")
+
+    # Appendix: Fn / Other niri chords not on the alpha boards.
+    extra = [b for b in niri if b.get("layer") in ("Fn", "Other")]
+    if extra:
+        out.append('#text(size: 14pt, weight: 700)[Function & media keys]')
+        out.append("#v(2mm)")
+        for b in extra:
+            out.append(f'#text(size: 9pt)[`{esc(b["key"])}` — {esc(b["desc"])}] \\')
+    return "\n".join(out) + "\n"
+
+
+# --------------------------------------------------------------------------- #
+# niri binds (phase 1b — opt-in)                                               #
+# --------------------------------------------------------------------------- #
+def render_niri_binds(binds: list[dict]) -> str:
+    lines = [BEGIN]
+    for b in binds:
+        if b["tool"] != "niri":
+            continue
+        attrs = f" {b['attrs']}" if b.get("attrs") else ""
+        lines.append(f"    {b['key']}{attrs} {{ {b['action']}; }}")
+    lines.append(END)
+    return "\n".join(lines)
+
+
+def emit_niri(binds: list[dict], check: bool) -> int:
+    block = render_niri_binds(binds)
+    if check:
+        print(block)
+        return 0
+    text = NIRI_TMPL.read_text()
+    if BEGIN not in text or END not in text:
+        print(f"error: managed markers not found in {NIRI_TMPL}", file=sys.stderr)
+        print("  add these two lines inside the binds {} block first:", file=sys.stderr)
+        print(f"  {BEGIN}\n  {END}", file=sys.stderr)
+        return 2
+    pre = text[: text.index(BEGIN)]
+    post = text[text.index(END) + len(END):]
+    NIRI_TMPL.write_text(pre + block + post)
+    print(f"✓ niri binds → {NIRI_TMPL} (run render-templates next)")
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--niri", action="store_true", help="also regenerate niri binds (phase 1b)")
+    ap.add_argument("--check", action="store_true", help="with --niri: print binds, write nothing")
+    args = ap.parse_args()
+
+    keys = load_toml(KEYS)
+    binds: list[dict] = keys.get("bind", [])
+    if not binds:
+        print("error: no [[bind]] entries in keys.toml", file=sys.stderr)
+        return 1
+    colors = load_toml(TOKENS).get("color", {})
+
+    by_tool: dict[str, list[dict]] = {}
+    for b in binds:
+        by_tool.setdefault(b["tool"], []).append(b)
+
+    if args.niri:
+        return emit_niri(binds, args.check)
+
+    # default: json + cheatsheets + poster
+    JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    JSON_OUT.write_text(json.dumps(build_json(binds, colors), indent=2) + "\n")
+    for path, content in build_cheatsheets(by_tool).items():
+        path.write_text(content)
+    (DOCS_DIR / "keyboard-poster.typ").write_text(build_poster(binds, colors))
+
+    print(f"✓ {len(binds)} binds across {len(by_tool)} tools")
+    print(f"  → {JSON_OUT.relative_to(DOTFILES)}")
+    print(f"  → {(DOCS_DIR / 'SYSTEM-KEYS.md').relative_to(DOTFILES)} (+ {len(by_tool)} per-tool)")
+    print(f"  → {(DOCS_DIR / 'keyboard-poster.typ').relative_to(DOTFILES)}  (typst compile to SVG/PDF)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

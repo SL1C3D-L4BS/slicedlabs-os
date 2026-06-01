@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# verify-design-language — guarantee #6 (ownership): every render target binds to the
+# token cascade / semantic ROLES, never to raw hues. Fail if a HAND-WRITTEN render-
+# target source carries a raw 6-digit hex colour. The generated/ outputs (Theme.qml,
+# palette.py, theme.tcss) ARE the baked tokens, so they are exempt. CI / pre-commit.
+set -euo pipefail
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+cd "$ROOT"
+fail=0
+
+# Cockpit GPU shell — hand-written QML (generated/Theme.qml is the token bake).
+hits=$(grep -rnoE '#[0-9a-fA-F]{6}\b' quickshell/.config/quickshell/cockpit --include='*.qml' 2>/dev/null \
+    | grep -v '/generated/' || true)
+if [[ -n "$hits" ]]; then
+    echo "design-language: raw hex in Cockpit QML (bind to Theme.*/sem* instead):" >&2
+    echo "$hits" >&2
+    fail=1
+fi
+
+# Console TUIs — hand-written tui.tcss (generated/theme.tcss is the token bake).
+if [[ -f slicedlabs-team/slicedlabs_team/tui.tcss ]]; then
+    hits=$(grep -noE '#[0-9a-fA-F]{3,6}\b' slicedlabs-team/slicedlabs_team/tui.tcss 2>/dev/null || true)
+    if [[ -n "$hits" ]]; then
+        echo "design-language: raw hex in Console tui.tcss (use \$sl-*/\$hue-* tokens):" >&2
+        echo "$hits" >&2
+        fail=1
+    fi
+fi
+
+# Warden governance UI + docs CSS — scanned once they exist (placeholder, no-op now).
+for extra in slicedlabs-team/slicedlabs_team/warden docs; do
+    [[ -d "$extra" ]] || continue
+    hits=$(grep -rnoE '#[0-9a-fA-F]{6}\b' "$extra" --include='*.py' --include='*.tcss' --include='*.css' 2>/dev/null \
+        | grep -v '/generated/' || true)
+    if [[ -n "$hits" ]]; then
+        echo "design-language: raw hex in $extra (bind to tokens):" >&2
+        echo "$hits" >&2
+        fail=1
+    fi
+done
+
+# Tooling configs (Track 9) — hand-written .tmpl sources bind to {{tokens}}, never raw
+# hex. The rendered .kdl/.yml/.toml ARE the token bake (exempt, like /generated/).
+while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    hits=$(grep -noE '#[0-9a-fA-F]{6}\b' "$f" 2>/dev/null || true)
+    if [[ -n "$hits" ]]; then
+        echo "design-language: raw hex in tooling source $f (use {{tokens}}):" >&2
+        echo "$hits" >&2
+        fail=1
+    fi
+done < <(find zellij/.config/zellij/layouts lazygit gh-dash git cava spotify-player \
+              fish/.config/fish/conf.d -name '*.tmpl' 2>/dev/null)
+
+[[ $fail -eq 0 ]] && echo "design-language: all render targets bind to tokens, no raw hex ✓"
+exit $fail

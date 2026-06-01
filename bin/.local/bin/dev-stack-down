@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# dev-stack-down — tear down the local data + observability mesh (the sibling of
+# dev-stack-up). Manual path only: does NOT touch dev-stack.service auto-start.
+# Idempotent: a no-op when nothing is running.
+set -euo pipefail
+
+podman compose -f "$HOME/.dotfiles/podman-compose/dev-stack.yaml" down "$@"

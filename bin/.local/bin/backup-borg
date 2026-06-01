@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# backup-borg — point-in-time backup to a removable LUKS-encrypted disk.
+# Designed for two USB drives rotated weekly, one offsite. Self-contained:
+# unlocks LUKS, mounts, snapshots, prunes, unmounts, locks.
+#
+# Conventions:
+#   /dev/disk/by-label/engine-backup-a   (or -b)         — LUKS partition
+#   /run/media/$USER/engine-backup-X/borg                — repo path
+#   passphrase stored in `pass infra/borg-<label>`       — never on disk
+#
+# Drives are interchangeable: pass the label as $1 (`engine-backup-a` default).
+# The script is idempotent and exits zero on a clean run.
+set -euo pipefail
+
+LABEL="${1:-engine-backup-a}"
+PASS_KEY="${BORG_PASS_KEY:-infra/borg-${LABEL}}"
+LUKS_NAME="${LABEL}-crypt"
+LUKS_DEV="/dev/disk/by-label/${LABEL}"
+MOUNT_DIR="/run/media/${USER}/${LABEL}"
+REPO="${MOUNT_DIR}/borg"
+
+log() { printf '\n\033[1;35m==> %s\033[0m\n' "$*"; }
+
+cleanup() {
+    if mountpoint -q "${MOUNT_DIR}" 2>/dev/null; then
+        log "Unmounting ${MOUNT_DIR}"
+        sudo umount "${MOUNT_DIR}" || true
+    fi
+    if [ -e "/dev/mapper/${LUKS_NAME}" ]; then
+        log "Locking LUKS volume"
+        sudo cryptsetup luksClose "${LUKS_NAME}" || true
+    fi
+}
+trap cleanup EXIT
+
+# Preconditions ------------------------------------------------------------
+for tool in borg pass cryptsetup; do
+    command -v "${tool}" >/dev/null 2>&1 || {
+        echo "backup-borg: missing dependency: ${tool}" >&2; exit 1; }
+done
+
+if [ ! -e "${LUKS_DEV}" ]; then
+    echo "backup-borg: drive ${LABEL} not connected (${LUKS_DEV} absent)" >&2
+    exit 2
+fi
+
+# Decrypt + mount ----------------------------------------------------------
+log "Opening LUKS volume ${LABEL}"
+PASS_VALUE="$(pass show "${PASS_KEY}")"
+if [ -z "${PASS_VALUE}" ]; then
+    echo "backup-borg: pass key ${PASS_KEY} is empty" >&2
+    exit 3
+fi
+printf '%s' "${PASS_VALUE}" | sudo cryptsetup luksOpen --key-file=- \
+    "${LUKS_DEV}" "${LUKS_NAME}"
+
+log "Mounting ${MOUNT_DIR}"
+sudo mkdir -p "${MOUNT_DIR}"
+sudo mount "/dev/mapper/${LUKS_NAME}" "${MOUNT_DIR}"
+
+# Initialize repo on first run --------------------------------------------
+if [ ! -d "${REPO}" ]; then
+    log "Initializing new borg repo at ${REPO}"
+    sudo mkdir -p "${REPO}"
+    sudo chown "${USER}:${USER}" "${REPO}"
+    BORG_PASSPHRASE="${PASS_VALUE}" borg init --encryption=repokey-blake2 "${REPO}"
+fi
+
+# Snapshot ----------------------------------------------------------------
+SNAP="engine-$(date +%Y%m%d-%H%M%S)"
+log "Creating snapshot ${SNAP}"
+BORG_PASSPHRASE="${PASS_VALUE}" \
+borg create --verbose --filter=AME --list --stats --show-rc --compression=zstd,9 \
+    --exclude-caches \
+    --exclude '*/.cache' \
+    --exclude '*/node_modules' \
+    --exclude '*/target' \
+    --exclude '*/.venv' \
+    --exclude '*/dist' \
+    --exclude '*/build' \
+    --exclude "${HOME}/.local/share/mise" \
+    --exclude "${HOME}/.local/share/Steam" \
+    --exclude "${HOME}/.local/share/nvim" \
+    --exclude "${HOME}/.config/mozilla*/Cache*" \
+    --exclude "${HOME}/.config/discord/Cache*" \
+    --exclude "${HOME}/.config/Code/Cache*" \
+    "${REPO}::${SNAP}" \
+    "${HOME}/.dotfiles" \
+    "${HOME}/.password-store" \
+    "${HOME}/.gnupg" \
+    "${HOME}/.ssh" \
+    "${HOME}/.config/sops" \
+    "${HOME}/.config/obs-studio/basic/scenes" \
+    "${HOME}/.config/easyeffects" \
+    "${HOME}/.config/wireplumber" \
+    "${HOME}/.claude/.credentials.json" \
+    "${HOME}/Projects" \
+    "${HOME}/Resources" \
+    "${HOME}/discord-mcp" \
+    "${HOME}/Pictures/Screenshots" \
+    2>&1
+
+# Prune -------------------------------------------------------------------
+log "Pruning old snapshots"
+BORG_PASSPHRASE="${PASS_VALUE}" \
+borg prune --list --keep-daily=7 --keep-weekly=4 --keep-monthly=12 "${REPO}"
+
+log "Compact (reclaim space)"
+BORG_PASSPHRASE="${PASS_VALUE}" borg compact "${REPO}"
+
+log "Done. Snapshot: ${SNAP}"

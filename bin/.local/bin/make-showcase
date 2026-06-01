@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# make-showcase — assemble the PUBLIC SlicedLabs OS showcase tree from this private
+# dotfiles repo by an explicit ALLOWLIST (include-only), then gate it with
+# verify-public-clean. Produces a ready-to-publish tree; it NEVER creates or pushes a
+# repo — that is outward-facing and needs your review + gh auth. Review DEST, then push.
+#
+#   make-showcase [DEST]        # default: /tmp/slicedlabs-showcase
+#
+# Guarantee #4 (ownership): nothing secret/proprietary reaches the public repo — the
+# allowlist OMITS the proprietary slicedlabs-team submodule, claude-memory, secret-split
+# host files, and git internals; verify-public-clean (gitleaks + proprietary-path scan)
+# is the backstop that BLOCKS on any leak.
+set -euo pipefail
+SRC="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+DEST="${1:-/tmp/slicedlabs-showcase}"
+
+# ONLY clearly public-safe paths. Missing entries are skipped; everything not listed is
+# excluded by omission. (No claude-memory, no slicedlabs-team submodule, no recovery.md.)
+ALLOW=(
+  bin niri quickshell zellij ghostty mako fish wofi swaylock waybar bat lazygit gh-dash
+  btop starship sliced-engine iso nix docs podman-compose systemd-user
+  system/tokens.toml system/keys.toml system/governance.toml system/services.txt
+  system/user-services.txt system/packages.txt system/python-stack.txt
+  system/aur-packages.txt system/.gitleaks.toml system/brand-assets system/etc system/git-hooks
+  bootstrap.sh README.md .gitignore .stow-local-ignore justfile
+)
+
+rm -rf "$DEST"; mkdir -p "$DEST"
+for p in "${ALLOW[@]}"; do
+  [ -e "$SRC/$p" ] || continue
+  mkdir -p "$DEST/$(dirname "$p")"
+  cp -a "$SRC/$p" "$DEST/$(dirname "$p")/"
+done
+# Strip caches / rendered byproducts (the .tmpl is the tracked source).
+find "$DEST" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+find "$DEST" -type d -name 'out' -path '*/iso/*' -prune -exec rm -rf {} + 2>/dev/null || true
+
+echo "→ assembled $(du -sh "$DEST" | cut -f1) into $DEST ($(find "$DEST" -type f | wc -l) files)"
+echo "→ gating with verify-public-clean…"
+if verify-public-clean "$DEST"; then
+  cat <<EOF
+✓ showcase tree is clean and publishable. NEXT (outward-facing — do it yourself):
+    cd "$DEST"
+    git init -b main && git add -A && git commit -m "SlicedLabs OS — public showcase"
+    gh repo create SL1C3D-L4BS/slicedlabs-os --public --source . --remote origin --push
+EOF
+else
+  echo "✗ verify-public-clean FAILED — do NOT publish; tighten the allowlist above." >&2
+  exit 1
+fi

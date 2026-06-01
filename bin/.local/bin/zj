@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# zj — launch a fresh zellij session per terminal window. An optional first arg is
+# a LAYOUT name (coding / research / engine-dev) for the workspace dev-cockpits, e.g.
+# `ghostty -e zj coding`. No arg = the `default` layout: your shell + Claude Code
+# attached on the right (default_layout "default"; ghostty sets `command = zj`).
+# Opt out of the Claude pane per-window with `zj bare` or `SL_NO_CLAUDE=1` (→ `bare`
+# layout: shell only, same pill bar).
+#
+# Each window gets a uniquely-named session (epoch+PID) so sessions never collide
+# or auto-resume. Cockpits pass a LAYOUT and are started with -n
+# (--new-session-with-layout) — NOT `-s NAME --layout X`, which zellij 0.44
+# interprets as "attach to session NAME and add X as tabs" and so fails with
+# "There is no active session!" when NAME doesn't exist yet. Guards:
+#   - already inside a multiplexer ($ZELLIJ set) → just a shell (no nesting)
+#   - zellij not installed → graceful fallback to the login shell
+set -u
+
+SHELL_BIN="${SHELL:-/usr/bin/fish}"
+
+# Already inside zellij (e.g. a nested terminal) → plain shell, don't nest.
+if [ -n "${ZELLIJ:-}" ]; then
+    exec "$SHELL_BIN"
+fi
+
+# Zellij missing → degrade gracefully.
+if ! command -v zellij >/dev/null 2>&1; then
+    exec "$SHELL_BIN"
+fi
+
+layout="${1:-}"
+# Per-window opt-out of the Claude-attached default layout (SL_NO_CLAUDE=1 → bare).
+if [ -z "$layout" ] && [ -n "${SL_NO_CLAUDE:-}" ]; then
+    layout="bare"
+fi
+sess="win-$(date +%s)-$$"
+
+# Fresh, uniquely-named session per window. `-s` names a new session; with a
+# cockpit layout, `-n` forces a NEW session staged from that layout (combining
+# both keeps the unique name AND renders the layout — verified on zellij 0.44.3).
+if [ -n "$layout" ]; then
+    exec zellij -s "$sess" -n "$layout"
+fi
+exec zellij -s "$sess"

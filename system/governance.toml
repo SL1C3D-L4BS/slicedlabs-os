@@ -1,0 +1,68 @@
+# =============================================================================
+# Warden — local-first governance for the SlicedLabs AI team. POLICY SSOT.
+#
+# `render-governance` bakes this into:
+#   - cockpit/generated/governance.json   the Penalty Box contract (bar pill +
+#                                          Cockpit modal + Console screen)
+#   - the warden runtime config (the daemon reads policy from here)
+#
+# This file is POLICY ONLY. Live STATUS (clean | probation | suspended | retired),
+# the violation reason, and the evidence pointer come from the hash-chained SQLite
+# ledger that the Warden monitor writes (~/.cache/warden/) — never hand-edited here.
+# Mirrors data/team.toml roles; global [meta] defaults cover any agent not listed.
+# =============================================================================
+
+[meta]
+schema_version = 1
+# Global defaults — a per-agent [agent.<name>] key overrides its namesake here.
+default_max_cost_per_run = 1.00   # USD; mirrors team.toml default_per_task_usd_cap
+default_confidence_floor = 0.55   # acting below this is a low_confidence trip
+default_version          = "v1.0" # policy revision shown on the agent's passport
+
+# --- Rules: which behaviour trips which severity ----------------------------
+# yellow = advisory (logged) · orange = probation · red = immediate suspend.
+[rules]
+scope_boundary      = "red"     # acted outside its declared scope
+undeclared_resource = "red"     # touched a resource it never declared
+cost_cap            = "orange"  # exceeded max_cost_per_run (cost_cap.enforce)
+retry_loop          = "orange"  # repeated an identical failing action
+low_confidence      = "yellow"  # acted below its confidence_floor
+unsupported_claim   = "orange"  # a claim not supported by tool output (light hallucination check)
+
+# --- Penalty Box state machine ----------------------------------------------
+[penalty_box]
+probation_runs           = 3        # clean runs required to graduate probation
+auto_retire_on_eval_fail = true     # a failed eval while on probation → retire
+escalation               = "retire" # a second red trip during probation → retire
+
+# --- Per-agent policy (mirrors data/team.toml; declared_resources is the
+# --- allowlist the monitor checks every action against) ---------------------
+[agent.slicedlabs_architect]
+declared_resources = ["repo:read", "web:read", "memory:read"]
+scope              = "design"
+max_cost_per_run   = 2.00
+
+[agent.slicedlabs_engineer_1]
+declared_resources = ["repo:read", "repo:write", "shell:build", "shell:test"]
+scope              = "engine"
+max_cost_per_run   = 2.00
+
+[agent.slicedlabs_engineer_2]
+declared_resources = ["repo:read", "repo:write", "shell:test", "web:read"]
+scope              = "python-ai"
+max_cost_per_run   = 1.50
+confidence_floor   = 0.60
+
+[agent.slicedlabs_engineer_3]
+declared_resources = ["repo:read", "repo:write", "shell:infra", "systemd:user"]
+scope              = "devops"
+
+[agent.slicedlabs_researcher]
+declared_resources = ["web:read", "memory:read"]
+scope              = "research"
+max_cost_per_run   = 1.50
+
+[agent.slicedlabs_librarian]
+declared_resources = ["repo:read", "corpus:read"]
+scope              = "corpus"
+confidence_floor   = 0.65   # the librarian must never fabricate citations

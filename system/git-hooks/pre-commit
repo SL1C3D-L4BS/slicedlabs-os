@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG="${HOME}/.dotfiles/system/.gitleaks.toml"
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks not installed; skipping leak scan" >&2
+  exit 0
+fi
+
+# gitleaks 8.19+ removed `protect`; `git --staged` is the pre-commit scan.
+ARGS=(git --staged --redact --verbose --no-banner)
+if [ -f "$CONFIG" ]; then
+  ARGS+=(--config "$CONFIG")
+fi
+
+if ! gitleaks "${ARGS[@]}"; then
+  cat >&2 <<'MSG'
+
+pre-commit: gitleaks found likely secrets in staged changes. Commit aborted.
+  - True positive: unstage the offending content; move the value to an
+    untracked include (see dotfiles-secret-split pattern).
+  - False positive: add a targeted allowlist entry to
+    ~/.dotfiles/system/.gitleaks.toml and retry.
+  - Bypass once (only if you accept the risk): git commit --no-verify
+MSG
+  exit 1
+fi

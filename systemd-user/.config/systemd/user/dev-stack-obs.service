@@ -1,0 +1,20 @@
+[Unit]
+Description=Dev-stack observability tier (Loki/Tempo/OTel/ClickHouse) — boots with monitoring
+Documentation=file://%h/.dotfiles/podman-compose/dev-stack.yaml
+After=default.target podman.socket
+Wants=podman.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h
+Environment=DEV_STACK_PROFILES=obs
+ExecStart=%h/.local/bin/dev-stack-up
+ExecStop=/usr/bin/podman compose -f %h/.dotfiles/podman-compose/dev-stack.yaml --profile obs down
+TimeoutStartSec=600
+# `podman compose down` for the 7-container obs tier routinely exceeds the 90s
+# default, which SIGKILLed teardown and booted the unit into a failed state.
+TimeoutStopSec=300
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,178 @@
+# Local developer service mesh — data tier (L4) + observability (L5).
+# Brought up by `systemctl --user start dev-stack.service` (workstation-scoped,
+# on-login, not on-boot). Each service binds 127.0.0.1 only — exposure to the
+# Tailnet is opt-in via Caddy reverse-proxy at the host level.
+#
+# Volumes use named podman volumes so the data survives `compose down`.
+# Connection strings live encrypted in ~/.config/sliced-engine/db.env.sops.
+#
+# Resource note: idle footprint ~6-8 GB RAM with the full mesh up. Use
+# `podman compose --profile <name>` to bring a subset (data-only / obs-only).
+#
+# Versions are pinned to a major; minor updates flow via `podman pull` + restart.
+
+version: "3.9"
+
+networks:
+  devnet:
+    driver: bridge
+
+volumes:
+  pgdata:
+  valkeydata:
+  qdrantdata:
+  meilidata:
+  clickhousedata:
+  prometheusdata:
+  grafanadata:
+  lokidata:
+  tempodata:
+
+services:
+
+  # ===== L4 — Data tier =====================================================
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    container_name: dev-postgres
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    profiles: ["data", "all"]
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+      POSTGRES_DB: dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    secrets: [pg_password]
+    networks: [devnet]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  valkey:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: dev-valkey
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    profiles: ["data", "all"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes:
+      - valkeydata:/data
+    networks: [devnet]
+    command: ["valkey-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  qdrant:
+    image: docker.io/qdrant/qdrant:latest
+    container_name: dev-qdrant
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    profiles: ["data", "ai", "all"]
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrantdata:/qdrant/storage
+    networks: [devnet]
+
+  meilisearch:
+    image: docker.io/getmeili/meilisearch:latest
+    container_name: dev-meili
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    profiles: ["data", "all"]
+    environment:
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: "true"
+    ports: ["127.0.0.1:7700:7700"]
+    volumes:
+      - meilidata:/meili_data
+    networks: [devnet]
+
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:latest
+    container_name: dev-clickhouse
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 2g
+    profiles: ["data", "obs", "all"]
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - clickhousedata:/var/lib/clickhouse
+    networks: [devnet]
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+
+  # ===== L5 — Observability tier ============================================
+  # Prometheus + Grafana are HOST-installed (pacman packages already running
+  # on :9090 and :3000). The compose definitions for those services have
+  # been removed to avoid port conflicts. Containers reach the host via
+  # host.containers.internal:9090 (prom) and :3000 (grafana). The host's
+  # /etc/prometheus/prometheus.yml + ~/.config/grafana-provisioning are
+  # the live configs — they consume the same files mounted earlier.
+
+  loki:
+    image: docker.io/grafana/loki:latest
+    container_name: dev-loki
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    profiles: ["obs", "all"]
+    ports: ["127.0.0.1:3100:3100"]
+    volumes:
+      - lokidata:/loki
+      - ${HOME}/.config/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+    networks: [devnet]
+    command: ["-config.file=/etc/loki/loki-config.yml"]
+
+  tempo:
+    image: docker.io/grafana/tempo:latest
+    container_name: dev-tempo
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    profiles: ["obs", "all"]
+    ports:
+      - "127.0.0.1:3200:3200"   # tempo HTTP
+      - "127.0.0.1:4317:4317"   # OTLP gRPC (in)
+      - "127.0.0.1:4318:4318"   # OTLP HTTP (in)
+    volumes:
+      - tempodata:/var/tempo
+      - ${HOME}/.config/tempo/tempo.yml:/etc/tempo.yml:ro
+    networks: [devnet]
+    command: ["-config.file=/etc/tempo.yml"]
+
+  otel-collector:
+    image: docker.io/otel/opentelemetry-collector-contrib:latest
+    container_name: dev-otel
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    profiles: ["obs", "all"]
+    ports:
+      - "127.0.0.1:14317:4317"   # OTLP gRPC (collector side)
+      - "127.0.0.1:14318:4318"   # OTLP HTTP (collector side)
+    volumes:
+      - ${HOME}/.config/otel/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    networks: [devnet]
+    depends_on: [tempo, loki]
+
+secrets:
+  pg_password:
+    file: ${HOME}/.config/postgres/dev.password
+  grafana_admin:
+    file: ${HOME}/.config/grafana-provisioning/admin.password

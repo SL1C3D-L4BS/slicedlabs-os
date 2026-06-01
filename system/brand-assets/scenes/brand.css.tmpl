@@ -1,0 +1,56 @@
+
+/* [ENGINE] brand CSS · shared by all OBS browser-source scenes.
+   Tokens substituted from system/tokens.toml by render-templates. */
+
+:root {
+    --bg:           {{color.bg}};
+    --bg-alt:       {{color.bg_alt}};
+    --fg:           {{color.fg}};
+    --fg-muted:     {{color.fg_muted}};
+    --primary:      {{color.primary}};
+    --secondary:    {{color.secondary}};
+    --tertiary:     {{color.tertiary}};
+    --error:        {{color.error}};
+    --warm-shadow:  {{color.warm_shadow}};
+    --backdrop:     {{color_css.backdrop}};
+    --shadow-soft:  0 6px 24px {{color_css.overlay_dim}};
+    --shadow-glow:  0 0 48px {{color_rgba.shadow_primary}};
+
+    --font-mono:    "{{font.mono}}", monospace;
+    --font-display: "{{font.display}}", "{{font.mono}}", monospace;
+
+    --gap:          {{geom.gap}}px;
+    --radius:       {{geom.radius}}px;
+    --radius-lg:    {{geom.radius_lg}}px;
+    --border:       {{geom.border}}px;
+
+    --ease:         {{motion.ease}};
+    --quick:        {{motion.quick_ms}}ms;
+    --normal:       {{motion.normal_ms}}ms;
+    --slow:         {{motion.slow_ms}}ms;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    overflow: hidden;
+}
+
+.brand-mark {
+    font-family: var(--font-display);
+    color: var(--primary);
+    letter-spacing: 0.04em;
+}
+
+.brand-accent {
+    color: var(--tertiary);
+}
+
+.brand-bar {
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--tertiary));
+    border-radius: 2px;
+}

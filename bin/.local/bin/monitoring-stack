@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# monitoring-stack — opens the NATIVE observability cockpit (`slicedlabs monitor`).
+#
+# This REPLACED the old Firefox webstack (Grafana/Prometheus/Pyroscope/Alloy tabs):
+# the workstation now renders its own internal information natively — host vitals,
+# scrape-target + service health, the journal, and agent spend — token-themed in the
+# monitoring identity hue, exactly like every other cockpit. It lives on DP-2 now
+# (the monitoring workspace), freeing the portrait DP-3 to be the blank `desk`.
+#
+# The `monitoring` workspace stages this via ~/.config/sliced-engine/workspaces.toml
+# (a normal layout=single scene app, like coding/engine/media). This script remains
+# a stable, idempotent entry point so `monitoring-stack` by hand still works.
+set -euo pipefail
+
+APP_ID="com.slicedlabs.monitoring"
+
+# Idempotent: never open a second cockpit if one is already mapped in niri.
+if niri msg --json windows 2>/dev/null \
+    | jq -e --arg a "$APP_ID" 'any(.[]; .app_id==$a)' >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Export the workspace identity hue so the cockpit (and the terminal's tooling)
+# breathe monitoring-green even when launched outside the scene choreography.
+export SL_IDENTITY="$(sl-identity monitoring 2>/dev/null || echo '#639922')"
+
+exec ghostty --class="$APP_ID" --title=monitoring -e slicedlabs monitor

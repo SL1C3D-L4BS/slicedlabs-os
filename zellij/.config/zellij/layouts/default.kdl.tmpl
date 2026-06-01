@@ -1,0 +1,55 @@
+// [ENGINE] platform — DEFAULT zellij layout (zj no-arg / default_layout "default").
+// Every plain ghostty window opens here: your shell on the left, Claude Code attached
+// and ready on the right (Track 9.2). Opt out per-window with `zj bare` or SL_NO_CLAUDE=1.
+//
+// The bar is zjstatus — Liquid-Glass capsule pills generated from system/tokens.toml
+// ([powerline] caps · [color]/[semantic] hues). One pill atom, same as the Cockpit.
+// pane_frames stay off (config.kdl): niri draws the rounded frame + frost + shadow.
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {tabs}"
+                format_center ""
+                format_right  "{mode}#[bg={{color.bg}}]  #[fg={{color.secondary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.secondary}},bold] {{icon.clock}} {datetime} #[fg={{color.secondary}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                // tab pills — rounded capsules; active filled primary, inactive frosted chip
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.primary}},bold] {{powerline.dot}} {index} {name} #[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                // mode pill — green NORMAL · gray LOCKED · golden sub-modes
+                mode_normal       "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked       "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_pane         "#[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.primary}},bold] PANE #[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tab          "#[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.primary}},bold] TAB #[fg={{color.primary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_resize       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RESIZE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_move         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] MOVE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_scroll       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SCROLL #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_search       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_enter_search "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_tab   "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_pane  "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_session      "#[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.wisteria}},bold] SESSION #[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tmux         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] TMUX #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    // shell (your work) on the left; Claude Code attached on the right.
+    tab name="shell" focus=true {
+        pane split_direction="vertical" {
+            pane                                                       // shell — your work
+            pane size="{{terminal.claude_pane_pct}}%" command="claude" // Claude Code, attached & ready
+        }
+    }
+}

@@ -1,0 +1,15 @@
+# SlicedLabs — bat configuration.
+#
+# The cascade law: content rides the [ansi] SSOT terminal palette; identity and
+# semantic hues live on chrome (statuslines, prompts, borders), never on body text.
+# `--theme="ansi"` makes bat's syntax colours the 16 terminal colours — so bat is
+# ALWAYS in sync with system/tokens.toml [ansi] by construction, with no second
+# palette to maintain or drift. (A token-driven truecolor .tmTheme matching the
+# nvim engine scheme is the future-richer option; ansi is the SSOT-correct default.)
+--theme="ansi"
+
+# Hairline, restrained chrome — matches the desktop's medium-weight aesthetic.
+# `grid` frames the pager like a card; `header-filename` titles it (the pill feel).
+--style="numbers,changes,grid,header-filename"
+--italic-text=always
+--paging=auto

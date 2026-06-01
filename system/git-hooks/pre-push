@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# pre-push — composes the repo's CI gate (just ci if available) with a
+# gitleaks scan over every commit about to ship.
+#
+# Reads stdin (one line per ref being pushed):
+#   <local-ref> <local-sha> <remote-ref> <remote-sha>
+# For each line, scans <remote-sha>..<local-sha> with the repo-local or
+# dotfiles-global gitleaks config. New branches (remote-sha = zeros) get
+# their reachable-not-on-remote history scanned.
+#
+# Wired into target repos via: install-hooks <repo> pre-push
+set -euo pipefail
+
+# If the repo defines a `just ci` recipe, run it first — the dotfiles
+# pre-push is intentionally a superset of any project's existing gate so
+# repos like ~/Projects/engine keep their CI without bypass.
+if command -v just >/dev/null 2>&1 \
+        && [ -f "$(git rev-parse --show-toplevel)/justfile" ] \
+        && just --list 2>/dev/null | grep -qE '^\s+ci\b'; then
+    just ci
+fi
+
+# Supply-chain gate: on any repo with a Cargo.lock, run cargo-audit (RUSTSEC
+# advisories) and, if a deny.toml exists, cargo-deny (licenses/bans/sources)
+# before the push ships. Both are installed by bootstrap layer 4; each is
+# skipped cleanly when absent. This wires the supply-chain tools that were
+# previously installed-but-never-invoked.
+REPO_TOP="$(git rev-parse --show-toplevel)"
+if [ -f "${REPO_TOP}/Cargo.lock" ]; then
+    if command -v cargo-audit >/dev/null 2>&1; then
+        ( cd "${REPO_TOP}" && cargo audit --quiet ) \
+            || { echo "pre-push: cargo audit found vulnerable dependencies" >&2; exit 1; }
+    fi
+    if command -v cargo-deny >/dev/null 2>&1 && [ -f "${REPO_TOP}/deny.toml" ]; then
+        ( cd "${REPO_TOP}" && cargo deny check ) \
+            || { echo "pre-push: cargo deny check failed" >&2; exit 1; }
+    fi
+fi
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "pre-push: gitleaks not installed; refusing to push without a scan" >&2
+    exit 1
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+GITLEAKS_CONFIG="${REPO_ROOT}/.gitleaks.toml"
+if [ ! -f "${GITLEAKS_CONFIG}" ]; then
+    GITLEAKS_CONFIG="${HOME}/.dotfiles/system/.gitleaks.toml"
+fi
+
+ZERO="0000000000000000000000000000000000000000"
+exit_code=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # `git push --delete` — nothing to scan, but exit cleanly.
+    [ "${local_sha}" = "${ZERO}" ] && continue
+
+    if [ "${remote_sha}" = "${ZERO}" ]; then
+        # Brand-new branch: scan everything reachable from the new tip
+        # that isn't already on the remote. Falls back to the full
+        # ancestor set if no remote refs exist at all.
+        existing="$(git for-each-ref --format='%(refname)' refs/remotes/ | head -1)"
+        if [ -n "${existing}" ]; then
+            range="--log-opts=${local_sha} --not --remotes"
+        else
+            range="--log-opts=${local_sha}"
+        fi
+    else
+        range="--log-opts=${remote_sha}..${local_sha}"
+    fi
+
+    # gitleaks 8.19+ removed `detect` — use `git`. ONE scan: capture output,
+    # branch on exit (1 = findings, 0 = clean). ${range} is quoted so
+    # --log-opts's space-separated value travels intact instead of
+    # word-splitting into unrecognised gitleaks flags (which made brand-new
+    # branch pushes hit help text + a false "found secrets").
+    if ! out="$(gitleaks git --config "${GITLEAKS_CONFIG}" --redact --no-banner "${range}" 2>&1)"; then
+        printf '%s\n' "${out}" | grep -v '^$' >&2 || true
+        echo "pre-push: gitleaks found secrets in ${local_ref} (${remote_sha:0:8}..${local_sha:0:8})" >&2
+        exit_code=1
+    fi
+done
+
+exit "${exit_code}"

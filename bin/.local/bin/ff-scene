@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# ff-scene — serialized, collision-proof Firefox launcher for niri scenes.
+#
+# WHY: the boot contract stages up to THREE Firefoxes near-simultaneously — the
+# monitoring webstack (dedicated profile, --no-remote), the browser scene (your
+# DEFAULT profile = your real browsing identity), and research-web (dedicated
+# profile, --no-remote). Fired in a burst they RACE for the per-profile first-
+# instance lock; the last to start loses ("Firefox is already running, but is not
+# responding") and never opens a window — which is exactly why research-web was
+# missing from the research workspace at login. This wrapper holds ONE cross-process
+# flock so the scenes' Firefoxes start strictly one-at-a-time, each waiting for its
+# window to register in niri before releasing the lock to the next caller.
+#
+# All URLs are passed on a single command line (Firefox opens them as tabs in the
+# new window) — no fragile post-launch `--new-tab` IPC, which a --no-remote instance
+# refuses anyway.
+#
+# Usage:
+#   ff-scene --app-id <id> [--profile <dir>] [url ...]
+#     --app-id   Wayland app-id (passed as `firefox --name`); niri window-rules
+#                route placement on this id.
+#     --profile  dedicated profile dir → adds `--profile <dir> --no-remote` (an
+#                isolated, throwaway browser). OMIT to use your DEFAULT profile —
+#                that's the browser scene's primary Firefox (no --no-remote), so it
+#                keeps your real bookmarks/session and serves xdg-open links.
+set -uo pipefail
+
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# scene_log (file + stderr) lives in lib/scene.sh; fall back to stderr if absent.
+# shellcheck source=/dev/null
+[ -f "$SELF_DIR/lib/scene.sh" ] && source "$SELF_DIR/lib/scene.sh"
+if ! declare -f scene_log >/dev/null 2>&1; then scene_log() { echo "$*" >&2; }; fi
+
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/ff-scene.lock"
+REGISTER_TIMEOUT=20   # seconds to wait for the new window to appear in niri (a COLD
+                      # dedicated profile is slow to first-init; keep this ≥ the caller's
+                      # poll window in lib/scene.sh, which waits 25s for the same window).
+
+app_id=""; profile=""; urls=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --app-id)  app_id="$2"; shift 2 ;;
+        --profile) profile="$2"; shift 2 ;;
+        --)        shift; while [ $# -gt 0 ]; do urls+=("$1"); shift; done ;;
+        *)         urls+=("$1"); shift ;;
+    esac
+done
+[ -n "$app_id" ] || { echo "ff-scene: --app-id <id> required" >&2; exit 2; }
+
+_present() {  # is a window with our app-id already mapped in niri?
+    niri msg --json windows 2>/dev/null \
+        | jq -e --arg a "$app_id" 'any(.[]; .app_id==$a)' >/dev/null 2>&1
+}
+
+# Idempotent: scenes re-realize on focus, so never open a second copy.
+if _present; then scene_log "ff-scene[$app_id]: already present — skip"; exit 0; fi
+
+(
+    flock 9
+    if _present; then scene_log "ff-scene[$app_id]: present after lock — skip"; exit 0; fi
+
+    args=(--name "$app_id")
+    if [ -n "$profile" ]; then
+        mkdir -p "$profile"
+        # Clear a STALE single-instance lock from a crashed prior run. A --no-remote
+        # Firefox REFUSES to open a window while lock/.parentlock exist ("Firefox is
+        # already running, but is not responding") and exits silently — which is exactly
+        # why research-web never registered at login (its ~/.cache/ff-research/.parentlock
+        # outlived a crash). Guard: only clear when NO live firefox actually owns this
+        # profile, so we never yank the lock from under a healthy instance.
+        if ! pgrep -af firefox 2>/dev/null | grep -q -- "--profile $profile"; then
+            rm -f "$profile/lock" "$profile/.parentlock" "$profile/lock.tmp" 2>/dev/null || true
+        fi
+        args+=(--profile "$profile" --no-remote)
+    fi
+    if [ "${#urls[@]}" -gt 0 ]; then args+=(--new-window "${urls[@]}"); fi
+
+    scene_log "ff-scene[$app_id]: launch firefox ${args[*]}"
+    setsid -f firefox "${args[@]}" >/dev/null 2>&1
+
+    # Hold the lock until OUR window registers, so the next ff-scene caller never
+    # races our profile-lock acquisition. Bounded so a failure can't wedge the queue.
+    t=0
+    while [ "$t" -lt "$REGISTER_TIMEOUT" ]; do
+        _present && { scene_log "ff-scene[$app_id]: registered (${t}s)"; exit 0; }
+        sleep 1; t=$((t + 1))
+    done
+    scene_log "ff-scene[$app_id]: WARNING did not register within ${REGISTER_TIMEOUT}s"
+) 9>"$LOCK"

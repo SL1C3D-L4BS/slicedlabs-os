@@ -1,0 +1,183 @@
+{
+    // -------------------------------------------------------------------------
+    // Waybar — workspace-driven tab system, big-screen-only.
+    //
+    // One bar on HDMI-A-1 (4K TV). DP-3 (24" portrait) intentionally has no bar.
+    // The CENTER is the active workspace's fused instrument cluster (nothing
+    // else); the clock lives in the global RIGHT cluster. The active tab is
+    // driven by ~/.local/bin/waybar-tab-watcher; overlay HUD tabs are summoned
+    // by ~/.local/bin/waybar-hud (Mod+Alt+{M,N,A,T}).
+    //
+    // DO NOT hand-edit the GENERATED:center / GENERATED:tab-modules regions —
+    // they are produced by `render-waybar` from tabs.toml. Pipeline:
+    //     render-waybar && render-templates
+    // All dimensions derive from system/tokens.toml [geom]/[icon].
+    // -------------------------------------------------------------------------
+
+    "output": "HDMI-A-1",
+    "layer": "top",
+    "position": "top",
+    "height": {{geom.bar_height}},
+    "spacing": {{geom.unit}},
+
+    "modules-left": ["niri/workspaces", "niri/window", "custom/workstation", "custom/alerts"],
+
+    // >>> GENERATED:center (render-waybar) >>>
+    "modules-center": [
+        // engine
+        "custom/tab-engine-header", "custom/engine-build", "custom/engine-target", "custom/engine-tests",
+        // comms
+        "custom/tab-comms-header", "custom/comms-discord", "custom/comms-matrix", "custom/comms-zoom", "custom/comms-mail", "custom/comms-notifs",
+        // stream
+        "custom/tab-stream-header", "custom/stream-obs", "custom/stream-scene", "custom/stream-mic", "custom/stream-bitrate", "custom/stream-uptime",
+        // monitoring
+        "custom/tab-monitoring-header", "custom/mon-top-cpu", "custom/mon-top-mem", "custom/mon-disk-pressure", "custom/mon-failed-units", "custom/mon-net-io",
+        // gaming
+        "custom/tab-gaming-header", "custom/gaming-status", "custom/gpu-stats", "custom/cpu-temp", "custom/gamemode", "custom/ds4-battery",
+        // coding
+        "custom/tab-coding-header", "custom/coding-git", "custom/coding-build", "custom/coding-team", "custom/coding-corpus", "custom/coding-pomo",
+        // browser
+        "custom/tab-browser-header", "custom/browser-status",
+        // media
+        "custom/tab-media-header", "custom/media-now", "custom/media-ee", "custom/media-sink",
+        // net
+        "custom/tab-net-header", "custom/net-vpn", "custom/net-fw", "custom/net-route", "custom/net-link",
+        // ai
+        "custom/tab-ai-header", "custom/ai-spend", "custom/ai-agents", "custom/ai-pomo",
+        // agenda
+        "custom/tab-agenda-header", "custom/agenda-next", "custom/agenda-standup"
+    ],
+// <<< GENERATED:center <<<
+
+    "modules-right": ["cpu", "memory", "temperature", "network", "pulseaudio", "clock", "tray"],
+
+    "niri/workspaces": {
+        "format": "{icon}",
+        "format-icons": {
+            "engine":     "{{icon.engine}}",
+            "comms":      "{{icon.comms}}",
+            "stream":     "{{icon.stream}}",
+            "monitoring": "{{icon.monitoring}}",
+            "gaming":     "{{icon.gaming}}",
+            "coding":     "{{icon.coding}}",
+            "browser":    "{{icon.browser}}",
+            "default":    ""
+        },
+        "all-outputs": true,
+        "tooltip": false
+    },
+    "niri/window": {
+        "format": "{title}",
+        // Capped so the left box never overflows into the centred cluster —
+        // Waybar/GTK only keeps modules-center truly screen-centered while the
+        // side boxes stay clear of it. 80 pushed the centre right.
+        "max-length": 30
+    },
+
+    // Clock — moved to the right cluster so the centre belongs wholly to the
+    // active tab. Compact HH:MM; left-click toggles to the date; calendar in
+    // the tooltip.
+    "clock": {
+        "format": "{{icon.clock}}  {:%H:%M}",
+        "format-alt": "{{icon.clock}}  {:%a %d %b}",
+        "tooltip-format": "<tt>{calendar}</tt>"
+    },
+
+    // >>> GENERATED:tab-modules (render-waybar) >>>
+    "custom/tab-engine-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh engine '{{icon.engine}} [ENGINE]'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/engine-build": {"exec": "$HOME/.config/waybar/scripts/engine/build.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}", "on-click": "ghostty --working-directory=$HOME/Projects/engine -e bacon"},
+    "custom/engine-target": {"exec": "$HOME/.config/waybar/scripts/engine/target.sh", "return-type": "json", "interval": 15, "signal": 8, "format": "{}"},
+    "custom/engine-tests": {"exec": "$HOME/.config/waybar/scripts/engine/tests.sh", "return-type": "json", "interval": 30, "signal": 8, "format": "{}", "on-click": "ghostty --working-directory=$HOME/Projects/engine -e cargo test"},
+    "custom/tab-comms-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh comms '{{icon.comms}} COMMS'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/comms-discord": {"exec": "$HOME/.config/waybar/scripts/comms/discord.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}"},
+    "custom/comms-matrix": {"exec": "$HOME/.config/waybar/scripts/comms/matrix.sh", "return-type": "json", "interval": 10, "signal": 8, "format": "{}"},
+    "custom/comms-zoom": {"exec": "$HOME/.config/waybar/scripts/comms/zoom.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}"},
+    "custom/comms-mail": {"exec": "$HOME/.config/waybar/scripts/comms/mail.sh", "return-type": "json", "interval": 60, "signal": 8, "format": "{}"},
+    "custom/comms-notifs": {"exec": "$HOME/.config/waybar/scripts/comms/notifs.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}", "on-click": "makoctl dismiss --all"},
+    "custom/tab-stream-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh stream '{{icon.stream}} STREAM'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/stream-obs": {"exec": "$HOME/.config/waybar/scripts/stream/obs.sh", "return-type": "json", "interval": 3, "signal": 8, "format": "{}"},
+    "custom/stream-scene": {"exec": "$HOME/.config/waybar/scripts/stream/scene.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}", "on-scroll-up": "$HOME/.config/waybar/scripts/stream/scene.sh --next", "on-scroll-down": "$HOME/.config/waybar/scripts/stream/scene.sh --prev"},
+    "custom/stream-mic": {"exec": "$HOME/.config/waybar/scripts/stream/mic.sh", "return-type": "json", "interval": 3, "signal": 8, "format": "{}", "on-click": "pactl set-source-mute easyeffects_source toggle", "on-scroll-up": "pactl set-source-volume easyeffects_source +5%", "on-scroll-down": "pactl set-source-volume easyeffects_source -5%"},
+    "custom/stream-bitrate": {"exec": "$HOME/.config/waybar/scripts/stream/bitrate.sh", "return-type": "json", "interval": 3, "signal": 8, "format": "{}"},
+    "custom/stream-uptime": {"exec": "$HOME/.config/waybar/scripts/stream/uptime.sh", "return-type": "json", "interval": 1, "signal": 8, "format": "{}"},
+    "custom/tab-monitoring-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh monitoring '{{icon.monitoring}} MONITORING'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/mon-top-cpu": {"exec": "$HOME/.config/waybar/scripts/monitoring/top-cpu.sh", "return-type": "json", "interval": 2, "signal": 8, "format": "{}", "on-click": "ghostty -e btop"},
+    "custom/mon-top-mem": {"exec": "$HOME/.config/waybar/scripts/monitoring/top-mem.sh", "return-type": "json", "interval": 3, "signal": 8, "format": "{}", "on-click": "ghostty -e btop"},
+    "custom/mon-disk-pressure": {"exec": "$HOME/.config/waybar/scripts/monitoring/disk-pressure.sh", "return-type": "json", "interval": 30, "signal": 8, "format": "{}", "on-click": "ghostty -e bash -ic 'df -h; echo; read -n1 -r -p \"[enter]\"'"},
+    "custom/mon-failed-units": {"exec": "$HOME/.config/waybar/scripts/monitoring/failed-units.sh", "return-type": "json", "interval": 10, "signal": 8, "format": "{}", "on-click": "ghostty -e journalctl -xb -p 3 --no-pager"},
+    "custom/mon-net-io": {"exec": "$HOME/.config/waybar/scripts/monitoring/net-io.sh", "return-type": "json", "interval": 1, "signal": 8, "format": "{}"},
+    "custom/tab-gaming-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh gaming '{{icon.gaming}} GAMING'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/gaming-status": {"exec": "$HOME/.config/waybar/scripts/gaming/status.sh", "return-type": "json", "interval": 3, "signal": 8, "format": "{}"},
+    "custom/gpu-stats": {"exec": "$HOME/.config/waybar/scripts/gaming/gpu.sh", "return-type": "json", "interval": 2, "signal": 8, "format": "{}", "on-click": "ghostty -e btop"},
+    "custom/cpu-temp": {"exec": "$HOME/.config/waybar/scripts/gaming/cpu_temp.sh", "return-type": "json", "interval": 3, "signal": 8, "format": "{}"},
+    "custom/gamemode": {"exec": "$HOME/.config/waybar/scripts/gaming/gamemode.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}", "on-click": "$HOME/.config/gaming/gamemode-toggle.sh"},
+    "custom/ds4-battery": {"exec": "$HOME/.config/waybar/scripts/gaming/ds4.sh", "return-type": "json", "interval": 30, "signal": 8, "format": "{}"},
+    "custom/tab-coding-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh coding '{{icon.coding}} CODING'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/coding-git": {"exec": "$HOME/.config/waybar/scripts/tabs/coding/git.sh", "return-type": "json", "interval": 10, "signal": 8, "format": "{}"},
+    "custom/coding-build": {"exec": "$HOME/.config/waybar/scripts/tabs/coding/build.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}"},
+    "custom/coding-team": {"exec": "$HOME/.config/waybar/scripts/tabs/coding/team.sh", "return-type": "json", "interval": 15, "signal": 8, "format": "{}", "on-click": "ghostty -e slicedlabs cost"},
+    "custom/coding-corpus": {"exec": "$HOME/.config/waybar/scripts/tabs/coding/corpus.sh", "return-type": "json", "interval": 60, "signal": 8, "format": "{}", "on-click": "ghostty -e slicedlabs ingest --status"},
+    "custom/coding-pomo": {"exec": "$HOME/.config/waybar/scripts/tabs/coding/pomo.sh", "return-type": "json", "interval": 1, "signal": 8, "format": "{}", "on-click": "uairctl toggle"},
+    "custom/tab-browser-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh browser '{{icon.browser}} BROWSER'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/browser-status": {"exec": "$HOME/.config/waybar/scripts/tabs/browser/status.sh", "return-type": "json", "interval": 10, "signal": 8, "format": "{}"},
+    "custom/tab-media-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh media '{{icon.media}} MEDIA'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/media-now": {"exec": "$HOME/.config/waybar/scripts/media/now.sh", "return-type": "json", "interval": 2, "signal": 8, "format": "{}", "on-click": "playerctl play-pause", "on-scroll-up": "playerctl next", "on-scroll-down": "playerctl previous"},
+    "custom/media-ee": {"exec": "$HOME/.config/waybar/scripts/media/easyeffects.sh", "return-type": "json", "interval": 10, "signal": 8, "format": "{}"},
+    "custom/media-sink": {"exec": "$HOME/.config/waybar/scripts/media/sink.sh", "return-type": "json", "interval": 5, "signal": 8, "format": "{}", "on-click": "$HOME/.config/waybar/scripts/media/sink.sh --cycle", "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+", "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"},
+    "custom/tab-net-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh net '{{icon.net}} NET'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/net-vpn": {"exec": "$HOME/.config/waybar/scripts/net/vpn.sh", "return-type": "json", "interval": 10, "signal": 8, "format": "{}"},
+    "custom/net-fw": {"exec": "$HOME/.config/waybar/scripts/net/firewall.sh", "return-type": "json", "interval": 30, "signal": 8, "format": "{}"},
+    "custom/net-route": {"exec": "$HOME/.config/waybar/scripts/net/route.sh", "return-type": "json", "interval": 30, "signal": 8, "format": "{}", "on-click": "ghostty -e bash -ic 'ip -br addr; echo; ip route; echo; read -n1 -r -p \"[enter]\"'"},
+    "custom/net-link": {"exec": "$HOME/.config/waybar/scripts/net/link.sh", "return-type": "json", "interval": 2, "signal": 8, "format": "{}"},
+    "custom/tab-ai-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh ai '{{icon.ai}} AI'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/ai-spend": {"exec": "$HOME/.config/waybar/scripts/ai/spend.sh", "return-type": "json", "interval": 30, "signal": 8, "format": "{}", "on-click": "ghostty -e slicedlabs cost"},
+    "custom/ai-agents": {"exec": "$HOME/.config/waybar/scripts/ai/agents.sh", "return-type": "json", "interval": 10, "signal": 8, "format": "{}", "on-click": "ghostty -e slicedlabs agents"},
+    "custom/ai-pomo": {"exec": "$HOME/.config/waybar/scripts/ai/pomo.sh", "return-type": "json", "interval": 1, "signal": 8, "format": "{}", "on-click": "uairctl toggle"},
+    "custom/tab-agenda-header": {"exec": "$HOME/.config/waybar/scripts/tabs/header.sh agenda '{{icon.agenda}} AGENDA'", "return-type": "json", "interval": "once", "signal": 8, "format": "{}"},
+    "custom/agenda-next": {"exec": "$HOME/.config/waybar/scripts/agenda/next.sh", "return-type": "json", "interval": 60, "signal": 8, "format": "{}", "on-click": "ghostty -e bash -ic 'khal calendar 2>/dev/null || cal; read -n1 -r -p \"[enter]\"'"},
+    "custom/agenda-standup": {"exec": "$HOME/.config/waybar/scripts/agenda/standup.sh", "return-type": "json", "interval": 30, "signal": 8, "format": "{}", "on-click": "$HOME/.local/bin/standup-post"},
+// <<< GENERATED:tab-modules <<<
+
+    // === Workstation widget — always-visible left chip ======================
+    // Aggregates engine repo + build status + Pomodoro countdown into one chip
+    // next to the workspace pill. Left-click toggles uair; right-click opens
+    // lazygit in the engine repo.
+    "custom/workstation": {
+        "exec": "$HOME/.config/waybar/scripts/workstation.sh",
+        "return-type": "json",
+        "interval": 5,
+        "signal": 8,
+        "format": "{}",
+        "on-click": "uairctl toggle",
+        "on-click-right": "ghostty -e lazygit -p $HOME/Projects/engine"
+    },
+
+    // Always-visible urgency badge — fed by waybard, collapses when clear.
+    // Click acknowledges (clears the urgency state file + refreshes).
+    "custom/alerts": {
+        "exec": "$HOME/.config/waybar/scripts/alerts.sh",
+        "return-type": "json",
+        "interval": 5,
+        "signal": 8,
+        "format": "{}",
+        "on-click": "sh -c 'printf \"\" > $HOME/.cache/waybar-urgent; pkill -SIGRTMIN+8 waybar'"
+    },
+
+    // === Right cluster — global, tab-agnostic ================================
+    "cpu":    { "format": "{{icon.cpu}} {usage}%", "interval": 2, "tooltip": false },
+    "memory": { "format": "{{icon.mem}} {percentage}%", "interval": 2, "tooltip-format": "{used:0.1f} GiB / {total:0.1f} GiB" },
+    "temperature": { "format": "{temperatureC}°C", "critical-threshold": 80, "interval": 5, "tooltip": false },
+    "network": {
+        "format-ethernet":     "{{icon.net}} {ipaddr}",
+        "format-wifi":         "{{icon.net}} {essid} {signalStrength}%",
+        "format-disconnected": "OFFLINE",
+        "tooltip-format":      "{ifname}"
+    },
+    "pulseaudio": {
+        "format":       "VOL {volume}%",
+        "format-muted": "{{icon.mute}} MUTE",
+        "scroll-step":  5,
+        "on-click":     "pavucontrol"
+    },
+    "tray": { "spacing": 10 }
+}

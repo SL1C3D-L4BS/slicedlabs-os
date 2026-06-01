@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# verify-tooling — the tooling design cascade (Track 8) is intact:
+#   1. no unrendered {{tokens}} left in any rendered tool config,
+#   2. the key configs PARSE (ghostty / nvim engine colorscheme),
+#   3. the identity headline is wired (sl-identity + scene.sh export + fzf/nvim read it),
+#   4. [ansi] (the terminal palette) is NOT repointed to identity hues — the one rule
+#      that keeps ls/TUIs sane while identity/semantic ride on the chrome.
+set -uo pipefail
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+cd "$ROOT"
+fail=0
+ok() { echo "  ✓ $1"; }
+no() { echo "  ✗ $1" >&2; fail=1; }
+
+# 1) no unrendered placeholders in rendered (non-.tmpl) tool configs
+stray=$(grep -rl '{{' ghostty zellij fish nvim mako wofi btop lazygit gh-dash cava git spotify-player 2>/dev/null \
+    | grep -vE '\.tmpl$' || true)
+[[ -z "$stray" ]] && ok "no unrendered {{tokens}} in tool configs" \
+    || { no "unrendered placeholders:"; echo "$stray" | sed 's/^/      /' >&2; }
+
+# 2) key configs parse
+if command -v nvim >/dev/null 2>&1; then
+    nvim --headless -u NONE -c 'set rtp+=~/.config/nvim' -c 'colorscheme engine' -c 'qa' >/dev/null 2>&1 \
+        && ok "nvim engine colorscheme loads" || no "nvim engine colorscheme errors"
+fi
+if command -v ghostty >/dev/null 2>&1; then
+    ghostty +show-config >/dev/null 2>&1 && ok "ghostty config parses" \
+        || echo "  · ghostty +show-config unavailable headless (skipped)"
+fi
+
+# 3) identity headline wired
+command -v sl-identity >/dev/null 2>&1 && [[ "$(sl-identity engine)" == "#D85A30" ]] \
+    && ok "sl-identity: engine → #D85A30" || no "sl-identity broken"
+grep -q 'SL_IDENTITY=' bin/.local/bin/lib/scene.sh \
+    && ok "scene.sh exports SL_IDENTITY on spawn" || no "scene.sh missing SL_IDENTITY export"
+grep -q 'SL_IDENTITY' fish/.config/fish/conf.d/sl-fzf.fish.tmpl \
+    && ok "fzf reads SL_IDENTITY" || no "fzf not identity-aware"
+grep -q 'SL_IDENTITY' nvim/.config/nvim/colors/engine.lua \
+    && ok "nvim reads SL_IDENTITY" || no "nvim not identity-aware"
+
+# 3b) Track 9 — Liquid-Glass pill cascade (tide · zjstatus · lualine · Claude-everywhere)
+grep -q 'SL_IDENTITY' fish/.config/fish/conf.d/sl-tide.fish.tmpl \
+    && ok "tide prompt identity-aware" || no "tide prompt not identity-aware"
+! grep -q 'starship init' fish/.config/fish/config.fish \
+    && ok "starship retired (tide owns the prompt)" || no "starship still initialized in config.fish"
+command -v fish >/dev/null 2>&1 && fish -c 'functions -q tide' 2>/dev/null \
+    && ok "tide installed" || no "tide not installed (fisher install ilancosman/tide@v6)"
+grep -q 'SL_IDENTITY' nvim/.config/nvim/lua/plugins/lualine.lua \
+    && ok "lualine identity-aware" || no "lualine not identity-aware"
+grep -lq 'location="zjstatus"' zellij/.config/zellij/layouts/*.kdl.tmpl 2>/dev/null \
+    && ok "zellij layouts wear the zjstatus pill bar" || no "zjstatus bar missing from layouts"
+[[ -f "$HOME/.config/zellij/plugins/zjstatus.wasm" ]] \
+    && ok "zjstatus.wasm present" || no "zjstatus.wasm missing (bootstrap fetches it)"
+{ [[ -f "$HOME/.cache/zellij/permissions.kdl" ]] && grep -qF 'zjstatus.wasm' "$HOME/.cache/zellij/permissions.kdl"; } \
+    && ok "zjstatus permission granted (pill bar renders)" || no "zjstatus permission ungranted (run 'zj grant')"
+grep -q 'command="claude"' zellij/.config/zellij/layouts/default.kdl.tmpl \
+    && ok "default layout attaches Claude Code" || no "default layout missing Claude pane"
+
+# 3c) new CLI render targets rendered + wired
+for t in lazygit/.config/lazygit/config.yml gh-dash/.config/gh-dash/config.yml \
+         cava/.config/cava/config spotify-player/.config/spotify-player/theme.toml; do
+    f="$ROOT/$t"; { [[ -f "$f" ]] && ! grep -q '{{' "$f"; } \
+        && ok "$(basename "$(dirname "$t")") theme rendered" || no "$t missing/unrendered"
+done
+{ [[ -f "$ROOT/git/.config/git/delta-theme.gitconfig" ]] && grep -q 'syntax-theme = ansi' "$ROOT/git/.config/git/delta-theme.gitconfig"; } \
+    && ok "delta theme rendered (rides [ansi])" || no "delta theme missing/unrendered"
+grep -q 'delta-theme.gitconfig' "$HOME/.gitconfig" 2>/dev/null \
+    && ok "delta wired into ~/.gitconfig" || no "delta not included in ~/.gitconfig"
+
+# 4) ANSI integrity — the terminal palette must stay the royal-blue terminal colour,
+#    never the coding identity hue (that's the load-bearing rule of the cascade).
+ansi_blue=$(awk '/^\[ansi\]/{a=1} a&&/^blue/{gsub(/[" ]/,"",$3); print $3; exit}' system/tokens.toml)
+[[ "$ansi_blue" == "#2961B1" ]] && ok "[ansi] palette intact (blue=$ansi_blue, not identity)" \
+    || no "[ansi] blue drifted to identity: $ansi_blue"
+
+# 5) btop — the one NEW render target of the cascade: theme rendered + activated.
+#    btop.conf stays unmanaged (btop rewrites it on exit); bootstrap deploys the
+#    read-only theme + sets color_theme. Assert both so the new surface can't rot.
+if command -v btop >/dev/null 2>&1; then
+    bt="$ROOT/btop/.config/btop/themes/slicedlabs.theme"
+    { [[ -f "$bt" ]] && ! grep -q '{{' "$bt"; } \
+        && ok "btop theme rendered (slicedlabs.theme, no stray tokens)" \
+        || no "btop theme missing or unrendered"
+    # btop.conf is FULLY MANAGED (Track 9): symlinked from the dotfiles, with
+    # save_config_on_exit=false so btop never clobbers it, and color_theme set.
+    bc="$ROOT/btop/.config/btop/btop.conf"
+    [[ "$(readlink -f "$HOME/.config/btop/btop.conf" 2>/dev/null)" == "$bc" ]] \
+        && ok "btop.conf fully managed (symlinked to dotfiles)" || no "btop.conf not symlinked to dotfiles"
+    grep -q '^save_config_on_exit = false' "$bc" 2>/dev/null \
+        && ok "btop won't self-overwrite (save_config_on_exit=false)" || no "btop.conf would self-overwrite"
+    grep -q '^color_theme = "slicedlabs"' "$bc" 2>/dev/null \
+        && ok "btop color_theme=slicedlabs" || no "btop color_theme not slicedlabs"
+fi
+
+# 6) bat — the syntax pager rides the [ansi] SSOT (content=palette, chrome=identity).
+#    Pinned to theme=ansi so bat's colours ARE the terminal palette, never an
+#    identity hue and never a second palette that could drift from tokens.toml.
+if command -v bat >/dev/null 2>&1; then
+    grep -q -- '--theme="ansi"' "$ROOT/bat/.config/bat/config" 2>/dev/null \
+        && ok "bat rides [ansi] SSOT (theme=ansi)" || no "bat theme not pinned to ansi SSOT"
+fi
+
+[[ $fail -eq 0 ]] && echo "tooling: cascade intact — render+parse, identity wired, ANSI safe ✓"
+exit $fail

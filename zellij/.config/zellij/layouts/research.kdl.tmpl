@@ -1,0 +1,96 @@
+// [ENGINE] research dev-cockpit (zj research) — a full-scope environment for deep
+// thinking, auditing, architecture, and design-systems work. Launched by the `research`
+// scene (ghostty -e zj research, cwd ~/Documents/research); a dedicated Firefox rides
+// alongside as the scene's second niri column. zjstatus pill bar from system/tokens.toml.
+//
+// Tabs:
+//   study      — VIM notepad (NOTES.md) │ books (TUI corpus reader) + shell
+//   architect  — Claude Code │ slicedlabs (in-house AI team) — architecture & ADRs
+//   design     — nvim system/tokens.toml │ shell (~/.dotfiles: render-templates · chafa preview)
+//   audit      — lazygit │ shell (git log · delta · rg · semgrep · ruff)
+//   read       — books (TUI corpus reader) │ shell (pandoc · pdftotext · fetch)
+//   write      — nvim DRAFT.md │ shell (typst watch · glow preview)
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {tabs}"
+                format_center ""
+                format_right  "{mode}#[bg={{color.bg}}]  #[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.research}},bold] {{icon.clock}} {datetime} #[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.research}},bold] {{powerline.dot}} {index} {name} #[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal       "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked       "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_pane         "#[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.research}},bold] PANE #[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tab          "#[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.research}},bold] TAB #[fg=#{{color_raw.research}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_resize       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RESIZE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_move         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] MOVE #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_scroll       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SCROLL #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_search       "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_enter_search "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] SEARCH #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_tab   "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_rename_pane  "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] RENAME #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_session      "#[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.wisteria}},bold] SESSION #[fg={{color.wisteria}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_tmux         "#[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.tertiary}},bold] TMUX #[fg={{color.tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="study" focus=true {
+        pane split_direction="vertical" {
+            pane size="58%" command="vim" {
+                args "NOTES.md"
+            }
+            pane size="42%" split_direction="horizontal" {
+                pane command="books"
+                pane
+            }
+        }
+    }
+    tab name="architect" {
+        pane split_direction="vertical" {
+            pane size="60%" command="claude"
+            pane size="40%" command="slicedlabs"
+        }
+    }
+    tab name="design" {
+        pane split_direction="vertical" {
+            pane size="60%" command="nvim" {
+                args "/home/doodlebob/.dotfiles/system/tokens.toml"
+            }
+            pane size="40%" cwd="/home/doodlebob/.dotfiles"   // render-templates · chafa previews
+        }
+    }
+    tab name="audit" {
+        pane split_direction="vertical" {
+            pane command="lazygit"
+            pane                                              // git log · delta · rg · semgrep · ruff
+        }
+    }
+    tab name="read" {
+        pane split_direction="vertical" {
+            pane size="55%" command="books"                   // TUI corpus reader
+            pane size="45%"                                   // pandoc · pdftotext · fetch
+        }
+    }
+    tab name="write" {
+        pane split_direction="vertical" {
+            pane size="60%" command="nvim" {
+                args "DRAFT.md"
+            }
+            pane size="40%"                                   // typst watch · glow preview
+        }
+    }
+}

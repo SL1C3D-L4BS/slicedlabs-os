@@ -1,0 +1,1224 @@
+# ===========================================================================
+# SlicedLabs OS — KEYBINDING SSOT
+# ===========================================================================
+# Single source of truth for EVERY keybind across the system. Rendered by
+# `bin/.local/bin/render-keys` into four artifacts (the cascade — never hand-edit
+# the outputs):
+#
+#   1. niri binds   → managed region in niri/.config/niri/config.kdl.tmpl
+#                     (phase 1b; then render-templates substitutes {{tokens}})
+#   2. modal data   → quickshell/.config/quickshell/cockpit/generated/keys.json
+#                     (the searchable Cockpit "Keys" modal, Mod+Alt+K)
+#   3. cheatsheets  → docs/keys/<tool>.md  +  docs/keys/SYSTEM-KEYS.md
+#   4. poster       → docs/keys/keyboard-poster.typ  (typst → SVG/PDF, graphed
+#                     per modifier layer, keys tinted by destination hue)
+#
+# SCHEMA — a flat array of [[bind]] tables. One loop in render-keys; group by
+# `tool` for cheatsheets/modal, by `layer` for the poster, filter `tool=="niri"`
+# for binding generation.
+#
+#   tool      required  owning surface: niri | slicedlabs | ghostty | zellij |
+#                       nvim | lazygit | rmpc | gh-dash | fish | media
+#   key       required  canonical chord, niri notation (Mod = Super)
+#   desc      required  human description (shown in modal/cheatsheet)
+#   category  required  sub-group within the tool (Focus, Window, Workspace, …)
+#   layer     required  modifier layer for the poster: Mod | Mod+Shift |
+#                       Mod+Ctrl | Mod+Alt | Mod+Ctrl+Shift | Fn | Other
+#   action    niri-only EXACT KDL action (no trailing ';'); render-keys wraps it
+#   attrs     optional  niri key attributes, e.g. "allow-when-locked=true"
+#   src       optional  "default" marks an upstream framework default (informational)
+#
+# Hue map for the poster (destination workspace/HUD identity, from tokens.toml):
+#   coding=coding research=research engine=engine browser=browser monitoring=monitoring
+#   streaming=streaming gaming=gaming media=media net=net ai=ai agenda=agenda
+#   agenda=agenda
+# ===========================================================================
+
+[meta]
+version = 1
+mod = "Super"                       # niri "Mod" → the Super/Windows key
+layers = ["Mod", "Mod+Shift", "Mod+Ctrl", "Mod+Alt", "Mod+Ctrl+Shift", "Fn", "Other"]
+tools  = ["niri", "slicedlabs", "ghostty", "zellij", "nvim", "lazygit", "rmpc", "gh-dash", "fish", "media"]
+# Gaming/app-launch *menu* actions (Steam/Lutris/…) are not chords — they live in
+# docs/SYSTEM-MAP.md. Gaming *keys* are niri binds tagged category="Gaming".
+
+# ===========================================================================
+# niri — the compositor. This is the muscle-memory surface; transcribed verbatim
+# from config.kdl.tmpl so phase-1b generation can reproduce it byte-for-byte.
+# ===========================================================================
+
+# ---- Launch ----------------------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+Return"
+action = 'spawn "ghostty"'
+desc = "Open a terminal (ghostty → zellij)"
+category = "Launch"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Space"
+action = 'spawn "wofi" "--show" "drun"'
+desc = "App launcher (wofi drun)"
+category = "Launch"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+Space"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/sliced-menu"'
+desc = "Command palette — all workstation actions"
+category = "Launch"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+S"
+action = 'spawn "ghostty" "--class=com.slicedlabs.tui" "-e" "slicedlabs"'
+desc = "SlicedLabs mission-control TUI (floating)"
+category = "Launch"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+E"
+action = 'spawn "sh" "-c" "ghostty --working-directory=$HOME/Projects/engine"'
+desc = "Open the [ENGINE] repo in a terminal"
+category = "Launch"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+P"
+action = 'spawn "ghostty" "--class=com.slicedlabs.music" "-e" "music"'
+desc = "Music cockpit (mpd / rmpc · SomaFM radio)"
+category = "Launch"
+layer = "Mod+Alt"
+
+# ---- Focus -----------------------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+H"
+action = "focus-column-left"
+desc = "Focus column left"
+category = "Focus"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+L"
+action = "focus-column-right"
+desc = "Focus column right"
+category = "Focus"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+J"
+action = "focus-window-down"
+desc = "Focus window down"
+category = "Focus"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+K"
+action = "focus-window-up"
+desc = "Focus window up"
+category = "Focus"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Tab"
+action = "focus-window-down-or-column-right"
+desc = "Cycle forward (window / column)"
+category = "Focus"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+Tab"
+action = "focus-window-up-or-column-left"
+desc = "Cycle backward (window / column)"
+category = "Focus"
+layer = "Mod+Shift"
+
+# ---- Move ------------------------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+H"
+action = "move-column-left"
+desc = "Move column left"
+category = "Move"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+L"
+action = "move-column-right"
+desc = "Move column right"
+category = "Move"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+J"
+action = "move-window-down"
+desc = "Move window down"
+category = "Move"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+K"
+action = "move-window-up"
+desc = "Move window up"
+category = "Move"
+layer = "Mod+Shift"
+
+# ---- Window / Layout -------------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+Q"
+action = "close-window"
+desc = "Close focused window"
+category = "Window"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+F"
+action = "fullscreen-window"
+desc = "Fullscreen window"
+category = "Window"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+F"
+action = "maximize-column"
+desc = "Maximize column"
+category = "Layout"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+W"
+action = "toggle-window-floating"
+desc = "Toggle floating"
+category = "Window"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+R"
+action = "switch-preset-column-width"
+desc = "Cycle column width (¼ → ⅓ → ½ → ⅔)"
+category = "Layout"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Comma"
+action = "consume-window-into-column"
+desc = "Consume window into column"
+category = "Layout"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Period"
+action = "expel-window-from-column"
+desc = "Expel window from column"
+category = "Layout"
+layer = "Mod"
+
+# ---- Workspace — numeric (1-8) — WS1..8 identity order --------------------
+[[bind]]
+tool = "niri"
+key = "Mod+1"
+action = 'focus-workspace "coding"'
+desc = "Workspace: coding"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+2"
+action = 'focus-workspace "research"'
+desc = "Workspace: research"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+3"
+action = 'focus-workspace "engine"'
+desc = "Workspace: engine"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+4"
+action = 'focus-workspace "browser"'
+desc = "Workspace: browser"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+5"
+action = 'focus-workspace "monitoring"'
+desc = "Workspace: monitoring"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+6"
+action = 'focus-workspace "streaming"'
+desc = "Workspace: streaming"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+7"
+action = 'focus-workspace "gaming"'
+desc = "Workspace: gaming"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+8"
+action = 'focus-workspace "media"'
+desc = "Workspace: media"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+9"
+action = 'focus-workspace "desk"'
+desc = "Workspace: desk (blank · portrait DP-3)"
+category = "Workspace"
+layer = "Mod"
+
+# ---- Workspace — mnemonic --------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+E"
+action = 'focus-workspace "engine"'
+desc = "Workspace: engine (mnemonic)"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+C"
+action = 'focus-workspace "research"'
+desc = "Workspace: research (mnemonic)"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+M"
+action = 'focus-workspace "monitoring"'
+desc = "Workspace: monitoring (mnemonic)"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+D"
+action = 'focus-workspace "coding"'
+desc = "Workspace: coding / Develop (mnemonic)"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+B"
+action = 'focus-workspace "browser"'
+desc = "Workspace: browser (mnemonic)"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+V"
+action = 'focus-workspace "media"'
+desc = "Workspace: media (mnemonic)"
+category = "Workspace"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+G"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/workspace-gaming-action"'
+desc = "Gaming: focus workspace, or actions menu if already there"
+category = "Workspace"
+layer = "Mod"
+
+# ---- Workspace — move column to (numeric 1-8, WS1..8 identity order) --------
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+1"
+action = 'move-column-to-workspace "coding"'
+desc = "Move column → coding"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+2"
+action = 'move-column-to-workspace "research"'
+desc = "Move column → research"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+3"
+action = 'move-column-to-workspace "engine"'
+desc = "Move column → engine"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+4"
+action = 'move-column-to-workspace "browser"'
+desc = "Move column → browser"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+5"
+action = 'move-column-to-workspace "monitoring"'
+desc = "Move column → monitoring"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+6"
+action = 'move-column-to-workspace "streaming"'
+desc = "Move column → streaming"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+7"
+action = 'move-column-to-workspace "gaming"'
+desc = "Move column → gaming"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+8"
+action = 'move-column-to-workspace "media"'
+desc = "Move column → media"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+9"
+action = 'move-column-to-workspace "desk"'
+desc = "Move column → desk"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+E"
+action = 'move-column-to-workspace "engine"'
+desc = "Move column → engine (mnemonic)"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+C"
+action = 'move-column-to-workspace "research"'
+desc = "Move column → research (mnemonic)"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+M"
+action = 'move-column-to-workspace "monitoring"'
+desc = "Move column → monitoring (mnemonic)"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+D"
+action = 'move-column-to-workspace "coding"'
+desc = "Move column → coding (mnemonic)"
+category = "Workspace"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+B"
+action = 'move-column-to-workspace "browser"'
+desc = "Move column → browser (mnemonic)"
+category = "Workspace"
+layer = "Mod+Shift"
+
+# ---- Scenes — focus workspace + stage its apps/services (cockpit) ----------
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+E"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace engine;     cockpit engine"'
+desc = "Stage scene: engine"
+category = "Scene"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+D"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace coding;     cockpit coding"'
+desc = "Stage scene: coding"
+category = "Scene"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+C"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace research;   cockpit research"'
+desc = "Stage scene: research"
+category = "Scene"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+B"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace browser;    cockpit browser"'
+desc = "Stage scene: browser"
+category = "Scene"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+V"
+action = 'move-column-to-workspace "media"'
+desc = "Move column → media (mnemonic)"
+category = "Move"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+V"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace media;      cockpit media"'
+desc = "Stage scene: media (Spotify)"
+category = "Scene"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+M"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace monitoring; cockpit monitoring"'
+desc = "Stage scene: monitoring"
+category = "Scene"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+S"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace streaming;  cockpit streaming"'
+desc = "Stage scene: streaming"
+category = "Scene"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+Shift+G"
+action = 'spawn "sh" "-c" "niri msg action focus-workspace gaming;     cockpit gaming"'
+desc = "Stage scene: gaming"
+category = "Scene"
+layer = "Mod+Ctrl+Shift"
+
+# ---- Cockpit HUD (Quickshell) ----------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+Slash"
+action = 'spawn "sh" "-c" "qs -c cockpit ipc call cockpit menu"'
+desc = "Cockpit ☰ command menu"
+category = "HUD"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+K"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal keys"'
+desc = "Keybindings console — every key, searchable"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+C"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl control"'
+desc = "Control Center — toggles · sliders · stats · media · power"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+I"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal context"'
+desc = "HUD inspector: focused workspace context"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+M"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal media"'
+desc = "HUD inspector: media / leisure hub"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+N"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal net"'
+desc = "HUD inspector: network / VPN / security"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+A"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal ai"'
+desc = "HUD inspector: AI team / spend"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+T"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal agenda"'
+desc = "HUD inspector: agenda / standup"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+Y"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal system"'
+desc = "HUD inspector: system"
+category = "HUD"
+layer = "Mod+Alt"
+
+# ---- Appearance ------------------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+L"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl theme toggle"'
+desc = "Toggle dark / light (hot-reloads)"
+category = "Appearance"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+W"
+action = 'spawn "engine-wallpaper" "--random"'
+desc = "Random wallpaper"
+category = "Appearance"
+layer = "Mod+Shift"
+
+# ---- Screenshot ------------------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Print"
+action = "screenshot"
+desc = "Screenshot (region picker)"
+category = "Screenshot"
+layer = "Fn"
+
+[[bind]]
+tool = "niri"
+key = "Shift+Print"
+action = "screenshot-screen"
+desc = "Screenshot whole screen"
+category = "Screenshot"
+layer = "Other"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+S"
+action = "screenshot"
+desc = "Screenshot (region) — ergonomic trigger"
+category = "Screenshot"
+layer = "Mod+Shift"
+
+# ---- Session / Notifications ----------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+Escape"
+action = 'spawn "swaylock" "-f"'
+desc = "Lock screen"
+category = "Session"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+Escape"
+action = 'spawn "wlogout" "-p" "layer-shell"'
+desc = "Power menu (lock/suspend/logout/reboot/shutdown)"
+category = "Session"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+BackSpace"
+action = 'spawn "makoctl" "dismiss" "--all"'
+desc = "Dismiss all notifications"
+category = "Session"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+Q"
+action = "quit"
+desc = "Quit niri (exit session)"
+category = "Session"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+Slash"
+action = "show-hotkey-overlay"
+desc = "niri's built-in hotkey overlay (legacy; prefer Mod+Alt+K)"
+category = "Session"
+layer = "Mod+Shift"
+
+# ---- Audio (media keys) ----------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "XF86AudioRaiseVolume"
+action = 'spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%+"'
+attrs = "allow-when-locked=true"
+desc = "Volume up"
+category = "Audio"
+layer = "Fn"
+
+[[bind]]
+tool = "niri"
+key = "XF86AudioLowerVolume"
+action = 'spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"'
+attrs = "allow-when-locked=true"
+desc = "Volume down"
+category = "Audio"
+layer = "Fn"
+
+[[bind]]
+tool = "niri"
+key = "XF86AudioMute"
+action = 'spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"'
+attrs = "allow-when-locked=true"
+desc = "Mute output"
+category = "Audio"
+layer = "Fn"
+
+[[bind]]
+tool = "niri"
+key = "XF86AudioMicMute"
+action = 'spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"'
+attrs = "allow-when-locked=true"
+desc = "Mute microphone"
+category = "Audio"
+layer = "Fn"
+
+# ---- Gaming ----------------------------------------------------------------
+[[bind]]
+tool = "niri"
+key = "Mod+Shift+G"
+action = 'spawn "sh" "-c" "$HOME/.config/gaming/menu.sh"'
+desc = "Gaming launcher menu (Steam/Lutris/Heroic/Bottles…)"
+category = "Gaming"
+layer = "Mod+Shift"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+G"
+action = 'spawn "sh" "-c" "$HOME/.config/gaming/gamemode-toggle.sh"'
+desc = "Toggle GameMode hold"
+category = "Gaming"
+layer = "Mod+Ctrl"
+
+[[bind]]
+tool = "niri"
+key = "Mod+F12"
+action = 'spawn "ydotool" "key" "88"'
+desc = "Toggle MangoHud overlay (sends F12)"
+category = "Gaming"
+layer = "Fn"
+
+# ===========================================================================
+# slicedlabs — the mission-control TUI (Textual). Ctrl+digit switches tabs.
+# ===========================================================================
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+1"
+desc = "Tab: Chat"
+category = "Tabs"
+layer = "Other"
+
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+2"
+desc = "Tab: Agents"
+category = "Tabs"
+layer = "Other"
+
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+3"
+desc = "Tab: Cost"
+category = "Tabs"
+layer = "Other"
+
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+4"
+desc = "Tab: Audit"
+category = "Tabs"
+layer = "Other"
+
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+5"
+desc = "Tab: Memory"
+category = "Tabs"
+layer = "Other"
+
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+6"
+desc = "Tab: Control"
+category = "Tabs"
+layer = "Other"
+
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+P"
+desc = "Command palette"
+category = "Action"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "slicedlabs"
+key = "Ctrl+Q"
+desc = "Quit the TUI"
+category = "Action"
+layer = "Other"
+src = "default"
+
+# ===========================================================================
+# ghostty — terminal host (panes/tabs delegated to zellij; minimal by design).
+# ===========================================================================
+[[bind]]
+tool = "ghostty"
+key = "Ctrl+Shift+R"
+desc = "Reload ghostty config"
+category = "Terminal"
+layer = "Other"
+
+[[bind]]
+tool = "ghostty"
+key = "Ctrl+Shift+N"
+desc = "New window"
+category = "Terminal"
+layer = "Other"
+
+[[bind]]
+tool = "ghostty"
+key = "Ctrl+Shift+C"
+desc = "Copy selection"
+category = "Terminal"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "ghostty"
+key = "Ctrl+Shift+V"
+desc = "Paste"
+category = "Terminal"
+layer = "Other"
+src = "default"
+
+# ===========================================================================
+# zellij — multiplexer (panes/tabs/sessions). Upstream defaults; modal modes.
+# ===========================================================================
+[[bind]]
+tool = "zellij"
+key = "Ctrl+p"
+desc = "Pane mode"
+category = "Modes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Ctrl+t"
+desc = "Tab mode"
+category = "Modes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Ctrl+n"
+desc = "Resize mode"
+category = "Modes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Ctrl+s"
+desc = "Scroll / search mode"
+category = "Modes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Ctrl+o"
+desc = "Session mode"
+category = "Modes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Ctrl+g"
+desc = "Lock mode (pass keys through)"
+category = "Modes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Alt+n"
+desc = "New pane"
+category = "Panes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Alt+h / Alt+l"
+desc = "Focus pane left / right"
+category = "Panes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Alt+j / Alt+k"
+desc = "Focus pane down / up"
+category = "Panes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Alt+f"
+desc = "Toggle floating panes"
+category = "Panes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Alt+= / Alt+-"
+desc = "Resize pane grow / shrink"
+category = "Panes"
+layer = "Other"
+src = "default"
+
+# ===========================================================================
+# nvim — LazyVim. Leader = Space. Curated high-value defaults (full: :help).
+# ===========================================================================
+[[bind]]
+tool = "nvim"
+key = "Space Space"
+desc = "Find files (root dir)"
+category = "Find"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space /"
+desc = "Live grep (search in files)"
+category = "Find"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space e"
+desc = "File explorer (neo-tree)"
+category = "Find"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space ,"
+desc = "Switch buffer"
+category = "Find"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Shift+H / Shift+L"
+desc = "Previous / next buffer"
+category = "Buffers"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space b d"
+desc = "Delete buffer"
+category = "Buffers"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space g g"
+desc = "Lazygit (root dir)"
+category = "Git"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "g d"
+desc = "Go to definition"
+category = "LSP"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "K"
+desc = "Hover documentation"
+category = "LSP"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space c a"
+desc = "Code action"
+category = "LSP"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space c f"
+desc = "Format buffer"
+category = "LSP"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "nvim"
+key = "Space q q"
+desc = "Quit all"
+category = "Session"
+layer = "Other"
+src = "default"
+
+# ===========================================================================
+# lazygit — git TUI. Curated defaults (? in-app for the full list).
+# ===========================================================================
+[[bind]]
+tool = "lazygit"
+key = "1 … 5"
+desc = "Switch panel (status/files/branches/commits/stash)"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "lazygit"
+key = "Space"
+desc = "Stage / unstage file"
+category = "Stage"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "lazygit"
+key = "a"
+desc = "Stage all"
+category = "Stage"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "lazygit"
+key = "c"
+desc = "Commit"
+category = "Commit"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "lazygit"
+key = "P"
+desc = "Push"
+category = "Sync"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "lazygit"
+key = "p"
+desc = "Pull"
+category = "Sync"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "lazygit"
+key = "z"
+desc = "Undo"
+category = "History"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "lazygit"
+key = "?"
+desc = "Help (all keybinds)"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+# ===========================================================================
+# rmpc — Rust mpd client (the `music` cockpit). Curated defaults.
+# ===========================================================================
+[[bind]]
+tool = "rmpc"
+key = "p"
+desc = "Play / pause"
+category = "Transport"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "rmpc"
+key = "> / <"
+desc = "Next / previous track"
+category = "Transport"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "rmpc"
+key = "s"
+desc = "Stop"
+category = "Transport"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "rmpc"
+key = ", / ."
+desc = "Volume down / up"
+category = "Transport"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "rmpc"
+key = "1 / 2 / 3"
+desc = "Tabs: Queue / Directories / Search"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "rmpc"
+key = "q"
+desc = "Quit"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+# ===========================================================================
+# gh-dash — GitHub PR/issue dashboard. Curated defaults.
+# ===========================================================================
+[[bind]]
+tool = "gh-dash"
+key = "j / k"
+desc = "Move down / up"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "gh-dash"
+key = "Tab"
+desc = "Next section"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "gh-dash"
+key = "Enter"
+desc = "Open item"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "gh-dash"
+key = "/"
+desc = "Search"
+category = "Navigate"
+layer = "Other"
+src = "default"
+
+# ===========================================================================
+# fish — shell custom commands (not chords; surfaced for discovery).
+# ===========================================================================
+[[bind]]
+tool = "fish"
+key = "sl"
+desc = "Open the SlicedLabs TUI inline (= slicedlabs)"
+category = "Command"
+layer = "Other"
+
+[[bind]]
+tool = "fish"
+key = "cb"
+desc = "cargo build + write Waybar build status"
+category = "Command"
+layer = "Other"

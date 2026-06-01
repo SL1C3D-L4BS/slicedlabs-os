@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# waybar-hud — summon/dismiss overlay HUD tabs and switch the bar theme.
+# Called by Niri keybinds (Mod+Alt+{M,N,A,T} for HUDs; theme on its own bind).
+#
+#   waybar-hud <media|net|ai|agenda>   toggle that overlay HUD
+#   waybar-hud clear                   dismiss any overlay (restore workspace tab)
+#   waybar-hud theme [toggle|dark|light]   switch the day/dark variant
+#
+# Overlays write the active-tab state file directly; the watcher naturally
+# dismisses them on the next workspace focus change. A per-summon nonce drives
+# the auto-dismiss timeout so a re-summon or theme change can't be clobbered.
+set -u
+
+SELF="$HOME/.local/bin/waybar-hud"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
+STATE="$CACHE/waybar-active-tab"
+OVL="$CACHE/waybar-overlay"
+THEME="$CACHE/waybar-theme"
+OVERRIDE="$CACHE/waybar-theme-override"
+RENDER="$HOME/.dotfiles/bin/.local/bin/render-templates"
+
+# shellcheck disable=SC1090
+source "$HOME/.config/waybar/scripts/lib/tabs.env" 2>/dev/null || { OVERLAY_TABS=(); declare -A OVERLAY_TIMEOUT=(); WAYBAR_SIGNAL=8; }
+
+sig()  { pkill "-SIGRTMIN+${WAYBAR_SIGNAL:-8}" waybar 2>/dev/null || true; }
+
+focused_ws_tab() {
+    niri msg --json workspaces 2>/dev/null \
+        | jq -r '.[] | select(.is_focused == true) | .name // empty' 2>/dev/null | head -1
+}
+
+is_overlay() { local x="$1" o; for o in "${OVERLAY_TABS[@]}"; do [[ "$o" == "$x" ]] && return 0; done; return 1; }
+
+show() {
+    local o="$1" nonce; nonce=$(date +%s%N)
+    printf '%s:%s\n' "$o" "$nonce" > "$OVL"
+    printf '%s\n' "$o" > "$STATE"
+    sig
+    local t="${OVERLAY_TIMEOUT[$o]:-10}"
+    setsid bash -c "sleep $t; [[ \"\$(cut -d: -f2 '$OVL' 2>/dev/null)\" == '$nonce' ]] && '$SELF' clear" >/dev/null 2>&1 < /dev/null &
+}
+
+clear_overlay() {
+    : > "$OVL"
+    local base; base=$(focused_ws_tab); [[ -z "$base" ]] && base="engine"
+    printf '%s\n' "$base" > "$STATE"
+    sig
+}
+
+theme() {
+    local mode="${1:-toggle}" cur new
+    cur=$(cat "$THEME" 2>/dev/null || echo dark)
+    case "$mode" in
+        toggle)      [[ "$cur" == dark ]] && new=light || new=dark ;;
+        dark|light)  new="$mode" ;;
+        *)           new="$cur" ;;
+    esac
+    printf '%s\n' "$new" > "$THEME"
+    date +%s > "$OVERRIDE"            # mark a manual override so waybard backs off
+    "$RENDER" --variant="$new" >/dev/null 2>&1   # re-themes bar + Niri (+ all .tmpl)
+    killall -SIGUSR2 waybar 2>/dev/null || true  # niri auto-reloads its own config
+    command -v notify-send >/dev/null 2>&1 && notify-send "Theme" "Switched to $new variant" || true
+}
+
+cmd="${1:-}"
+case "$cmd" in
+    theme) theme "${2:-toggle}" ;;
+    clear) clear_overlay ;;
+    "")    echo "usage: waybar-hud <media|net|ai|agenda|clear|theme [toggle|dark|light]>" >&2; exit 1 ;;
+    *)
+        if is_overlay "$cmd"; then
+            if [[ "$(cat "$STATE" 2>/dev/null)" == "$cmd" ]]; then clear_overlay; else show "$cmd"; fi
+        else
+            echo "waybar-hud: unknown overlay '$cmd' (have: ${OVERLAY_TABS[*]})" >&2; exit 1
+        fi ;;
+esac

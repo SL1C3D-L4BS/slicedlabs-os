@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# palette-test — render every [color] hex value in tokens.toml as a labeled
+# swatch in the terminal. Quick eyeball check after editing the palette.
+set -eu
+
+TOKENS="$HOME/.dotfiles/system/tokens.toml"
+
+if [[ ! -f "$TOKENS" ]]; then
+    echo "palette-test: tokens.toml missing at $TOKENS" >&2
+    exit 2
+fi
+
+# Convert "#RRGGBB" → "R;G;B" for ANSI 24-bit truecolor escape.
+hex_to_rgb() {
+    local hex=${1#\#}
+    printf '%d;%d;%d' "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
+}
+
+swatch() {
+    local label="$1" hex="$2"
+    local rgb
+    rgb=$(hex_to_rgb "$hex")
+    # bg block (10 cols wide) · label · hex
+    printf '\033[48;2;%sm          \033[0m  %-18s  %s\n' "$rgb" "$label" "$hex"
+}
+
+echo
+echo "════════════════════════════════════════════════════════════════"
+echo "  [ENGINE] palette swatch — variant=$(cat ${XDG_CACHE_HOME:-$HOME/.cache}/ricing-variant 2>/dev/null || echo dark)"
+echo "════════════════════════════════════════════════════════════════"
+
+# Walk every line of [color] block: "key = "#RRGGBB"" and emit a swatch.
+in_block=0
+while IFS= read -r line; do
+    if [[ "$line" =~ ^\[color\]$ ]]; then
+        in_block=1
+        echo
+        echo "  ── [color] base ────────────────────────────"
+        continue
+    fi
+    if [[ "$in_block" -eq 1 && "$line" =~ ^\[ ]]; then
+        break
+    fi
+    if [[ "$in_block" -eq 1 && "$line" =~ ^([a-z_]+)[[:space:]]*=[[:space:]]*\"(#[A-Fa-f0-9]{6})\" ]]; then
+        swatch "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    fi
+done < "$TOKENS"
+
+# ANSI block — same iteration but for [ansi].
+in_block=0
+while IFS= read -r line; do
+    if [[ "$line" =~ ^\[ansi\]$ ]]; then
+        in_block=1
+        echo
+        echo "  ── [ansi] terminal ─────────────────────────"
+        continue
+    fi
+    if [[ "$in_block" -eq 1 && "$line" =~ ^\[ ]]; then
+        break
+    fi
+    if [[ "$in_block" -eq 1 && "$line" =~ ^([a-z_]+)[[:space:]]*=[[:space:]]*\"(#[A-Fa-f0-9]{6})\" ]]; then
+        swatch "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    fi
+done < "$TOKENS"
+
+echo

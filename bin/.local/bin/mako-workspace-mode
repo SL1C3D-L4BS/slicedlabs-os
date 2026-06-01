@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# mako-workspace-mode — toggle Mako's "do-not-disturb" mode based on focused
+# Niri workspace.
+#
+# Engages DND when the active workspace is `engine` (deep-work, silence the
+# pop-up surface), lifts DND on any other workspace. Notifications still
+# queue and remain visible in the Waybar comms/notifs chip.
+#
+# Mirrors the architecture of waybar-tab-watcher (niri event stream → action).
+# Idempotent: sending the same mode set twice is a no-op.
+set -euo pipefail
+
+DND_MODE="do-not-disturb"
+
+# Apply current state at startup so we don't wait for the first event to set DND.
+current=$(niri msg --json focused-output 2>/dev/null | jq -r '.workspace // ""' 2>/dev/null || echo "")
+if [[ "$current" == "engine" ]]; then
+    makoctl mode -a "$DND_MODE" 2>/dev/null || true
+else
+    makoctl mode -r "$DND_MODE" 2>/dev/null || true
+fi
+
+# Stream workspace-activated events. The watcher reacts only when the workspace
+# is named (sticky for unnamed scratch workspaces, matching waybar-tab-watcher).
+last_active=""
+niri msg --json event-stream 2>/dev/null | while read -r line; do
+    case "$line" in
+        *WorkspaceActivated* | *WorkspacesChanged*)
+            ws=$(niri msg --json workspaces 2>/dev/null \
+                | jq -r '.[] | select(.is_focused == true) | .name // ""' 2>/dev/null \
+                || echo "")
+            # Skip unnamed (numeric scratch) workspaces — preserve current DND state.
+            [[ -z "$ws" ]] && continue
+            [[ "$ws" == "$last_active" ]] && continue
+            last_active="$ws"
+
+            if [[ "$ws" == "engine" ]]; then
+                makoctl mode -a "$DND_MODE" 2>/dev/null || true
+            else
+                makoctl mode -r "$DND_MODE" 2>/dev/null || true
+            fi
+            ;;
+    esac
+done

@@ -1,0 +1,81 @@
+# SlicedLabs — tide prompt as Liquid-Glass powerline capsules. Generated from
+# system/tokens.toml by render-templates; dotfiles-reproducible (the .tmpl is the source).
+#
+# Why `set -gx` (exported): tide computes the prompt in a background `fish -c`
+# subprocess that only sees EXPORTED env (and universals). Exporting these per-shell
+# means each terminal's prompt subprocess inherits THAT terminal's values — so the pwd
+# capsule BREATHES the focused workspace's hue via $SL_IDENTITY (per-terminal, never
+# leaking across terminals the way a universal var would). Chrome rides identity +
+# [semantic]; set_color wants bare hex, so colours come from [color_raw] (no '#').
+# Items keep tide's default 2-line structure (no recompile needed) — we restyle colour + shape.
+
+status is-interactive; or exit 0
+
+# ── identity accent: $SL_IDENTITY (#RRGGBB) → bare hex; fallback global accent ──
+set -l sl_id (string replace -r '^#' '' -- "$SL_IDENTITY")
+test -z "$sl_id"; and set sl_id {{color_raw.primary}}
+
+# ── capsule SHAPE — rounded caps + powerline joins from [powerline] ──
+set -gx tide_left_prompt_prefix '{{powerline.round_left}}'
+set -gx tide_left_prompt_suffix '{{powerline.round_right}}'
+set -gx tide_left_prompt_separator_diff_color '{{powerline.round_right}}'
+set -gx tide_left_prompt_separator_same_color '{{powerline.thin_left}}'
+set -gx tide_right_prompt_prefix '{{powerline.round_left}}'
+set -gx tide_right_prompt_suffix '{{powerline.round_right}}'
+set -gx tide_right_prompt_separator_diff_color '{{powerline.round_left}}'
+set -gx tide_right_prompt_separator_same_color '{{powerline.thin_right}}'
+set -gx tide_prompt_add_newline_before true
+set -gx tide_prompt_pad_items true
+set -gx tide_prompt_color_separator_same_color {{color_raw.fg_muted}}
+
+# ── pwd pill — the prominent IDENTITY capsule (dark text on the workspace hue) ──
+set -gx tide_pwd_bg_color $sl_id
+set -gx tide_pwd_color_dir {{color_raw.bg}}
+set -gx tide_pwd_color_anchors {{color_raw.bg}}
+set -gx tide_pwd_color_truncated_dirs {{color_raw.bg}}
+
+# ── os pill — identity glyph on a charcoal chip (if you add `os` to your items) ──
+set -gx tide_os_bg_color {{color_raw.bg_alt}}
+set -gx tide_os_color $sl_id
+
+# ── git pill — golden (urgent → coral) ──
+set -gx tide_git_bg_color {{color_raw.tertiary}}
+set -gx tide_git_bg_color_unstable {{color_raw.tertiary}}
+set -gx tide_git_bg_color_urgent {{color_raw.error}}
+for c in branch conflicted dirty clean operation staged stash untracked upstream
+    set -gx tide_git_color_$c {{color_raw.bg}}
+end
+
+# ── status pill — success green / failure coral ──
+set -gx tide_status_bg_color {{color_raw.success}}
+set -gx tide_status_bg_color_failure {{color_raw.error}}
+set -gx tide_status_color {{color_raw.bg}}
+set -gx tide_status_color_failure {{color_raw.bg}}
+
+# ── cmd_duration / time / direnv — charcoal chips, accent text ──
+set -gx tide_cmd_duration_bg_color {{color_raw.bg_alt}}
+set -gx tide_cmd_duration_color {{color_raw.tertiary}}
+set -gx tide_cmd_duration_threshold 2000
+set -gx tide_time_bg_color {{color_raw.bg_alt}}
+set -gx tide_time_color {{color_raw.secondary}}
+set -gx tide_time_format '%H:%M'
+set -gx tide_direnv_bg_color {{color_raw.bg_alt}}
+set -gx tide_direnv_color {{color_raw.tertiary}}
+
+# ── language segments — charcoal chips, language-tinted text ──
+for seg in node python rustc go
+    set -gx tide_{$seg}_bg_color {{color_raw.bg_alt}}
+end
+set -gx tide_node_color {{color_raw.success}}
+set -gx tide_python_color {{color_raw.secondary}}
+set -gx tide_rustc_color {{color_raw.tertiary}}
+set -gx tide_go_color {{color_raw.secondary}}
+
+# ── prompt character — identity ❯ (coral on failure), no pill ──
+set -gx tide_character_color $sl_id
+set -gx tide_character_color_failure {{color_raw.error}}
+set -gx tide_character_icon '❯'
+set -gx tide_character_vi_icon_default '❮'
+set -gx tide_character_vi_icon_insert '❯'
+set -gx tide_character_vi_icon_replace '▶'
+set -gx tide_character_vi_icon_visual 'V'

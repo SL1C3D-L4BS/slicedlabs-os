@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""claude-pre-tool — PreToolUse hook script.
+
+Claude Code invokes this script before every tool call (when wired in
+~/.claude/settings.json). Stdin is JSON with `tool`, `input`, plus context.
+Exit 0 = allow; exit 2 = deny (block tool call); exit 1 = error.
+
+Two safety gates:
+  1. Destructive Bash patterns (rm -rf, git push --force, git reset --hard,
+     drop table, mkfs, dd of=/dev/*) — blocked outright.
+  2. Cost cap — blocked when projected daily spend exceeds the hard cap.
+"""
+from __future__ import annotations
+
+import json
+import sys
+
+# Make slicedlabs_team importable even before the package is uv-installed.
+import os
+DOTFILES_ROOT = os.environ.get("DOTFILES_ROOT", os.path.expanduser("~/.dotfiles"))
+sys.path.insert(0, os.path.join(DOTFILES_ROOT, "slicedlabs-team"))
+
+try:
+    from slicedlabs_team.hooks.safety import pre_tool_use as safety_pre
+    from slicedlabs_team.hooks.cost_cap import can_invoke, hard_cap, daily_spend_so_far
+except Exception:  # noqa: BLE001
+    # Hook scripts must never crash hard — if our package isn't ready,
+    # fall through to a permissive default.
+    sys.exit(0)
+
+
+def main() -> int:
+    try:
+        data = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError:
+        return 0
+
+    tool = data.get("tool_name") or data.get("tool", "")
+    args = data.get("tool_input") or data.get("input", {})
+
+    ok, reason = safety_pre(tool, args)
+    if not ok:
+        print(reason, file=sys.stderr)
+        return 2
+
+    # Cost cap — heuristic: assume each new agent invocation costs ~$0.10
+    # until Langfuse gives us a real number.
+    projected = 0.10
+    ok, reason = can_invoke(projected_cost=projected, agent=data.get("agent", "unknown"))
+    if not ok:
+        print(reason, file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

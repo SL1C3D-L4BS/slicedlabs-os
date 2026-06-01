@@ -1,0 +1,188 @@
+# AI/agent service mesh — long-term memory (L=M), observability (L=N),
+# automation (L=P), and knowledge graph (L=Q). Layered on top of dev-stack:
+# Mem0/Cognee/Langfuse reuse Postgres+Qdrant+ClickHouse from dev-stack.yaml
+# rather than duplicating storage. Bring both stacks up via the systemd-user
+# unit `ai-stack.service` which depends_on dev-stack.service.
+#
+# Profiles let you bring up a subset:
+#   memory  → mem0 + neo4j
+#   obs     → langfuse + phoenix
+#   auto    → n8n
+#   all     → everything
+
+version: "3.9"
+
+networks:
+  ainet:
+    driver: bridge
+  devnet:
+    # Reuse the dev-stack network so mem0/langfuse can reach postgres,
+    # qdrant, and clickhouse without re-publishing ports. podman-compose
+    # prefixes auto-created networks with the project name, so the
+    # external reference uses the prefixed form.
+    external: true
+    name: podman-compose_devnet
+
+volumes:
+  mem0data:
+  neo4jdata:
+  neo4jlogs:
+  langfusedata:
+  phoenixdata:
+  n8ndata:
+  cogneedata:
+
+services:
+
+  # ===== M — Long-term memory ==============================================
+  neo4j:
+    image: docker.io/library/neo4j:5-community
+    container_name: ai-neo4j
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    profiles: ["memory", "all"]
+    # Was OOM-killed (exit 137): dbms.memory.* was renamed to server.memory.* in
+    # neo4j 5, so the old names were ignored and the heap auto-sized past budget.
+    # Pin heap+pagecache with the v5 names + a hard container cap as backstop
+    # (1G heap + 512m pagecache + JVM/native overhead < 2G).
+    mem_limit: 2g
+    ports:
+      - "127.0.0.1:7474:7474"   # browser
+      - "127.0.0.1:7687:7687"   # bolt
+    environment:
+      # podman-compose doesn't honor docker secrets the same way; source
+      # NEO4J_AUTH=neo4j/<pw> from the ai-stack-up wrapper instead.
+      NEO4J_AUTH: ${NEO4J_AUTH}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512m
+    volumes:
+      - neo4jdata:/data
+      - neo4jlogs:/logs
+    networks: [ainet]
+
+  mem0:
+    # Mem0 OSS server image is not currently published on Docker Hub
+    # (docker.io/mem0ai/mem0 is private/missing). Run mem0 in-process via the
+    # slicedlabs-team Python package (`from mem0 import Memory`) which is the
+    # supported path for single-user workstations. Bring this container up
+    # only after building the image locally from github.com/mem0ai/mem0
+    # server/ — gate it behind the explicit "memory-server" profile so the
+    # default `--profile memory` brings up neo4j alone.
+    image: docker.io/mem0ai/mem0:latest
+    container_name: ai-mem0
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    profiles: ["memory-server"]
+    ports: ["127.0.0.1:8089:8089"]
+    environment:
+      MEM0_CONFIG: /etc/mem0/config.yaml
+      # Containers joined to devnet reach PG/Qdrant/etc. via their compose
+      # service names (dev-postgres, dev-qdrant). host.containers.internal
+      # often resolves to a routing gateway that refuses TCP — avoid it.
+      OLLAMA_HOST: http://host.containers.internal:11434
+      POSTGRES_URL: postgresql://dev:${POSTGRES_PASSWORD}@dev-postgres:5432/mem0
+      QDRANT_URL: http://dev-qdrant:6333
+      NEO4J_URL: bolt://ai-neo4j:7687
+    volumes:
+      - mem0data:/var/lib/mem0
+      - ${HOME}/.config/mem0:/etc/mem0:ro
+    networks: [ainet, devnet]
+    depends_on: [neo4j]
+
+  # ===== N — Agent observability ===========================================
+  langfuse:
+    # Pinned to v2 (legacy all-in-one). v3 split into langfuse-web +
+    # langfuse-worker and requires ClickHouse + Redis + S3/MinIO blob
+    # storage; v2 only needs Postgres, which is a much better fit for
+    # workstation-scoped use. Bump to v3 when MinIO + the worker split
+    # are wanted.
+    image: docker.io/langfuse/langfuse:2
+    container_name: ai-langfuse
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    profiles: ["obs", "all"]
+    ports: ["127.0.0.1:3030:3000"]
+    environment:
+      DATABASE_URL: postgresql://dev:${POSTGRES_PASSWORD}@dev-postgres:5432/langfuse
+      # v2 reads NEXTAUTH_SECRET + SALT directly; the *_FILE pattern is v3+
+      # only. The systemd-user unit + interactive shells export both from
+      # ~/.config/langfuse/{nextauth_secret,salt} before `compose up`.
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      SALT: ${LANGFUSE_SALT}
+      NEXTAUTH_URL: http://localhost:3030
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_INIT_ORG_ID: slicedlabs
+      LANGFUSE_INIT_PROJECT_ID: slicedlabs-team
+      LANGFUSE_DEFAULT_PROJECT_ID: slicedlabs-team
+    volumes:
+      - langfusedata:/var/lib/langfuse
+    networks: [ainet, devnet]
+
+  phoenix:
+    image: docker.io/arizephoenix/phoenix:latest
+    container_name: ai-phoenix
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    profiles: ["obs", "all"]
+    ports:
+      - "127.0.0.1:6006:6006"   # Phoenix UI
+      - "127.0.0.1:6007:4317"   # OTLP gRPC
+    volumes:
+      - phoenixdata:/data
+    networks: [ainet]
+
+  # ===== P — Automation ====================================================
+  n8n:
+    image: docker.io/n8nio/n8n:latest
+    container_name: ai-n8n
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    profiles: ["auto", "all"]
+    ports: ["127.0.0.1:5678:5678"]
+    environment:
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_USER_FOLDER: /home/node/.n8n
+      N8N_EDITOR_BASE_URL: http://localhost:5678
+      WEBHOOK_URL: http://localhost:5678/
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: dev-postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_USER: dev
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POSTGRESDB_DATABASE: n8n
+    volumes:
+      - n8ndata:/home/node/.n8n
+      - ${HOME}/.config/n8n/workflows:/home/node/workflows:ro
+    networks: [ainet, devnet]
+
+  # ===== Q — Knowledge graph (Cognee runs in-process by default; container
+  # provided for the heavy-ingest case where Cognee owns its own process). ==
+  cognee:
+    image: docker.io/cognee/cognee:latest
+    container_name: ai-cognee
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    profiles: ["kg", "all"]
+    ports: ["127.0.0.1:8088:8088"]
+    environment:
+      COGNEE_VECTOR_PROVIDER: qdrant
+      COGNEE_VECTOR_URL: http://dev-qdrant:6333
+      COGNEE_GRAPH_PROVIDER: neo4j
+      COGNEE_GRAPH_URL: bolt://ai-neo4j:7687
+      COGNEE_LLM_PROVIDER: anthropic
+    volumes:
+      - cogneedata:/var/lib/cognee
+    networks: [ainet, devnet]
+    depends_on: [neo4j]
+
+secrets:
+  neo4j_auth:
+    file: ${HOME}/.config/neo4j/auth

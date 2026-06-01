@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# verify-keys — keys.toml is the SSOT for the niri binds (phase-1b guarantee).
+# Fails if: (1) any niri key is bound twice (a duplicate breaks niri — §18.5),
+# (2) the managed binds region in config.kdl.tmpl has drifted from `render-keys
+# --niri`, or (3) niri validate fails. Wire into verify-all / CI / pre-commit.
+set -euo pipefail
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+cd "$ROOT"
+fail=0
+
+# (1) no duplicate niri binds
+dups=$(python3 -c "
+import tomllib
+from collections import Counter
+from pathlib import Path
+b = [x for x in tomllib.loads(Path('system/keys.toml').read_text()).get('bind', []) if x.get('tool') == 'niri']
+nk = lambda x: x['key'] + (' ' + x['attrs'] if x.get('attrs') else '')
+print(';'.join(k for k, n in Counter(nk(x) for x in b).items() if n > 1))")
+if [[ -n "$dups" ]]; then
+    echo "keys: DUPLICATE niri binds: $dups" >&2
+    fail=1
+fi
+
+# (2) the managed region matches what keys.toml generates
+gen=$(render-keys --niri --check)
+cur=$(awk '/>>> generated: keys/{p=1} p{print} /<<< generated: keys/{p=0}' \
+      niri/.config/niri/config.kdl.tmpl)
+if [[ "$gen" != "$cur" ]]; then
+    echo "keys: niri binds region DRIFTED from keys.toml" >&2
+    echo "      run: render-keys --niri && render-templates" >&2
+    fail=1
+fi
+
+# (3) the rendered niri config validates
+niri validate >/dev/null 2>&1 || { echo "keys: niri validate FAILED" >&2; fail=1; }
+
+[[ $fail -eq 0 ]] && echo "keys: SSOT intact — no dup binds, region in sync, niri valid ✓"
+exit $fail

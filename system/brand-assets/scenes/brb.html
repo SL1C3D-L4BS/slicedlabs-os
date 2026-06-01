@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>[ENGINE] · BRB</title>
+<link rel="stylesheet" href="brand.css">
+<style>
+body {
+    background: var(--bg);
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Drifting accent shapes — subtle motion, no media weight. */
+body::before, body::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.35;
+}
+body::before {
+    width: 720px; height: 720px;
+    background: var(--primary);
+    top: -240px; left: -240px;
+    animation: drift-a 24s ease-in-out infinite alternate;
+}
+body::after {
+    width: 600px; height: 600px;
+    background: var(--tertiary);
+    bottom: -200px; right: -200px;
+    animation: drift-b 28s ease-in-out infinite alternate;
+}
+@keyframes drift-a {
+    to { transform: translate(280px, 220px); }
+}
+@keyframes drift-b {
+    to { transform: translate(-260px, -240px); }
+}
+
+.title {
+    font-family: var(--font-display);
+    font-size: 200px;
+    color: var(--fg);
+    letter-spacing: 0.04em;
+    text-shadow: var(--shadow-glow);
+    z-index: 1;
+}
+
+.subtitle {
+    font-family: var(--font-mono);
+    font-size: 32px;
+    color: var(--fg-muted);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    z-index: 1;
+}
+
+.away-time {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    color: var(--tertiary);
+    margin-top: 16px;
+    z-index: 1;
+    font-variant-numeric: tabular-nums;
+}
+</style>
+</head>
+<body>
+<div class="title">BRB</div>
+<div class="subtitle">be right back</div>
+<div class="away-time" id="away">away for 0:00</div>
+
+<script>
+const start = Date.now();
+const el = document.getElementById('away');
+setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000);
+    const m = Math.floor(s / 60), r = s % 60;
+    el.textContent = `away for ${m}:${r.toString().padStart(2, '0')}`;
+}, 1000);
+</script>
+</body>
+</html>

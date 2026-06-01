@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# ai-stack-down — tear down the personal AI team mesh (the sibling of
+# ai-stack-up). `down` removes the project's containers across all profiles.
+# Manual path only: does NOT touch ai-stack.service auto-start. Idempotent.
+set -euo pipefail
+
+podman compose -f "$HOME/.dotfiles/podman-compose/ai-stack.yaml" down "$@"

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# tunes — keyboard-driven Spotify via spotify_player (Premium, librespot, MPRIS).
+# The `media` workspace cockpit (Violet). Mirrors `music` (the FOSS mpd cockpit)
+# but for Spotify; spotify_player exposes MPRIS so the Cockpit media HUD + playerctl
+# light up. First run: `tunes` opens the player — log in once (it guides you).
+#
+#   tunes                       open the spotify_player cockpit (media-workspace app)
+#   tunes toggle|play|pause|next|prev   transport (via playerctl → MPRIS)
+#   tunes <name>                play a saved context URI (hiphop|rap|country|metal …)
+#   tunes <anything-else>       passed straight to `spotify_player`
+#
+# Focus the cockpit with Mod+8 / Mod+V; stage it with Mod+Ctrl+V.
+set -euo pipefail
+
+PLAYER="spotify_player"
+command -v "$PLAYER" >/dev/null 2>&1 || { echo "tunes: spotify_player not installed (cargo install spotify_player)"; exit 1; }
+
+# Saved playlist/album/artist context URIs. Fill your own: in spotify_player search
+# the item, then its URI (spotify:playlist:… / spotify:album:…); paste below.
+declare -A URIS=(
+    [hiphop]=""
+    [rap]=""
+    [country]=""
+    [metal]=""
+)
+
+ctl() { playerctl --player=spotify_player "$@" 2>/dev/null; }
+
+case "${1:-tui}" in
+    tui)
+        exec "$PLAYER" ;;
+    toggle)        ctl play-pause ;;
+    play|pause|next|stop)   ctl "$1" ;;
+    prev|previous) ctl previous ;;
+    hiphop|rap|country|metal)
+        uri="${URIS[$1]:-}"
+        [[ -n "$uri" ]] || { echo "tunes: no saved URI for '$1' — edit ~/.local/bin/tunes"; exit 1; }
+        ctl open "$uri" || "$PLAYER" playback start context --id "${uri##*:}" ;;
+    *)
+        exec "$PLAYER" "$@" ;;
+esac

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# ingest-books — bulk-ingest ~/Resources/books/ into Qdrant collection `books`.
+# Writes a status summary to ~/.cache/slicedlabs-corpus.json on completion.
+
+set -euo pipefail
+exec python3 -m slicedlabs_team.ingest.books "$@"

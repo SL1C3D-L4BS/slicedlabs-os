@@ -1,0 +1,37 @@
+# SlicedLabs — lazygit theme (Track 9.1). GENERATED from system/tokens.toml by
+# render-templates — edit the .tmpl, not this. Chrome rides identity/[semantic];
+# diff content rides delta (which rides the [ansi] SSOT). Active border = the global
+# accent (lazygit reads its config once, so it can't be per-workspace identity).
+gui:
+  nerdFontsVersion: "3"
+  showBottomLine: false
+  theme:
+    activeBorderColor:
+      - "{{color.primary}}"
+      - bold
+    inactiveBorderColor:
+      - "{{semantic.border_tertiary}}"
+    searchingActiveBorderColor:
+      - "{{color.tertiary}}"
+      - bold
+    optionsTextColor:
+      - "{{color.secondary}}"
+    selectedLineBgColor:
+      - "{{color.selection}}"
+    cherryPickedCommitBgColor:
+      - "{{color.selection}}"
+    cherryPickedCommitFgColor:
+      - "{{color.primary}}"
+    markedBaseCommitBgColor:
+      - "{{color.selection}}"
+    markedBaseCommitFgColor:
+      - "{{color.tertiary}}"
+    unstagedChangesColor:
+      - "{{color.error}}"
+    defaultFgColor:
+      - "{{color.fg}}"
+  authorColorDefault: "{{color.secondary}}"
+git:
+  paging:
+    colorArg: always
+    pager: delta --paging=never

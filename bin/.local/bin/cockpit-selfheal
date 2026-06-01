@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# cockpit-selfheal — login backstop. Fire the `cockpit` gap-fill reconcile as soon
+# as the eager-staged [meta].auto scenes have SETTLED (their windows are mapped), or
+# a cap elapses — instead of a blind `sleep 30`. On a warm boot this closes gaps
+# ~15s sooner; the cap still covers a genuinely-missing window on a slow cold boot.
+# Idempotent by construction: `cockpit` skips every surface already present, so this
+# only ever FILLS GAPS — belt to niri-workspace-launcher's brace.
+set -uo pipefail
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# shellcheck source=/dev/null
+source "$SELF_DIR/lib/scene.sh"
+
+CAP="${COCKPIT_SELFHEAL_CAP:-25}"   # seconds; ≥ scene.sh's per-app register wait (25s)
+
+# Expected app_ids across all [meta].auto workspaces (the surfaces login stages).
+mapfile -t expected < <(
+    while IFS= read -r ws; do
+        [[ -z "$ws" ]] && continue
+        _scene_apps "$ws" | awk -F'|' 'NF{print $1}'
+    done < <(scene_meta_auto)
+)
+
+_all_present() {  # true once every expected app_id is mapped in niri
+    local wins a
+    wins="$(niri msg --json windows 2>/dev/null)" || return 1
+    for a in "${expected[@]}"; do
+        [[ -z "$a" ]] && continue
+        jq -e --arg a "$a" 'any(.[]; .app_id==$a)' >/dev/null 2>&1 <<<"$wins" || return 1
+    done
+    return 0
+}
+
+t=0
+if [[ ${#expected[@]} -gt 0 ]]; then
+    while [[ $t -lt $CAP ]]; do _all_present && break; sleep 1; t=$((t + 1)); done
+fi
+scene_log "cockpit-selfheal: scenes settled after ${t}s (cap ${CAP}s) — running gap-fill reconcile"
+exec cockpit

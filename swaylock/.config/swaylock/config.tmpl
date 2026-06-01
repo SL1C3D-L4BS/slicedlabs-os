@@ -1,0 +1,59 @@
+## [ENGINE] platform — swaylock-effects config
+## Tokens substituted by render-templates from system/tokens.toml. Each
+## color references the live palette so theme changes propagate at next
+## render rather than via hand-editing here.
+
+# Backdrop: blurred screenshot + soft vignette for depth. Larger blur
+# than baseline windows since the lock is the most "stopped" state.
+screenshots
+effect-blur={{blur.backdrop_lg}}x6
+effect-vignette=0.5:0.5
+fade-in=0.3
+
+# Layout: large indicator ring centred over the blurred backdrop. The
+# clock + date stack uses the display font (Geist Mono) for a heavier
+# weight than the terminal stack so the lock surface reads as separate.
+indicator-radius=140
+indicator-thickness=10
+indicator-idle-visible
+clock
+timestr=%H:%M
+datestr=%a · %Y-%m-%d
+font={{font.display}}
+font-size=24
+
+# Colors. Suffix legend:
+#   inside-*   = ring interior fill
+#   ring-*     = ring border color
+#   line-*     = inner separator between text and inside
+#   text-*     = clock + status text
+#   key-hl-*   = keypress highlight pulse
+#   bs-hl-*    = backspace pulse
+# State variants: -clear (post-type), -ver (verifying), -wrong (denied).
+
+# Idle / typing state — primary accent ring, near-bg interior.
+inside-color={{color_raw.bg}}cc
+ring-color={{color_raw.primary}}
+line-color={{color_raw.bg}}
+text-color={{color_raw.fg}}
+key-hl-color={{color_raw.secondary}}
+bs-hl-color={{color_raw.error}}
+
+# After-typing pulse — selection purple inside, primary ring stays.
+inside-clear-color={{color_raw.selection}}
+ring-clear-color={{color_raw.primary}}
+line-clear-color={{color_raw.bg}}
+text-clear-color={{color_raw.fg}}
+
+# Verifying — cyan ring signals "checking" without success/fail commit.
+inside-ver-color={{color_raw.selection}}
+ring-ver-color={{color_raw.secondary}}
+line-ver-color={{color_raw.bg}}
+text-ver-color={{color_raw.fg}}
+
+# Wrong password — error red, semi-transparent interior so the underlying
+# blurred backdrop bleeds through (drives the "shake/wrong" affordance).
+inside-wrong-color={{color_raw.error}}44
+ring-wrong-color={{color_raw.error}}
+line-wrong-color={{color_raw.bg}}
+text-wrong-color={{color_raw.fg}}

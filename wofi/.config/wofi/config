@@ -1,0 +1,15 @@
+## [ENGINE] platform — Wofi launcher config
+## Styling lives in style.css (rendered from style.css.tmpl).
+show=drun
+prompt=›
+width=520
+height=380
+location=center
+allow_images=true
+image_size=24
+insensitive=true
+no_actions=true
+hide_scroll=true
+matching=fuzzy
+gtk_dark=true
+key_expand=Tab

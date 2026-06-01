@@ -1,0 +1,32 @@
+# Live-ISO essentials. The curated SlicedLabs stack is appended at build time from
+# `snapshot-packages` (see build.sh). Keep this list to what archiso/live needs.
+archlinux-keyring
+base
+linux
+linux-firmware
+mkinitcpio
+mkinitcpio-archiso
+intel-ucode
+amd-ucode
+btrfs-progs
+cryptsetup
+lvm2
+networkmanager
+sudo
+git
+zsh
+fish
+# desktop (so the live env shows SlicedLabs OS, not a bare TTY)
+niri
+quickshell-git
+swaylock-effects
+swayidle
+mako
+ghostty
+zellij
+neovim
+starship
+plymouth
+qt6-shadertools
+cava
+grim

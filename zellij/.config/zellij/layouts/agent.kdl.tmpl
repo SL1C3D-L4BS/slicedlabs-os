@@ -1,0 +1,44 @@
+// agent — the persistent AI / notes side-column for the coding & engine desktops
+// (com.slicedlabs.coding-side / com.slicedlabs.engine-side, the 18% niri column). A narrow
+// vertical stack: Claude Code on top, the slicedlabs in-house AI team below, a scratch
+// shell at the foot for quick notes/commands. Launched by the scene as `zj agent`, cwd =
+// the scene's --working-directory (~/Projects for coding, ~/Projects/engine for engine).
+//
+// NEUTRAL accent (semantic.text_tertiary): this one layout serves BOTH the coding-blue and
+// engine-coral workspaces, so the pill bar stays identity-agnostic — the niri window border
+// and the SL_IDENTITY-tinted tools inside carry the workspace hue.
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {mode} {tabs}"
+                format_center ""
+                format_right  "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{icon.clock}} {datetime} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{powerline.dot}} {name} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal   "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked   "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="agent" focus=true {
+        pane split_direction="horizontal" {
+            pane size="50%" command="claude"      // primary coding agent
+            pane size="30%" command="slicedlabs"  // in-house AI team (architect/critic/…)
+            pane size="20%"                        // scratch shell — notes / quick commands
+        }
+    }
+}

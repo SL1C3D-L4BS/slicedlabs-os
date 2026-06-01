@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# build-shaders — compile the Cockpit's GLSL fragment shaders → .qsb (Qt6 RHI).
+# qsb ships with qt6-shadertools (independent of quickshell). Idempotent.
+set -euo pipefail
+QSB="${QSB:-/usr/lib/qt6/bin/qsb}"
+DIR="${1:-$HOME/.dotfiles/quickshell/.config/quickshell/cockpit/core/shaders}"
+
+[[ -x "$QSB" ]] || { echo "build-shaders: qsb not found at $QSB (install qt6-shadertools)" >&2; exit 1; }
+
+shopt -s nullglob
+n=0
+for f in "$DIR"/*.frag "$DIR"/*.vert; do
+    out="$f.qsb"
+    "$QSB" --glsl "120,150,100es" --hlsl 50 --msl 12 -o "$out" "$f"
+    echo "qsb: $(basename "$out")"
+    n=$((n + 1))
+done
+echo "build-shaders: compiled $n shader(s) in $DIR"

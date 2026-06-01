@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# verify-all — aggregate every SlicedLabs invariant gate into one green/red run.
+# The plan's "verify-all green" is the system-wide ownership gate; it grows as
+# tracks land (verify-keys, verify-governance, verify-public-clean). Exit 1 on any
+# failure. Optional gates are run only when present, so partial builds still pass.
+set -u
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+rc=0
+run() {  # <label> <cmd...>
+    local label="$1"; shift
+    printf '\n\033[1m▶ %s\033[0m\n' "$label"
+    if "$@"; then :; else rc=1; printf '\033[31m  ✗ %s FAILED\033[0m\n' "$label"; fi
+}
+opt() { command -v "$1" >/dev/null 2>&1; }
+
+run "OKLCH colour round-trip"  python3 "$ROOT/bin/.local/bin/lib/color.py" --selftest
+run "workspace remap (#1)"     verify-workspace-remap
+run "design language (#6)"     verify-design-language
+run "token drift"              verify-tokens-drift
+opt verify-keys       && run "keys SSOT"          verify-keys
+opt verify-governance && run "governance ledger"  verify-governance
+opt verify-tooling    && run "tooling cascade"    verify-tooling
+opt verify-boot-contract && run "boot contract"   verify-boot-contract
+run "cockpit invariants"       verify-cockpit.sh
+opt verify-gaming.sh  && run "gaming stack"        verify-gaming.sh
+
+echo
+if [[ $rc -eq 0 ]]; then
+    printf '\033[32m✓ verify-all: ALL GATES GREEN\033[0m\n'
+else
+    printf '\033[31m✗ verify-all: FAILURES above\033[0m\n'
+fi
+exit $rc

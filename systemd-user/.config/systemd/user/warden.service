@@ -1,0 +1,18 @@
+[Unit]
+Description=Warden — local AI-governance daemon (Penalty Box freshness)
+Documentation=file:%h/.dotfiles/system/governance.toml
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+# Bakes the Cockpit contract on login, then re-bakes only when the ledger status
+# file changes. Idle and near-zero CPU at rest (the in-process monitor does the
+# real enforcement when agents actually run).
+ExecStart=%h/.local/bin/warden daemon
+Restart=on-failure
+RestartSec=3
+Nice=10
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- [ENGINE] mark · 1024×1024 master · tokens from system/tokens.toml -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Primary→tertiary diagonal sweep, matches the niri focus-ring gradient -->
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="{{color.primary}}"/>
+      <stop offset="0.65" stop-color="{{color.primary}}"/>
+      <stop offset="1"   stop-color="{{color.tertiary}}"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Disc backdrop, deepest bg, soft inner shadow via a duplicate ring. -->
+  <circle cx="512" cy="512" r="496" fill="{{color.bg}}"/>
+  <circle cx="512" cy="512" r="488" fill="none"
+          stroke="{{color.warm_shadow}}" stroke-width="3" opacity="0.7"/>
+
+  <!-- Outer ring, gradient. Represents the build pipeline circumference. -->
+  <circle cx="512" cy="512" r="448" fill="none"
+          stroke="url(#brand)" stroke-width="22"/>
+
+  <!-- Inner bracketed [E] glyph, large + bold, in the display font. -->
+  <text x="512" y="640" text-anchor="middle"
+        font-family="{{font.display}}, {{font.mono}}, monospace"
+        font-size="560" font-weight="800"
+        fill="url(#brand)">E</text>
+
+  <!-- Tick marks at cardinal points — a subtle gear/precision nod. -->
+  <g stroke="{{color.fg_muted}}" stroke-width="6" stroke-linecap="round" opacity="0.55">
+    <line x1="512" y1="36"   x2="512" y2="84"/>
+    <line x1="512" y1="940"  x2="512" y2="988"/>
+    <line x1="36"  y1="512"  x2="84"  y2="512"/>
+    <line x1="940" y1="512"  x2="988" y2="512"/>
+  </g>
+</svg>

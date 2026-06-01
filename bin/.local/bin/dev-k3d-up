@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# dev-k3d-up — bring up the local k3d cluster matching the plan baseline.
+
+set -euo pipefail
+
+NAME="${K3D_NAME:-dev}"
+
+if ! command -v k3d >/dev/null 2>&1; then
+    echo "dev-k3d-up: k3d not on PATH — run bootstrap layer E first" >&2
+    exit 127
+fi
+
+if k3d cluster list "$NAME" >/dev/null 2>&1; then
+    echo "dev-k3d-up: cluster '$NAME' already exists"
+    exit 0
+fi
+
+k3d cluster create "$NAME" \
+    --servers 1 --agents 1 \
+    --port "8080:80@loadbalancer" \
+    --registry-create "dev-registry:0.0.0.0:5005" \
+    --wait
+
+kubectl cluster-info --context "k3d-${NAME}" | head -3
+echo "dev-k3d-up: cluster '${NAME}' ready · LB :8080 · registry :5005"

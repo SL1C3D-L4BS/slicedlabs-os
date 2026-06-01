@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""render-engine-palette — generate the [ENGINE] UI palette from tokens.toml.
+
+Mirrors render-templates / render-prompts: system/tokens.toml is the single
+source of truth for the workstation design system; this emits a zero-dependency
+Rust palette (const data) into engine-ui so the engine's in-app chrome stays in
+lockstep with Waybar / Niri / Neovim. Re-run via `just gen-palette` in the
+engine, or directly. Override paths with DOTFILES_ROOT / ENGINE_ROOT.
+"""
+from __future__ import annotations
+
+import os
+import re
+import tomllib
+from pathlib import Path
+
+DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+ENGINE = Path(os.environ.get("ENGINE_ROOT") or (Path.home() / "Projects/engine"))
+TOKENS = DOTFILES / "system/tokens.toml"
+OUT = ENGINE / "crates/engine-ui/src/theme/palette.rs"
+
+HEX = re.compile(r"^#([0-9a-fA-F]{6})$")
+
+
+def rust_str(v: str) -> str:
+    return str(v).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def main() -> int:
+    t = tomllib.loads(TOKENS.read_text())
+    L: list[str] = []
+    L += [
+        "// GENERATED from ~/.dotfiles/system/tokens.toml by `render-engine-palette`.",
+        "// DO NOT EDIT — edit tokens.toml then run `just gen-palette`.",
+        "#![allow(dead_code)]",
+        "",
+        "/// 8-bit sRGB colour with alpha.",
+        "#[derive(Clone, Copy, Debug, PartialEq, Eq)]",
+        "pub struct Rgba {",
+        "    /// Red channel (0-255).",
+        "    pub r: u8,",
+        "    /// Green channel (0-255).",
+        "    pub g: u8,",
+        "    /// Blue channel (0-255).",
+        "    pub b: u8,",
+        "    /// Alpha channel (0-255).",
+        "    pub a: u8,",
+        "}",
+        "",
+        "impl Rgba {",
+        "    /// Opaque colour from a packed `0xRRGGBB` literal.",
+        "    pub const fn rgb(v: u32) -> Self {",
+        "        Self { r: (v >> 16) as u8, g: (v >> 8) as u8, b: v as u8, a: 255 }",
+        "    }",
+        "}",
+        "",
+        "/// Semantic colours (tokens.toml `[color]`).",
+        "pub mod color {",
+        "    use super::Rgba;",
+    ]
+    for k, v in t["color"].items():
+        m = HEX.match(str(v))
+        if m:
+            L.append(f"    /// `{v}`")
+            L.append(f"    pub const {k.upper()}: Rgba = Rgba::rgb(0x{m.group(1).upper()});")
+    L += ["}", "", "/// Nerd-Font glyphs (tokens.toml `[icon]`).", "pub mod icon {"]
+    for k, v in t["icon"].items():
+        L.append(f"    /// `{rust_str(v)}`")
+        L.append(f'    pub const {k.upper()}: &str = "{rust_str(v)}";')
+    L += ["}", "", "/// Geometry in logical px (tokens.toml `[geom]`).", "pub mod geom {"]
+    for k, v in t["geom"].items():
+        if isinstance(v, int):
+            L.append(f"    /// `{v}` px")
+            L.append(f"    pub const {k.upper()}: u32 = {v};")
+    L += ["}", "", "/// Motion durations in ms + easing curve (tokens.toml `[motion]`).", "pub mod motion {"]
+    for k, v in t["motion"].items():
+        if isinstance(v, int):
+            L.append(f"    /// `{v}` ms")
+            L.append(f"    pub const {k.upper()}: u32 = {v};")
+        else:
+            L.append(f"    /// `{rust_str(v)}`")
+            L.append(f'    pub const {k.upper()}: &str = "{rust_str(v)}";')
+    L.append("}")
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text("\n".join(L) + "\n")
+    n_col = sum(1 for v in t["color"].values() if HEX.match(str(v)))
+    print(f"render-engine-palette: {OUT.relative_to(ENGINE)} "
+          f"({n_col} colours, {len(t['icon'])} icons, {len(t['geom'])} geom, {len(t['motion'])} motion)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

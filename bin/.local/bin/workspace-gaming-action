@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# workspace-gaming-action — context-sensitive Mod+G handler.
+#
+# From the gaming workspace: opens the gaming actions Wofi menu.
+# From any other workspace: focuses the gaming workspace.
+#
+# Mnemonic Mod+G keybind invokes this; net effect is a single key both jumps
+# to gaming AND, once there, surfaces the lifted-from-Waybar action menu
+# (MangoHud toggle, GameMode toggle, Lutris/Heroic launch, …).
+set -eu
+
+current=$(niri msg --json workspaces 2>/dev/null \
+    | jq -r '.[] | select(.is_focused == true) | .name // ""' 2>/dev/null \
+    || echo "")
+
+if [[ "$current" == "gaming" ]]; then
+    exec "$HOME/.config/wofi/gaming-actions.sh"
+else
+    exec niri msg action focus-workspace gaming
+fi

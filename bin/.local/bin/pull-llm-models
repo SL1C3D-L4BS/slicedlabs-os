@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# pull-llm-models — Ollama model pulls for the local AI tier.
+# Skips models already present; ~10 GB total over the listed set.
+
+set -euo pipefail
+
+MODELS=(
+    "qwen2.5-coder:1.5b-instruct"          # ~1 GB — fast inline suggestions
+    "qwen2.5-coder:7b-instruct"            # ~4.5 GB — code completion
+    "llama3.2:3b"                          # ~2 GB — general chat (`:3b-instruct` tag doesn't exist; `:3b` defaults to instruct-q4_K_M)
+    "nomic-embed-text:v1.5"                # ~270 MB — embeddings for Qdrant RAG
+    # NOTE: bge-reranker-v2-m3 is not on the Ollama registry. Rerankers are not
+    # well-supported as Ollama models — load via sentence-transformers from
+    # HuggingFace (lazy import in slicedlabs_team.search.rerank) if needed.
+)
+
+if ! command -v ollama >/dev/null 2>&1; then
+    echo "pull-llm-models: ollama not on PATH — run bootstrap layer H first" >&2
+    exit 127
+fi
+
+if ! curl -sf http://localhost:11434/api/tags >/dev/null; then
+    systemctl --user start ollama.service 2>/dev/null || true
+    sleep 2
+fi
+
+for m in "${MODELS[@]}"; do
+    if ollama list | awk 'NR>1 {print $1}' | grep -qx "$m"; then
+        printf '  [skip] %s already pulled\n' "$m"
+    else
+        printf '==> pulling %s\n' "$m"
+        ollama pull "$m"
+    fi
+done
+echo "pull-llm-models: done"

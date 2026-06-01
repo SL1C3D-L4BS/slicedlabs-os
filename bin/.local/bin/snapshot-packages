@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# snapshot-packages — refresh system/packages.txt + system/aur-packages.txt
+# from the live pacman db. Tracks every package the user has explicitly
+# installed so a fresh-install bootstrap can reproduce exactly.
+#
+# Pair with: bin/install-hooks runs a pre-commit `gitleaks protect`; this
+# script is read-only on package state and safe to run anytime.
+
+set -euo pipefail
+
+ROOT="${DOTFILES_ROOT:-${HOME}/.dotfiles}"
+NATIVE="${ROOT}/system/packages.txt"
+AUR="${ROOT}/system/aur-packages.txt"
+SERVICES="${ROOT}/system/services.txt"
+USER_SERVICES="${ROOT}/system/user-services.txt"
+
+mkdir -p "${ROOT}/system"
+
+pacman -Qqen | sort > "${NATIVE}"
+pacman -Qqem | sort > "${AUR}"
+systemctl list-unit-files --state=enabled --no-legend --no-pager \
+  | awk '{print $1}' | sort > "${SERVICES}"
+systemctl --user list-unit-files --state=enabled --no-legend --no-pager 2>/dev/null \
+  | awk '{print $1}' | sort > "${USER_SERVICES}"
+
+printf 'snapshot-packages: %d native, %d AUR, %d system services, %d user services\n' \
+  "$(wc -l < "${NATIVE}")" "$(wc -l < "${AUR}")" \
+  "$(wc -l < "${SERVICES}")" "$(wc -l < "${USER_SERVICES}")"

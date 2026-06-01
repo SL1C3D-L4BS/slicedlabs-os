@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""render-waybar — expand tabs.toml into the Waybar templates + bash tab table.
+
+Run BEFORE render-templates (which resolves the {{token}} placeholders this
+emits):
+
+    render-waybar && render-templates
+
+It rewrites the GENERATED:<name> marker regions (which must already exist in
+the .tmpl files) and writes one whole generated bash file:
+
+  config.jsonc.tmpl : center, tab-modules
+  style.css.tmpl    : base-selectors, header-selectors, module-padding, fusion
+  scripts/lib/tabs.env  (whole file — sourced by waybar-tab-watcher / waybar-hud)
+
+Per-cap text colour is chosen by luminance (overridable per tab via `text`),
+so adding a tab needs no styling work. Idempotent; exits non-zero if a marker
+region is missing.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import color  # noqa: E402 — local OKLCH→sRGB lib (identity hues are oklch() now)
+
+ROOT = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+WB = ROOT / "waybar/.config/waybar"
+REG = WB / "tabs.toml"
+TOKENS = ROOT / "system/tokens.toml"
+CFG = WB / "config.jsonc.tmpl"
+CSS = WB / "style.css.tmpl"
+ENV = WB / "scripts/lib/tabs.env"
+SCRIPTS = "$HOME/.config/waybar/scripts"
+
+
+def load(p: Path) -> dict:
+    with open(p, "rb") as f:
+        return tomllib.load(f)
+
+
+def tok(key: str) -> str:
+    """A render-templates placeholder, e.g. tok('color.primary') -> {{color.primary}}."""
+    return "{{" + key + "}}"
+
+
+def luminance(hexstr: str) -> float:
+    h = (color.to_hex(hexstr) or hexstr).lstrip("#")[:6]
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+
+def cap_text(brand: str, tokens: dict, override: str | None) -> str:
+    if override in ("fg", "bg"):
+        return tok("color." + override)
+    # light cap -> dark (bg) text; dark cap -> light (fg) text
+    return tok("color.bg") if luminance(tokens["color"][brand]) > 0.55 else tok("color.fg")
+
+
+def splice(text: str, name: str, inner: str, style: str) -> str:
+    """Replace the body between GENERATED:<name> markers, keeping the markers."""
+    if style == "c":  # // line comments (JSONC)
+        begin = f"// >>> GENERATED:{name} (render-waybar) >>>"
+        end = f"// <<< GENERATED:{name} <<<"
+    else:  # /* */ (CSS)
+        begin = f"/* >>> GENERATED:{name} (render-waybar) >>> */"
+        end = f"/* <<< GENERATED:{name} <<< */"
+    pat = re.compile(re.escape(begin) + r".*?" + re.escape(end), re.S)
+    if not pat.search(text):
+        sys.exit(f"render-waybar: marker region '{name}' not found in template "
+                 f"(expected {begin!r}). Add the markers first.")
+    return pat.sub(lambda _: f"{begin}\n{inner}\n{end}", text, count=1)
+
+
+def main() -> int:
+    reg = load(REG)
+    tokens = load(TOKENS)
+    order = reg["meta"]["order"]
+    sig = reg["meta"]["signal"]
+    tabs = reg["tabs"]
+
+    # Center the BRAND WORD (not the whole pill) toward bar-centre. modules-center
+    # is a GTK center-widget, so Waybar centres the fused pill as a GROUP; the cap
+    # is its leftmost segment, so it lands LEFT of centre by ~chips_w/2. We pull it
+    # back with a left margin that counterweights the data chips (lead ≈ chips_w).
+    # The lead is estimated from the chip COUNT (runtime chip text is unknown here)
+    # and HARD-CAPPED at SAFE_LEAD_PX so a wide tab's cluster can never overrun the
+    # centre budget. NOTE: this is a MARGIN, not a min-width — worst case a chip is
+    # nudged, never the whole-centre-vanishes catastrophe of the retired
+    # left_reserve scheme. Narrow tabs centre fully; wide tabs centre partially.
+    # Tune CHIP_EST_PX / SAFE_LEAD_PX if a tab reads off-centre.
+    CHIP_EST_PX = 82      # fallback per-chip estimate when a tab has no cap_lead_px
+    SAFE_LEAD_PX = 520    # hard clip-guard: cluster (lead+cap+chips) stays in budget
+
+    def cap_lead(T: dict) -> int:
+        # Prefer the tab's measured `cap_lead_px` (≈ its rendered chips width →
+        # lead == chips_w lands the brand WORD on bar-centre). Else estimate from
+        # the chip count. Always clamped to SAFE_LEAD_PX so even a very wide tab
+        # can't overrun the centre budget and clip (it's a margin, never a
+        # min-width). Re-measure & update cap_lead_px in tabs.toml if a tab's
+        # typical content width changes a lot.
+        lead = int(T["cap_lead_px"]) if "cap_lead_px" in T else len(T["modules"]) * CHIP_EST_PX
+        return min(lead, SAFE_LEAD_PX)
+
+    header_ids = [f"#custom-tab-{t}-header" for t in order]
+    module_ids = [f"#custom-{m['id']}" for t in order for m in tabs[t]["modules"]]
+
+    # ---- config.jsonc.tmpl : center array ----------------------------------
+    center_lines = []
+    for t in order:
+        ids = [f'"custom/tab-{t}-header"'] + [f'"custom/{m["id"]}"' for m in tabs[t]["modules"]]
+        center_lines.append(f"        // {t}")
+        center_lines.append("        " + ", ".join(ids) + ",")
+    center = '    "modules-center": [\n' + "\n".join(center_lines) + "\n    ],"
+    center = center.replace(",\n    ],", "\n    ],")  # drop trailing array comma
+
+    # ---- config.jsonc.tmpl : tab-modules object entries --------------------
+    entries = []
+    for t in order:
+        T = tabs[t]
+        cap = f"{tok('icon.' + T['glyph'])} {T['label']}"
+        hdr = {
+            "exec": f"{SCRIPTS}/tabs/header.sh {t} '{cap}'",
+            "return-type": "json", "interval": "once", "signal": sig, "format": "{}",
+        }
+        entries.append(f'    "custom/tab-{t}-header": {json.dumps(hdr, ensure_ascii=False)},')
+        for m in T["modules"]:
+            obj = {
+                "exec": f"{SCRIPTS}/{m['script']}",
+                "return-type": "json", "interval": m["interval"], "signal": sig, "format": "{}",
+            }
+            if "on_click" in m:
+                obj["on-click"] = m["on_click"]
+            if "on_scroll_up" in m:
+                obj["on-scroll-up"] = m["on_scroll_up"]
+            if "on_scroll_down" in m:
+                obj["on-scroll-down"] = m["on_scroll_down"]
+            entries.append(f'    "custom/{m["id"]}": {json.dumps(obj, ensure_ascii=False)},')
+    tab_modules = "\n".join(entries)
+
+    cfg = CFG.read_text()
+    cfg = splice(cfg, "center", center, "c")
+    cfg = splice(cfg, "tab-modules", tab_modules, "c")
+    CFG.write_text(cfg)
+
+    # ---- style.css.tmpl : selector lists -----------------------------------
+    system_base = ["#clock", "#cpu", "#memory", "#temperature",
+                   "#network", "#pulseaudio", "#tray",
+                   "#custom-workstation", "#custom-alerts"]
+    base_sel = ",\n".join(system_base + header_ids + module_ids)
+    header_sel = ",\n".join(header_ids)
+    module_sel = ",\n".join(module_ids)
+
+    # ---- style.css.tmpl : per-tab fusion rules -----------------------------
+    HDR = ("#custom-tab-{t}-header {{ background: {brand}; color: {text}; "
+           "border-radius: {r}px 0 0 {r}px; margin: {u}px 0 {u}px {lead}px; }}")
+    MID = ("#custom-{id} {{ margin: {u}px 0; border-radius: 0; "
+           "border-left: 1px solid {inact}; border-bottom: {bd}px solid {brand}; }}")
+    LAST = ("#custom-{id} {{ margin: {u}px {u}px {u}px 0; "
+            "border-radius: 0 {r}px {r}px 0; border-left: 1px solid {inact}; "
+            "border-bottom: {bd}px solid {brand}; }}")
+    URGENT = ("#custom-tab-{t}-header.urgent {{ animation: glow-urgent {p}ms {e} infinite; }}")
+    fusion_lines = []
+    for t in order:
+        T = tabs[t]
+        brand = tok("color." + T["brand"])
+        text = cap_text(T["brand"], tokens, T.get("text"))
+        fusion_lines.append(f"/* {t} — {T['label']} */")
+        fusion_lines.append(HDR.format(t=t, brand=brand, text=text,
+                                       r=tok("geom.radius"), u=tok("geom.unit"),
+                                       lead=cap_lead(T)))
+        fusion_lines.append(URGENT.format(t=t, p=tok("motion.pulse_ms"), e=tok("motion.ease")))
+        mods = T["modules"]
+        for i, m in enumerate(mods):
+            tmpl = LAST if i == len(mods) - 1 else MID
+            fusion_lines.append(tmpl.format(id=m["id"], u=tok("geom.unit"),
+                                            r=tok("geom.radius"), bd=tok("geom.border"),
+                                            inact=tok("color.inactive"), brand=brand))
+    fusion = "\n".join(fusion_lines)
+
+    # hover-lift selector list — module chips + a few system chips (caps keep
+    # their brand fill; the segmented cpu|mem|temp trio is excluded so it stays
+    # visually fused).
+    lift_system = ["#clock", "#network", "#pulseaudio", "#custom-workstation"]
+    lift_sel = ",\n".join(s + ":hover" for s in lift_system + module_ids)
+
+    css = CSS.read_text()
+    css = splice(css, "base-selectors", base_sel, "css")
+    css = splice(css, "header-selectors", header_sel, "css")
+    css = splice(css, "module-padding", module_sel, "css")
+    css = splice(css, "lift", lift_sel, "css")
+    css = splice(css, "fusion", fusion, "css")
+    CSS.write_text(css)
+
+    # ---- scripts/lib/tabs.env (sourced by watcher + waybar-hud) ------------
+    ws = [t for t in order if tabs[t]["kind"] == "workspace"]
+    ov = [t for t in order if tabs[t]["kind"] == "overlay"]
+    timeouts = " ".join(f"[{t}]={tabs[t].get('timeout', 10)}" for t in ov)
+    env = (
+        "# GENERATED by render-waybar from tabs.toml — do not edit.\n"
+        f"WORKSPACE_TABS=({' '.join(ws)})\n"
+        f"OVERLAY_TABS=({' '.join(ov)})\n"
+        f"ALL_TABS=({' '.join(order)})\n"
+        f"declare -A OVERLAY_TIMEOUT=({timeouts})\n"
+        f"WAYBAR_SIGNAL={sig}\n"
+    )
+    ENV.write_text(env)
+
+    print(f"render-waybar: {len(order)} tabs ({len(ws)} workspace, {len(ov)} overlay), "
+          f"{len(module_ids)} modules → config.jsonc.tmpl, style.css.tmpl, tabs.env")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

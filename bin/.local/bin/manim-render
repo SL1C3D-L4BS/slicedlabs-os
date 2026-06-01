@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# manim-render — render a Manim scene with sane defaults for [ENGINE] explainers.
+#
+#   manim-render <scene.py> [SceneClass] [-q l|m|h|k] [-t] [-- <extra manim args>]
+#
+#   -q   quality: l(ow) m(edium) h(igh, default) k(=4K)
+#   -t   transparent background (alpha) — for OBS / compositing onto a stream
+#   --   pass remaining args straight to `manim render`
+#
+# Output goes to $MANIM_OUT (default ~/Videos/engine-anim), NOT into the repo,
+# so explainer videos never get committed. Palette is the workstation's —
+# scenes import the hexes from system/tokens.toml's [color] (see docs/anim).
+set -euo pipefail
+
+OUT="${MANIM_OUT:-$HOME/Videos/engine-anim}"
+qual="h"; transparent=0; file=""; scene=""; extra=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -q) qual="$2"; shift 2 ;;
+        -t) transparent=1; shift ;;
+        --) shift; extra+=("$@"); break ;;
+        -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) if [[ -z "$file" ]]; then file="$1"; elif [[ -z "$scene" ]]; then scene="$1"; fi; shift ;;
+    esac
+done
+[[ -z "$file" ]] && { echo "usage: manim-render <scene.py> [SceneClass] [-q l|m|h|k] [-t]" >&2; exit 1; }
+
+mkdir -p "$OUT"
+args=(manim render "-q$qual" --media_dir "$OUT")
+[[ "$transparent" == 1 ]] && args+=(-t)
+args+=("$file")
+[[ -n "$scene" ]] && args+=("$scene")
+[[ ${#extra[@]} -gt 0 ]] && args+=("${extra[@]}")
+
+echo "→ ${args[*]}"
+exec "${args[@]}"

@@ -1,0 +1,13 @@
+[Unit]
+Description=Borg backup to the LUKS external drive (engine-backup-a)
+# Skip cleanly when the drive isn't connected — no failure, no noise.
+ConditionPathExists=/dev/disk/by-label/engine-backup-a
+After=default.target
+
+[Service]
+Type=oneshot
+# pass/GPG must be unlocked for the borg passphrase; if locked the run fails
+# and is logged to the journal (run `backup-borg` by hand to unlock + retry).
+ExecStart=%h/.local/bin/backup-borg engine-backup-a
+StandardOutput=journal
+StandardError=journal

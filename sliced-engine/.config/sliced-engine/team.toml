@@ -1,0 +1,124 @@
+# SlicedLabs Agent Team — single source of truth for role metadata.
+#
+# `bin/render-prompts` reads this file plus the role bodies under
+# `prompts/roles/<name>.md`, prepends the brand+personal voice prefixes,
+# and writes the Claude Code subagent files at
+# `claude-agents/.claude/agents/<name>.md` (which stows to `~/.claude/agents/`).
+#
+# Schema is intentionally narrow — anything not represented here is the role
+# body's responsibility (in `prompts/roles/<name>.md`).
+#
+# Updating a role:
+#   1. Edit prompts/roles/<name>.md (the body) and/or this manifest.
+#   2. Run `render-prompts` (or git commit — the prompt-CI hook runs it).
+#   3. The generated .claude/agents/<name>.md changes.
+
+[meta]
+schema_version = 1
+voice_prefixes = ["prompts/voice/brand.md", "prompts/voice/personal.md"]
+
+# Default cost cap per task (overrideable per role).
+default_per_task_usd_cap = 1.00
+
+# ===========================================================================
+# Roster (13 roles)
+# ===========================================================================
+
+[[role]]
+name = "slicedlabs_architect"
+description = "System design, ADRs, trade-offs. Pairs with engineer_1 for Rust validation; consults librarian for prior art."
+model = "claude-opus-4-7"
+tools = ["Read", "Grep", "WebSearch", "WebFetch"]
+memory_scopes = ["identity", "projects", "code"]
+per_task_usd_cap = 2.00
+
+[[role]]
+name = "slicedlabs_engineer_1"
+description = "Senior Rust engineer on [ENGINE]. ECS, rendering, asset pipeline. Reads file:line before suggesting changes."
+model = "claude-opus-4-7"
+tools = ["Read", "Edit", "Grep", "Bash", "WebSearch"]
+memory_scopes = ["projects", "code"]
+per_task_usd_cap = 2.00
+
+[[role]]
+name = "slicedlabs_engineer_2"
+description = "Python / AI / data engineer. uv-managed; ruff+mypy+basedpyright must pass before claiming done."
+model = "claude-opus-4-7"
+tools = ["Read", "Edit", "Grep", "Bash", "WebSearch"]
+memory_scopes = ["projects", "code", "skills"]
+per_task_usd_cap = 1.50
+
+[[role]]
+name = "slicedlabs_engineer_3"
+description = "DevOps / observability / infra. Owns bootstrap.sh layers, systemd-user units, podman compose stacks."
+model = "claude-sonnet-4-6"
+tools = ["Read", "Edit", "Grep", "Bash"]
+memory_scopes = ["projects", "code"]
+
+[[role]]
+name = "slicedlabs_engineer_4"
+description = "Frontend / web. Biome+Bun+TS-strict+Vite+Vitest. On-demand only."
+model = "claude-sonnet-4-6"
+tools = ["Read", "Edit", "Grep", "Bash"]
+memory_scopes = ["projects"]
+
+[[role]]
+name = "slicedlabs_design_assistant"
+description = "UX / art direction / brand. Design tokens are law; references system/tokens.toml."
+model = "claude-sonnet-4-6"
+tools = ["Read", "Bash", "WebSearch"]
+memory_scopes = ["identity", "projects"]
+
+[[role]]
+name = "slicedlabs_researcher"
+description = "Papers, blogs, market, libraries. Produces 5-item digests; cites primary sources only."
+model = "claude-opus-4-7"
+tools = ["WebSearch", "WebFetch", "Read"]
+memory_scopes = ["skills", "events"]
+per_task_usd_cap = 1.50
+
+[[role]]
+name = "slicedlabs_critic"
+description = "Code review / security / devil's advocate. Last gate before merge. Uses extended thinking."
+model = "claude-opus-4-7"
+tools = ["Read", "Grep", "Bash", "WebSearch"]
+memory_scopes = ["code", "projects"]
+per_task_usd_cap = 2.00
+extended_thinking = true
+
+[[role]]
+name = "slicedlabs_docs_writer"
+description = "READMEs, runbooks, ADRs. Lead with the action, code-blocks for every command."
+model = "claude-sonnet-4-6"
+tools = ["Read", "Edit", "Grep"]
+memory_scopes = ["projects", "code"]
+
+[[role]]
+name = "slicedlabs_pm"
+description = "Daily standup, sprint planning, retro. Pulls from mem0.events; posts to Discord."
+model = "claude-sonnet-4-6"
+tools = ["Read", "Bash"]
+memory_scopes = ["projects", "events", "goals"]
+
+[[role]]
+name = "slicedlabs_librarian"
+description = "Book corpus specialist. Always cites book+chapter+page; never fabricates."
+model = "claude-sonnet-4-6"
+tools = ["Read", "Bash"]
+memory_scopes = ["skills"]
+
+[[role]]
+name = "slicedlabs_accountant"
+description = "Token spend + Pomodoro discipline + cost caps. Pings #alarms before caps hit."
+model = "claude-haiku-4-5-20251001"
+tools = ["Read", "Bash"]
+memory_scopes = ["events"]
+per_task_usd_cap = 0.25
+
+[[role]]
+name = "slicedlabs_oracle"
+description = "Memory steward; asks clarifying Qs; surfaces forgotten context. One Q/day max."
+model = "claude-opus-4-7"
+tools = ["Read", "Grep", "Bash"]
+memory_scopes = ["identity", "preferences", "projects", "people", "events", "skills", "goals", "code", "secrets"]
+per_task_usd_cap = 1.50

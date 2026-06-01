@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# mac-build — run a build on the MacBook Air macOS node from this Linux box.
+#
+# Stateless by design: each invocation rsyncs the current project to the Mac
+# and then runs a command there over SSH. No background daemon, no drift — if
+# it succeeds, the Mac's tree provably matches the local tree at that moment.
+# (For live two-way editing instead, use `mutagen sync create` — see the
+# MAC_INTEGRATION_RUNBOOK; this script is the automation/CI path.)
+#
+# Usage:
+#   mac-build                                   # default: `just build`
+#   mac-build test                              # → `just test`
+#   mac-build "cargo build --release --target aarch64-apple-darwin"
+#
+# Assumes ~/.ssh/config defines `Host mac`. Run from inside the project.
+set -euo pipefail
+
+MAC_HOST="${MAC_HOST:-mac}"
+REMOTE_ROOT="${MAC_REMOTE_ROOT:-Projects}"
+
+# Resolve the project root (git top-level if available, else CWD).
+PROJECT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT_NAME="$(basename "$PROJECT_DIR")"
+REMOTE_DIR="$REMOTE_ROOT/$PROJECT_NAME"
+
+# Default command runs the project's justfile; fall back to a raw command.
+if [[ $# -eq 0 ]]; then
+    REMOTE_CMD="just build"
+elif [[ $# -eq 1 && "$1" != *' '* && "$1" != cargo && "$1" != /* ]]; then
+    REMOTE_CMD="just $1"
+else
+    REMOTE_CMD="$*"
+fi
+
+# The Mac's login shell may be fish or zsh; `bash -lc` guarantees a uniform
+# environment and pulls in Homebrew / rustup / mise PATH entries from the
+# login files regardless of which interactive shell the user runs.
+REMOTE_SHELL='bash -lc'
+
+echo ">> sync   $PROJECT_DIR  ->  $MAC_HOST:$REMOTE_DIR"
+ssh "$MAC_HOST" $REMOTE_SHELL "'mkdir -p \"$REMOTE_DIR\"'"
+# Mirror the tree; never ship build artifacts (they are host-specific & huge).
+rsync -az --delete \
+    --exclude '.git/' \
+    --exclude 'target/' \
+    --exclude 'node_modules/' \
+    --exclude '.DS_Store' \
+    "$PROJECT_DIR"/ "$MAC_HOST:$REMOTE_DIR"/
+
+echo ">> run    $MAC_HOST: ($REMOTE_DIR) $REMOTE_CMD"
+# -t for a pseudo-tty so progress bars / colour render.
+ssh -t "$MAC_HOST" $REMOTE_SHELL "'cd \"$REMOTE_DIR\" && $REMOTE_CMD'"

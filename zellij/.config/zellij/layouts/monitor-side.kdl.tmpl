@@ -1,0 +1,40 @@
+// monitor-side — the ops side-column (com.slicedlabs.monitor-side, 35%) beside the native
+// `slicedlabs monitor` cockpit on the monitoring workspace. Launched as `zj monitor-side`.
+// `slicedlabs monitor` is the curated vitals/services/logs/cost surface; this column is the
+// hands-on layer: lazydocker for the dev-stack-obs containers, btop for the host, and a free
+// shell for `dev-stack logs -f` / journalctl. zjstatus pill bar in the monitoring hue.
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {tabs}"
+                format_center ""
+                format_right  "{mode}#[bg={{color.bg}}]  #[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.monitoring}},bold] {{icon.clock}} {datetime} #[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.monitoring}},bold] {{powerline.dot}} {index} {name} #[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal   "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked   "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="ops" focus=true {
+        pane split_direction="horizontal" {
+            pane size="50%" command="lazydocker"   // dev-stack-obs containers
+            pane size="25%" command="btop"          // host
+            pane size="25%"                          // `dev-stack logs -f` / journalctl --user
+        }
+    }
+}

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# cinema — open a streaming-video service in its own app-id window on the `media`
+# workspace. Named `cinema` (NOT `watch` — that shadows coreutils). Each service
+# gets a reverse-DNS app-id + its own profile, so niri routes it to `media` and
+# keeps it OPAQUE (sharp video, no glass blur), and services can run side by side.
+#
+#   cinema netflix       Netflix    (com.slicedlabs.netflix)
+#   cinema youtube       YouTube    (com.slicedlabs.youtube)
+#   cinema <url|host>    anything   (com.slicedlabs.cinema)
+#
+# Login is per cinema-profile (separate from your main browser) — a one-time step.
+# Netflix needs Widevine DRM: Zen ships it (first play may prompt to enable);
+# OpenH264 + a 1080p extension improve quality.
+set -euo pipefail
+
+# Firefox reliably honours --name (the Wayland app-id) + --no-remote per profile —
+# what lets niri route + opaque each service. Zen ignores --name, so it would land
+# in `browser`; fall back to it only if Firefox is absent.
+BROWSER="firefox"
+command -v "$BROWSER" >/dev/null 2>&1 || BROWSER="zen-browser"
+
+open_app() {  # $1=app-id  $2=profile-suffix  $3=url
+    local profile="$HOME/.cache/cinema-$2"
+    mkdir -p "$profile"
+    exec "$BROWSER" --name "$1" --profile "$profile" --no-remote --new-window "$3"
+}
+
+case "${1:-}" in
+    netflix) open_app com.slicedlabs.netflix netflix "https://www.netflix.com" ;;
+    youtube) open_app com.slicedlabs.youtube youtube "https://www.youtube.com" ;;
+    "")      echo "usage: cinema netflix|youtube|<url>" >&2; exit 2 ;;
+    http*)   open_app com.slicedlabs.cinema generic "$1" ;;
+    *)       open_app com.slicedlabs.cinema generic "https://$1" ;;
+esac

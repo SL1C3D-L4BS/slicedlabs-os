@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# waybar-density — toggle Waybar between dense (32px) and spacious (40px) modes.
+#
+# Usage: waybar-density {dense|spacious}
+#
+# Swaps the bar_height token in tokens.toml (40 ↔ 32, keeping bar_height_compact
+# in sync) then re-renders + hard-restarts Waybar. Choice cached in
+# ~/.cache/waybar-density.
+#
+# Note: at 32px (dense), Waybar's content auto-snaps to 36px if any module
+# has font-size > 12px. The current style.css.tmpl uses 14px tab headers, so
+# dense mode is best paired with reducing ui_size_lg to 11px (use the
+# `--legacy-headers` flag to do this in the same edit).
+set -euo pipefail
+
+MODE="${1:-}"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/waybar-density"
+TOKENS="$HOME/.dotfiles/system/tokens.toml"
+
+if [[ -z "$MODE" ]]; then
+    cur=$(cat "$CACHE" 2>/dev/null || echo spacious)
+    if [[ "$cur" == "spacious" ]]; then MODE="dense"; else MODE="spacious"; fi
+fi
+
+case "$MODE" in
+    dense|spacious) ;;
+    *) echo "waybar-density: usage: $0 {dense|spacious}" >&2; exit 2 ;;
+esac
+
+# Swap bar_height. In spacious mode bar_height=40 and bar_height_compact=32;
+# in dense mode the values flip.
+if [[ "$MODE" == "dense" ]]; then
+    sed -i -E 's/^(bar_height\s*=\s*)40$/\132/; s/^(bar_height_compact\s*=\s*)32$/\140/' "$TOKENS"
+else
+    sed -i -E 's/^(bar_height\s*=\s*)32$/\140/; s/^(bar_height_compact\s*=\s*)40$/\132/' "$TOKENS"
+fi
+
+echo "$MODE" > "$CACHE"
+
+# Re-render with current variant (default dark)
+variant=$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/ricing-variant" 2>/dev/null || echo dark)
+render-templates --variant="$variant"
+
+# Hard restart Waybar — height change needs full config reload
+pkill waybar 2>/dev/null || true
+sleep 0.3
+nohup waybar </dev/null >/tmp/waybar.log 2>&1 &
+disown 2>/dev/null || true
+
+notify-send "Waybar density" "$MODE mode (re-render + restart complete)"
+echo "waybar-density: done — mode cached at $CACHE"

@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# build-llamacpp — clone (or update) llama.cpp and build two side-by-side
+# binaries: Vulkan (primary) + HIP/ROCm (fallback). Outputs land at
+#
+#   ~/.local/bin/llama-server-vk
+#   ~/.local/bin/llama-server-hip
+#
+# A wrapper script `llama-server` (created by bootstrap layer_H) picks the
+# Vulkan binary, falls back to HIP, then to CPU.
+#
+# Idempotent: stamps ~/.cache/llamacpp-built-sha-{vk,hip} with the commit
+# hash; skips rebuild if HEAD matches.
+
+set -euo pipefail
+
+SRC="${LLAMACPP_SRC:-$HOME/Code/vendor/llama.cpp}"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
+mkdir -p "$CACHE" "$HOME/.local/bin" "$(dirname "$SRC")"
+
+if [[ ! -d "$SRC/.git" ]]; then
+    git clone --depth=1 https://github.com/ggerganov/llama.cpp "$SRC"
+else
+    git -C "$SRC" fetch --depth=1 origin master
+    git -C "$SRC" reset --hard origin/master
+fi
+
+head=$(git -C "$SRC" rev-parse HEAD)
+
+build_one() {
+    local kind="$1"; shift
+    local builddir="$SRC/build-$kind"
+    local stamp="$CACHE/llamacpp-built-sha-$kind"
+    local target_bin="$HOME/.local/bin/llama-server-$kind"
+
+    if [[ -f "$stamp" && "$(<"$stamp")" == "$head" && -x "$target_bin" ]]; then
+        printf '  [skip] %s up-to-date at %s\n' "$kind" "$head"
+        return 0
+    fi
+
+    printf '==> building llama.cpp (%s) at %s\n' "$kind" "$head"
+    rm -rf "$builddir"
+    cmake -S "$SRC" -B "$builddir" -G Ninja "$@"
+    cmake --build "$builddir" --target llama-server -j
+
+    local src_bin="$builddir/bin/llama-server"
+    [[ -x "$src_bin" ]] || { echo "build-llamacpp: $kind build did not produce $src_bin" >&2; return 1; }
+    install -m 0755 "$src_bin" "$target_bin"
+    printf '%s' "$head" > "$stamp"
+}
+
+# Vulkan — primary, stable on Polaris.
+build_one vk -DGGML_VULKAN=ON
+
+# HIP / ROCm — fallback. Polaris gfx803 sometimes requires AMDGPU_TARGETS
+# pinning; do it explicitly so kernels are built.
+build_one hip -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx803 -DCMAKE_C_COMPILER=hipcc -DCMAKE_CXX_COMPILER=hipcc || \
+    echo "build-llamacpp: HIP build failed (acceptable — Vulkan is primary)"
+
+# Wrapper picking Vulkan → HIP → CPU at runtime.
+cat > "$HOME/.local/bin/llama-server" <<'WRAP'
+#!/usr/bin/env bash
+# llama-server — pick the first working backend.
+set -u
+for cand in "$HOME/.local/bin/llama-server-vk" "$HOME/.local/bin/llama-server-hip"; do
+    if [[ -x "$cand" ]]; then
+        exec "$cand" "$@"
+    fi
+done
+echo "llama-server: no Vulkan or HIP build found — run build-llamacpp" >&2
+exit 127
+WRAP
+chmod +x "$HOME/.local/bin/llama-server"
+
+echo "build-llamacpp: done · llama-server picks vk → hip → cpu"

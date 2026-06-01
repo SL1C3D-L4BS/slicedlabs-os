@@ -1,0 +1,16 @@
+[Unit]
+Description=Dev-stack data tier (Postgres/Valkey/Qdrant/Meili) — staged by coding/engine
+Documentation=file://%h/.dotfiles/podman-compose/dev-stack.yaml
+After=default.target podman.socket
+Wants=podman.socket
+
+# No [Install]: never enabled at boot. The coding/engine scene starts it on
+# first focus via `systemctl --user start dev-stack-data.service`.
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h
+Environment=DEV_STACK_PROFILES=data
+ExecStart=%h/.local/bin/dev-stack-up
+ExecStop=/usr/bin/podman compose -f %h/.dotfiles/podman-compose/dev-stack.yaml --profile data down
+TimeoutStartSec=600

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# post-merge — re-render dotfiles templates when tokens.toml or any *.tmpl
+# changed in the merged commits. Idempotent: skipped if nothing relevant.
+#
+# Wired in via `bin/install-hooks --post-merge` (or rerun with default args
+# after the script learns multi-hook support).
+set -euo pipefail
+
+# Only fires inside the dotfiles repo itself.
+top="$(git rev-parse --show-toplevel 2>/dev/null || echo)"
+if [ "${top}" != "${HOME}/.dotfiles" ]; then
+    exit 0
+fi
+
+# What changed between the prior HEAD (ORIG_HEAD set by `git merge`) and HEAD.
+changed="$(git diff --name-only ORIG_HEAD HEAD 2>/dev/null || true)"
+if [ -z "${changed}" ]; then
+    exit 0
+fi
+
+if echo "${changed}" | grep -qE '(^system/tokens\.toml$|\.tmpl$)'; then
+    if command -v render-templates >/dev/null 2>&1; then
+        echo "post-merge: tokens or .tmpl changed — rerunning render-templates" >&2
+        render-templates
+    else
+        echo "post-merge: render-templates not on PATH; skipping" >&2
+    fi
+fi

@@ -1,0 +1,16 @@
+[Unit]
+Description=Developer service mesh (data tier + observability)
+Documentation=file://%h/.dotfiles/podman-compose/dev-stack.yaml
+After=default.target podman.socket
+Wants=podman.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/dev-stack-up
+ExecStop=/usr/bin/podman compose -f %h/.dotfiles/podman-compose/dev-stack.yaml down
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target

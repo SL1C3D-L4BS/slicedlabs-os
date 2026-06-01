@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# cockpit — realize principled per-workspace scenes on demand (idempotent).
+#
+#   cockpit                 realize every [meta].auto workspace
+#   cockpit <workspace>     realize one (e.g. `cockpit engine`, `cockpit coding`)
+#   cockpit --list          show the scene registry
+#   cockpit --dry-run [ws]  print what would happen; spawn nothing
+#
+# Re-running is safe: an app already on its target workspace is skipped, a
+# closed one respawns — so `cockpit` doubles as a "repair my layout" button.
+# SSOT: ~/.config/sliced-engine/workspaces.toml. See lib/scene.sh.
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# shellcheck source=/dev/null
+source "$SELF_DIR/lib/scene.sh"
+
+case "${1:-}" in
+    -l|--list)    scene_list; exit 0 ;;
+    -n|--dry-run) export SCENE_DRYRUN=1; shift ;;
+    -h|--help)    grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+esac
+
+if [[ -n "${1:-}" ]]; then
+    realize_scene "$1"
+else
+    while IFS= read -r ws; do
+        [[ -n "$ws" ]] && realize_scene "$ws"
+    done < <(scene_meta_auto)
+fi

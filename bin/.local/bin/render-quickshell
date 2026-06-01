@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+"""render-quickshell — generate the Cockpit's QML Theme singleton from tokens.toml.
+
+Mirrors render-engine-palette / render-templates: system/tokens.toml is the single
+source of truth for the workstation design system; this emits a Quickshell QML
+singleton (generated/Theme.qml + qmldir) so the GPU cockpit stays in lockstep with
+Niri / Neovim / the engine. The kernel→cockpit→engine cascade.
+
+Variant-aware: `--variant=light` bakes the light palette (toggle re-runs this; the
+cockpit hot-reloads on the file change). Override roots with DOTFILES_ROOT.
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import color  # noqa: E402 — local OKLCH→sRGB lib alongside this script
+
+DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+TOKENS = DOTFILES / "system/tokens.toml"
+OUT_DIR = DOTFILES / "quickshell/.config/quickshell/cockpit/generated"
+
+HEX6 = re.compile(r"^#[0-9a-fA-F]{6}$")
+HEX8 = re.compile(r"^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})$")  # CSS #RRGGBBAA
+RGBA = re.compile(r"^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$")
+
+# Workspace / HUD name → [color] token key (brand map). Identity is its OWN ramp
+# now (status ≠ identity), so each workspace maps to its same-named identity hue.
+BRAND = {
+    "coding": "coding", "research": "research", "engine": "engine",
+    "browser": "browser", "monitoring": "monitoring", "streaming": "streaming",
+    "gaming": "gaming", "media": "media",
+    "net": "net", "ai": "ai", "agenda": "agenda",
+}
+
+
+def camel(k: str) -> str:
+    p = k.split("_")
+    return p[0] + "".join(s.capitalize() for s in p[1:])
+
+
+def qml_color(v: object) -> str:
+    """Convert a token colour to a QML colour expression."""
+    s = str(v).strip()
+    hexed = color.to_hex(s)  # oklch(...) or #RRGGBB → "#RRGGBB" (QML-native)
+    if hexed:
+        return f'"{hexed}"'
+    m = HEX8.match(s)  # CSS #RRGGBBAA → QML #AARRGGBB
+    if m:
+        return f'"#{m.group(2)}{m.group(1)}"'
+    m = RGBA.match(s)
+    if m:
+        r, g, b, a = m.groups()
+        return f"Qt.rgba({int(r)/255:.4f}, {int(g)/255:.4f}, {int(b)/255:.4f}, {float(a)})"
+    return f'"{s}"'
+
+
+def merged(t: dict, base: str, light: str, variant: str) -> dict:
+    d = dict(t.get(base, {}))
+    if variant == "light":
+        d.update(t.get(light, {}))
+    return d
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--variant", choices=("dark", "light"), default="dark")
+    args = ap.parse_args()
+    variant = args.variant
+
+    t = tomllib.loads(TOKENS.read_text())
+    color = merged(t, "color", "color_light", variant)
+    css = merged(t, "color_css", "color_css_light", variant)
+    icon = t["icon"]
+    geom = t["geom"]
+    motion = t["motion"]
+    opacity = t["opacity"]
+    blur = t["blur"]
+    glass = merged(t, "glass", "glass_light", variant)
+    semantic = merged(t, "semantic", "semantic_light", variant)
+    cockpit = t.get("cockpit", {})
+
+    # cubic-bezier(a,b,c,d) → QML easing.bezierCurve [a,b,c,d,1,1]
+    bez = re.findall(r"[\d.]+", str(motion.get("ease", "")))
+    bezier = ", ".join(bez[:4] + ["1", "1"]) if len(bez) >= 4 else "0.2, 0.8, 0.2, 1.0, 1, 1"
+
+    L: list[str] = []
+    L += [
+        "pragma Singleton",
+        "import QtQuick",
+        "import Quickshell",
+        "",
+        "// GENERATED from ~/.dotfiles/system/tokens.toml by `render-quickshell`.",
+        f"// variant: {variant}.  DO NOT EDIT — edit tokens.toml then re-run render-quickshell.",
+        "Singleton {",
+        "    id: theme",
+        f'    readonly property string variant: "{variant}"',
+        f"    readonly property bool light: {'true' if variant == 'light' else 'false'}",
+        "",
+        "    // ---- semantic colours ([color]) ----",
+    ]
+    for k, v in color.items():
+        L.append(f"    readonly property color {camel(k)}: {qml_color(v)}")
+    L += ["", "    // ---- GTK/rgba surfaces + glows ([color_css]) ----"]
+    for k, v in css.items():
+        # prefix to avoid clashes with [color] keys (e.g. overlayDim)
+        name = "css" + camel(k)[0].upper() + camel(k)[1:]
+        L.append(f"    readonly property color {name}: {qml_color(v)}")
+    L += ["", "    // ---- glyphs ([icon]) ----"]
+    for k, v in icon.items():
+        gname = "g" + camel(k)[0].upper() + camel(k)[1:]
+        esc = str(v).replace("\\", "\\\\").replace('"', '\\"')
+        L.append(f'    readonly property string {gname}: "{esc}"')
+    L += ["", "    // ---- geometry ([geom]) ----"]
+    for k, v in geom.items():
+        if isinstance(v, (int, float)):
+            L.append(f"    readonly property int {camel(k)}: {int(v)}")
+    L += ["", "    // ---- motion ([motion]) ----"]
+    for k, v in motion.items():
+        if isinstance(v, (int, float)):
+            L.append(f"    readonly property int {camel(k)}: {int(v)}")
+    L += [
+        f"    readonly property var ease: [{bezier}]",
+        "",
+        "    // ---- opacity ([opacity]) — 'op' prefixed (overlay clashes [color]) ----",
+    ]
+    for k, v in opacity.items():
+        if isinstance(v, (int, float)):
+            name = "op" + camel(k)[0].upper() + camel(k)[1:]
+            L.append(f"    readonly property real {name}: {v}")
+    L += ["", "    // ---- blur ([blur]) ----"]
+    for k, v in blur.items():
+        if isinstance(v, (int, float)):
+            L.append(f"    readonly property real {camel(k)}: {v}")
+    L += ["", "    // ---- glass ([glass]) — Liquid Glass material knobs ----"]
+    for k, v in glass.items():
+        name = "glass" + camel(k)[0].upper() + camel(k)[1:]
+        if isinstance(v, bool):
+            L.append(f"    readonly property bool {name}: {'true' if v else 'false'}")
+        elif isinstance(v, (int, float)):
+            L.append(f"    readonly property real {name}: {v}")
+        else:
+            esc = str(v).replace("\\", "\\\\").replace('"', '\\"')
+            L.append(f'    readonly property string {name}: "{esc}"')
+    L += ["", "    // ---- semantic role tier ([semantic]) — bind to ROLES, not hues ----"]
+    for k, v in semantic.items():
+        name = "sem" + camel(k)[0].upper() + camel(k)[1:]
+        L.append(f"    readonly property color {name}: {qml_color(v)}")
+    L += ["", "    // ---- cockpit knobs ([cockpit]) ----"]
+    for k, v in cockpit.items():
+        if isinstance(v, bool):
+            L.append(f"    readonly property bool {camel(k)}: {'true' if v else 'false'}")
+        elif isinstance(v, (int, float)):
+            L.append(f"    readonly property int {camel(k)}: {int(v)}")
+        else:
+            esc = str(v).replace("\\", "\\\\").replace('"', '\\"')
+            L.append(f'    readonly property string {camel(k)}: "{esc}"')
+    L += ["", "    // ---- typography ([font]) ----"]
+    for k, v in t.get("font", {}).items():
+        if isinstance(v, (int, float)):
+            L.append(f"    readonly property int {camel(k)}: {int(v)}")
+        else:
+            esc = str(v).replace("\\", "\\\\").replace('"', '\\"')
+            L.append(f'    readonly property string {camel(k)}: "{esc}"')
+
+    # brand(name) → workspace/HUD identity colour
+    L += ["", "    // ---- brand identity map (workspace/HUD name → colour) ----",
+          "    function brand(name) {", "        switch (name) {"]
+    for name, key in BRAND.items():
+        L.append(f'        case "{name}": return {camel(key)};')
+    L += ["        default: return fgMuted;", "        }", "    }"]
+
+    # glyph(name) → identity glyph
+    L += ["", "    function glyph(name) {", "        switch (name) {"]
+    for name in BRAND:
+        if name in icon:
+            L.append(f'        case "{name}": return g{name.capitalize()};')
+    L += ["        default: return gIdle;", "        }", "    }"]
+
+    # workspaceLabel(name) → case-transformed per [cockpit].workspace_label_case.
+    # (small_caps yields a Title string; the QML applies Font.SmallCaps on top.)
+    L += ["", "    function workspaceLabel(s) {",
+          "        if (!s) return s;",
+          "        switch (workspaceLabelCase) {",
+          '        case "upper": return s.toUpperCase();',
+          '        case "lower": return s.toLowerCase();',
+          '        case "title":',
+          '        case "small_caps": return s.charAt(0).toUpperCase() + s.slice(1);',
+          "        default: return s;",
+          "        }",
+          "    }", "}"]
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    (OUT_DIR / "Theme.qml").write_text("\n".join(L) + "\n")
+    (OUT_DIR / "qmldir").write_text("singleton Theme 1.0 Theme.qml\n")
+    print(f"render-quickshell: {OUT_DIR}/Theme.qml ({variant}) "
+          f"— {len(color)} colours, {len(css)} surfaces, {len(icon)} glyphs, "
+          f"{len(geom)} geom, {len(motion)} motion")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

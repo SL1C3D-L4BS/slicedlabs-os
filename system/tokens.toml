@@ -1,0 +1,534 @@
+# Single source of truth for design tokens across the workstation.
+# Nature-inspired palette · perfect-fifth modular scale (1.5) · 8pt grid.
+#
+# Every color, font, motion, and spacing value lives here. Config files
+# under ~/.dotfiles/<package>/ are templates (`.tmpl`) that reference
+# `{{section.key}}` placeholders; `~/.dotfiles/bin/.local/bin/render-templates`
+# substitutes from this file at deploy time. Pass `--variant=light` to use
+# the [color_light] / [color_raw_light] / etc. blocks instead of the dark
+# defaults; templates need no changes for variant support.
+#
+# Workspace identities cascade everywhere (Waybar tab headers, Niri focus
+# rings, MangoHud, Starship). Hue story: cool blues for work (engine,
+# comms) → warm triad for signaling (stream, monitoring, gaming).
+
+# ===========================================================================
+# COLOR — DARK VARIANT (default)
+# ===========================================================================
+
+[color]
+# Base layers
+bg            = "#1E1E1E"   # Charcoal Black — deep base
+bg_alt        = "#2B2B2B"   # Soft Black — chip surfaces, panels
+bg_alt_light  = "#3A3A3A"   # Mid Charcoal — lighter container surfaces (workspaces pill)
+fg            = "#F7F6F2"   # Soft White — primary text
+fg_muted      = "#B8A789"   # Weathered Sand — muted text (Sand Beige desaturated)
+
+# Global accent + status triad — used by niri rings, starship, mangohud, the
+# [ansi] terminal palette, and the [color_rgba] shadows. Identity is a SEPARATE
+# ramp below: STATUS ≠ IDENTITY (the design-concept separation).
+primary     = "#2961B1"   # Royal Blue — global accent / focus
+secondary   = "#64A8E5"   # Sky Blue — secondary accent / info
+tertiary    = "#D9892B"   # Golden Orange — tertiary accent
+error       = "#D95C5C"   # Coral Red — danger / critical status
+success     = "#C7D42B"   # Lime Green — success status
+
+# Workspace identity ramp — OKLCH, lightness L≈0.622 held EVEN across all eight
+# hues (the perceptual payoff: equal-weight dots, distinct hue). These are the
+# cockpit pager dots/tabs and cascade to focus rings + scenes. Anchors come from
+# the design concept; `color.py --selftest` guarantees the exact sRGB bake.
+coding      = "oklch(0.62325 0.14864 251.503)"   # #378ADD blue    — WS1
+research    = "oklch(0.62320 0.15015 284.719)"   # #7F77DD violet  — WS2
+engine      = "oklch(0.62271 0.16827 38.262)"    # #D85A30 coral   — WS3
+browser     = "oklch(0.62306 0.12317 165.499)"   # #1D9E75 teal    — WS4
+monitoring  = "oklch(0.62227 0.15627 131.487)"   # #639922 green   — WS5
+streaming   = "oklch(0.62245 0.16662 2.522)"     # #D4537E magenta — WS6
+gaming      = "oklch(0.62339 0.18772 24.724)"    # #E24B4A red     — WS7
+media       = "oklch(0.62218 0.13039 67.215)"    # #BA7517 amber   — WS8
+
+# Overlay HUD-tab identities — summoned by keybind, not workspaces (violet slot
+# now belongs to research; these fill teal / orchid / rose).
+net         = "#2FA39A"   # Seafoam Teal — network/VPN/sec HUD
+ai          = "#C264B0"   # Orchid — AI/spend HUD
+agenda      = "#D98AAE"   # Rose — agenda/standup HUD
+
+# Surface modifiers
+selection   = "#1A3D6F"   # Deep Ocean — primary-darkened selection backdrop
+inactive    = "#3D3528"   # Earth Brown deep — inactive borders, disabled UI
+warm_shadow = "#1A1612"   # Warm undertone — overlay tints, low-urgency notify bg
+overlay     = "rgba(30, 30, 30, 0.85)"
+
+# Extended palette (additional brand colors, opt-in)
+mist        = "#BED7F4"   # Mist Blue — info hint, hover highlight, sparkle
+sand        = "#D3C399"   # Sand Beige — warm tooltip surface
+earth       = "#7A6142"   # Earth Brown — heavy borders, separators
+wisteria    = "#7C6ED6"   # Wisteria — special-state accent (profiling, heaptrack)
+honey       = "#D6BF3A"   # Warm Honey — caution tier (pre-alert)
+brick       = "#8E3A32"   # Deep Brick — critical tier (above coral)
+
+[color_css]
+backdrop      = "rgba(30, 30, 30, 0.85)"      # bg @ 85% — Waybar/Mako overlay
+bg_alt_soft   = "rgba(43, 43, 43, 0.78)"      # bg_alt @ 78% — chip surfaces
+chip          = "rgba(43, 43, 43, 0.85)"      # bg_alt @ 85% — opaque-feeling chip
+overlay_dim   = "rgba(0, 0, 0, 0.6)"          # modal scrim
+# Waybar/GTK living-state box-shadow glows (rgba — GTK rejects 8-digit hex).
+shadow_dim    = "rgba(0, 0, 0, 0.5)"          # hover-lift drop shadow
+glow_build    = "rgba(100, 168, 229, 0.40)"   # Sky — build in progress
+glow_rec      = "rgba(217, 137, 43, 0.50)"    # Golden — recording
+glow_live     = "rgba(217, 92, 92, 0.50)"     # Coral — live / streaming
+glow_urgent   = "rgba(217, 137, 43, 0.69)"    # Golden — urgency takeover
+
+[color_raw]
+bg          = "1E1E1E"
+bg_alt      = "2B2B2B"
+fg          = "F7F6F2"
+fg_muted    = "B8A789"
+primary     = "2961B1"
+secondary   = "64A8E5"
+tertiary    = "D9892B"
+error       = "D95C5C"
+success     = "C7D42B"
+# identity ramp (bare hex = OKLCH ramp baked by color.py; keep in sync via render)
+coding      = "378ADD"
+research    = "7F77DD"
+engine      = "D85A30"
+browser     = "1D9E75"
+monitoring  = "639922"
+streaming   = "D4537E"
+gaming      = "E24B4A"
+media       = "BA7517"
+selection   = "1A3D6F"
+inactive    = "3D3528"
+warm_shadow = "1A1612"
+
+[color_rgba]
+shadow_dim         = "#00000080"               # 50% black — baseline window shadow
+shadow_softer      = "#00000040"               # 25% black — inactive-window shadow
+shadow_primary     = "#2961B1a0"               # Royal Blue 63% — focused-window tint
+shadow_lifted      = "#2961B1d0"               # Royal Blue 81% — floating + overview
+shadow_tertiary    = "#D9892B80"               # Golden Orange 50% — stream/creator
+backdrop           = "#1E1E1Ed9"               # bg @ 85% — Mako/swaylock backdrop
+backdrop_strong    = "#1E1E1Ef0"               # bg @ 94% — overview workspace tiles
+overlay_dim        = "#000000a0"               # darken behind modal
+notify_low         = "#1A161280"               # warm_shadow @ 50% — low-urgency mako
+notify_critical    = "#D95C5C80"               # Coral Red @ 50% — critical-urgency mako
+# NOTE: Waybar/GTK box-shadow glows live in [color_css] as rgba() — GTK CSS
+# rejects 8-digit hex. This [color_rgba] block stays hex for Niri's parser.
+
+# ===========================================================================
+# COLOR — LIGHT VARIANT (activated via render-templates --variant=light)
+# ===========================================================================
+
+[color_light]
+# Base layers (inverted luminance)
+bg            = "#F7F6F2"   # Soft White — light base
+bg_alt        = "#EFE9DD"   # Warm White — light surface
+bg_alt_light  = "#E2D9C5"   # Aged Paper — lighter container surface for light variant
+fg            = "#1E1E1E"   # Charcoal — text on light
+fg_muted      = "#7A6142"   # Earth Brown — muted text on light (warm muted)
+
+# Workspace identities (darkened for contrast on light bg)
+primary     = "#1F4F92"   # Royal Blue darkened
+secondary   = "#3F8AC8"   # Sky Blue darkened
+tertiary    = "#B9682A"   # Burnt Orange — darker than Golden for light bg
+error       = "#B74A4A"   # Clay Red — darker than Coral
+success     = "#9DAE21"   # Lime Green darkened (Lime on white burns)
+# identity ramp — light variant (L=0.52 for contrast on the light base)
+coding      = "oklch(0.52000 0.14864 251.503)"   # #0B6ABB — WS1
+research    = "oklch(0.52000 0.15015 284.719)"   # #6258BA — WS2
+engine      = "oklch(0.52000 0.16827 38.262)"    # #B43902 — WS3
+browser     = "oklch(0.52000 0.12317 165.499)"   # #007E57 — WS4
+monitoring  = "oklch(0.52000 0.15627 131.487)"   # #467A00 — WS5
+streaming   = "oklch(0.52000 0.16662 2.522)"     # #B03160 — WS6
+gaming      = "oklch(0.52000 0.18772 24.724)"    # #BD242C — WS7
+media       = "oklch(0.52000 0.13039 67.215)"    # #995700 — WS8
+net         = "#1F7A73"   # Deep Seafoam — net HUD
+ai          = "#9A4089"   # Deep Orchid — AI HUD
+agenda      = "#B85F86"   # Deep Rose — agenda HUD
+
+# Surface modifiers (warm-tinted)
+selection   = "#BED7F4"   # Mist Blue — selection backdrop on light
+inactive    = "#D3C399"   # Sand Beige — inactive surface on light
+warm_shadow = "#EFE9DD"   # Warm tint instead of dark
+overlay     = "rgba(247, 246, 242, 0.85)"
+
+# Extended palette unchanged (mist/sand/earth/wisteria/honey/brick still apply)
+mist        = "#BED7F4"
+sand        = "#D3C399"
+earth       = "#7A6142"
+wisteria    = "#5A4AA8"   # Deep Violet — darker than Wisteria for light
+honey       = "#B89F2E"   # Muted Mustard — darker than Honey for light
+brick       = "#8E3A32"
+
+[color_css_light]
+backdrop      = "rgba(247, 246, 242, 0.85)"
+bg_alt_soft   = "rgba(239, 233, 221, 0.78)"
+chip          = "rgba(239, 233, 221, 0.85)"
+overlay_dim   = "rgba(0, 0, 0, 0.3)"
+shadow_dim    = "rgba(0, 0, 0, 0.25)"
+glow_build    = "rgba(63, 138, 200, 0.40)"
+glow_rec      = "rgba(185, 104, 42, 0.50)"
+glow_live     = "rgba(183, 74, 74, 0.50)"
+glow_urgent   = "rgba(185, 104, 42, 0.69)"
+
+[color_raw_light]
+bg          = "F7F6F2"
+bg_alt      = "EFE9DD"
+fg          = "1E1E1E"
+fg_muted    = "7A6142"
+primary     = "1F4F92"
+secondary   = "3F8AC8"
+tertiary    = "B9682A"
+error       = "B74A4A"
+success     = "9DAE21"
+coding      = "0B6ABB"
+research    = "6258BA"
+engine      = "B43902"
+browser     = "007E57"
+monitoring  = "467A00"
+streaming   = "B03160"
+gaming      = "BD242C"
+media       = "995700"
+selection   = "BED7F4"
+inactive    = "D3C399"
+warm_shadow = "EFE9DD"
+
+[color_rgba_light]
+shadow_dim         = "#00000040"
+shadow_softer      = "#00000020"
+shadow_primary     = "#1F4F92a0"
+shadow_lifted      = "#1F4F92d0"
+shadow_tertiary    = "#B9682A80"
+backdrop           = "#F7F6F2d9"
+backdrop_strong    = "#F7F6F2f0"
+overlay_dim        = "#0000004d"
+notify_low         = "#EFE9DD80"
+notify_critical    = "#B74A4A80"
+
+# ===========================================================================
+# TYPOGRAPHY — modular scale, ratio 1.5 (perfect fifth)
+# Base UI = 11px; mono = 13px; tab-header = 14px; heading = 16px; display = 24px
+# ===========================================================================
+
+[font]
+mono        = "JetBrainsMono Nerd Font"
+mono_size   = 13
+display     = "Geist Mono"
+ui_size     = 11
+ui_size_sm  = 9          # tooltips, captions, sub-labels
+ui_size_lg  = 14         # Waybar tab headers (bold) — 11 × 1.25 ≈ 14
+heading_md  = 16         # section headings in editors/launchers
+display_lg  = 24         # lockscreen, splash (reserved)
+
+# Weight tiers — Geist Mono axis (Light→Black). Hierarchy rides WEIGHT, not colour.
+weight_dim      = 300    # inactive tab names / de-emphasis (Light)
+weight_metric   = 400    # metric values (Regular)
+weight_emphasis = 500    # concept emphasis — value text, active pager (Medium)
+weight_label    = 600    # labels, clock (SemiBold)
+weight_active   = 700    # active tab name (Bold) — legacy strong
+
+# ===========================================================================
+# ICONOGRAPHY — Nerd Font glyph vocabulary, promoted to law so CSS, bash, and
+# Niri all bind to one source. Rendered into scripts/lib/glyphs.sh (bash) and
+# referenced in templates as {{icon.key}}. Glyphs are JetBrainsMono Nerd Font
+# (Material Design Icon range) unless they are plain Unicode.
+# ===========================================================================
+
+[icon]
+# State vocabulary — mirrors the .empty/.ok/.info/.alert/.critical CSS classes
+ok        = "✓"
+fail      = "✗"
+idle      = "·"
+info      = "󰋽"
+alert     = "󰀦"
+critical  = "󰀪"
+building  = "󱥸"
+spinner   = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"   # braille frames; scripts index one per tick
+
+# Tab identities — workspace tabs (1-7) + overlay HUD tabs (8-11)
+engine     = "󰒋"
+comms      = "󰭹"
+research   = "󰂽"
+control    = "󰕮"
+stream     = "󰕧"
+streaming  = "󰕧"
+monitoring = "󰓅"
+gaming     = "󰊴"
+coding     = "󰨸"
+browser    = "󰈹"
+media      = "󰎆"
+net        = "󰛳"
+ai         = "󰚩"
+agenda     = "󰃭"
+
+# Shared metric glyphs — used across module scripts
+clock     = "󰥔"
+cpu       = "󰻠"
+mem       = "󰍛"
+temp      = "󰔏"
+disk      = "󰋊"
+net_down  = "󰇚"
+net_up    = "󰕒"
+mic       = "󰍬"
+mute      = "󰍭"
+rec       = "⏺"
+live      = "󰐰"
+gpu       = "󰢮"
+battery   = "󰁹"
+bell      = "󰂚"
+mail      = "󰇮"
+vpn       = "󰦝"
+lock      = "󰌾"
+git       = "󰊢"
+pomo      = "󰔛"
+spend     = "󰉁"
+play      = "󰐊"
+pause     = "󰏤"
+speaker   = "󰕾"
+firewall  = "󰞀"
+warden    = "󰒃"
+route     = "󰑪"
+rust      = "🦀"   # language symbol — the one content glyph outside Waybar (starship)
+
+# ===========================================================================
+# MOTION — three tiers + one easing curve
+# ===========================================================================
+
+[motion]
+quick_ms    = 120         # micro: hover, click flash
+normal_ms   = 200         # state: tab switch, workspace activate, chip recolor
+slow_ms     = 380         # scene: overview, modal, lockscreen
+pulse_ms    = 2400        # living-state breathing period (live / rec / critical)
+lift_ms     = 120         # hover-lift micro-interaction (= quick)
+ease        = "cubic-bezier(0.2, 0.8, 0.2, 1.0)"   # fast-out, soft-in
+
+[spring]
+# Niri tactile-animation springs. damping<1 oscillates; 0.85-0.95 is polished
+# settle. stiffness = spring constant (higher = snappier). epsilon = rest
+# threshold (smaller = longer tail).
+overview_damping      = 0.95
+overview_stiffness    = 600
+overview_epsilon      = 0.0001
+window_open_damping   = 0.85
+window_open_stiffness = 500
+window_open_epsilon   = 0.001
+
+# ===========================================================================
+# GEOMETRY — 8pt grid; every Waybar value = f(bar_height=32)
+# ===========================================================================
+
+[geom]
+unit            = 4          # half-step atom — never below
+gap             = 8          # default module gap (= 2 units)
+gap_lg          = 16         # group separation (cpu/mem/temp cluster ↔ network)
+gap_xl          = 24         # sectional break
+
+bar_height          = 40     # 5 × grid — default; accommodates 14px bold tab headers
+bar_height_compact  = 32     # 4 × grid — compact alt (requires 11px tab headers)
+chip_height         = 32     # bar_height − 2 × 4px margin
+bar_reserve         = 56     # gap + bar_height + gap — window TOPS sit one gap BELOW the
+                             # pills (pill spans y=[gap, gap+bar_height]=[8,48]; windows
+                             # start at 56). Symmetric 8px rhythm. niri top strut SSOT.
+
+# RETIRED 2026-05-29: left_reserve / bar_center cap-centering tokens.
+# They forced .modules-left to min-width:1120, but modules-center is a GTK
+# center-widget whose usable width is (bar − 2×left) — so a 1120px reserve
+# clipped the centre to ~320px and made EVERY tab cluster invisible. The bar now
+# centers the active tab's fused pill as a group (no reserve, no per-cap lead).
+# Do not reintroduce a modules-left min-width. See render-waybar + style.css.tmpl.
+
+pad_y           = 2          # half-unit — vertical chip padding
+pad_x           = 12         # 3 units — horizontal module chip padding
+pad_x_lg        = 16         # 4 units — tab-header pill horizontal padding
+
+radius_sm       = 4          # tight UI elements
+radius          = 6          # default chip rounding (half of pad_x)
+radius_lg       = 12         # large elements, modal corners
+radius_window   = 14         # Niri window corners
+
+border          = 2          # half-unit — accent border, separator
+border_lg       = 4          # emphasized state, focus ring
+
+# ===========================================================================
+# OPACITY — 0.0 transparent → 1.0 opaque
+# ===========================================================================
+
+[opacity]
+# Uniform + transparent so a window stays FROSTED GLASS whether focused or not —
+# focus is signalled by the gradient ring + shadow, never by greying/solidifying.
+window_focused    = 0.85     # frosted; was 0.98 (near-opaque → looked grey when active)
+window_unfocused  = 0.85     # same as focused — focus change never greys a window
+window_floating   = 0.88     # floating/TUI: a touch more present, still clearly frosted
+ghostty_bg        = 0.88     # terminal background through transparency
+ghostty_inactive  = 0.78     # unfocused ghostty splits — sharper focus signal
+overlay           = 0.85     # mako, wofi backdrop
+launcher          = 0.88     # wofi window itself
+overview_backdrop = 0.92     # niri overview backdrop
+
+# ===========================================================================
+# SHADOW + BLUR (Niri renders shadows in screen-space; values in logical px)
+# ===========================================================================
+
+[shadow]
+softness_md   = 24
+softness_lg   = 40
+softness_xl   = 64           # floating + overview workspaces (lifted feel)
+spread_md     = 0
+spread_lg     = 4
+spread_xl     = 8
+offset_y      = 6
+offset_y_xl   = 14           # exaggerated drop for floating windows
+
+[blur]
+backdrop_md   = 12           # ghostty background-blur-radius (KWin portability)
+backdrop_lg   = 20
+# Niri 26.04 native blur (dual-kawase). Applied where a window/layer rule sets
+# background-effect{blur true}; tuned LIGHT (passes=2) for a frosted, not heavy,
+# transition. `niri-wm.github.io/niri/Configuration:-Miscellaneous` for ranges.
+passes        = 2            # downsample/upsample iterations (3 = niri default)
+offset        = 3            # per-pass pixel offset
+noise         = 0.02         # anti-banding overlay
+saturation    = 1.2          # blurred-bg saturation (1.5 default → muted for nature palette)
+
+# ===========================================================================
+# GLASS — Apple "Liquid Glass" as a quantified material. Procedural lensing /
+# specular / rim / chromatic, composited OVER niri's real dual-kawase blur and
+# refracting the current wallpaper (~/.cache/engine-backdrop.png). RX-580 budgeted.
+# Grounded: RealTimeRendering §9.5 (Fresnel rim), TheBookofShaders §3.3 (rounded-
+# rect SDF) / §3.1.1 (smoothstep edges) / §4.9 (fbm). Apple law: chrome-only, no
+# glass-on-glass, mandatory reduce-transparency/motion, variants → quality tiers.
+# ===========================================================================
+
+[glass]
+quality             = "high"  # high | low | off  (off ⇒ flat frosted = today's cssChip)
+refraction_px       = 2       # near-flat — only the faintest edge bend
+rim_width           = 1.0     # hairline border only (ref AuroraSurface outline)
+rim_opacity         = 0.14
+specular_intensity  = 0.0     # NO sheen / light-beam — flat by request
+specular_speed      = 0.0     # 0 = no motion; the glass is static by design
+chromatic_px        = 0.0     # no rim aberration — clean flat surface
+ambient_bleed       = 0.10    # active brand-hue tint (subtle / monochrome-leaning)
+tint_opacity        = 0.85    # == opacity.window_focused
+corner_continuous   = 1       # 1 = squircle (continuous) corners
+noise               = 0.02    # == blur.noise (anti-banding)
+reduce_transparency = 0       # a11y: 1 ⇒ force opaque frost + drop refraction
+reduce_motion       = 0       # a11y: 1 ⇒ freeze specular / breathing
+contrast_floor      = 4.5     # WCAG-AA min text contrast the material must never break
+
+# FOCAL surfaces (modals · Control Center · menu · lock) get TRUE Liquid Glass:
+# stronger wallpaper lensing + a slow moving specular sweep + a subtle chromatic
+# rim, composited over niri's real blur. The always-on bars keep the calm baseline
+# above — you read text through them all day. Glass.qml `focal: true` opts in.
+focal_refraction_px      = 9
+focal_rim_opacity        = 0.22
+focal_specular_intensity = 0.38
+focal_specular_speed     = 0.6
+focal_chromatic_px       = 1.4
+focal_ambient_bleed      = 0.14
+
+[glass_light]
+ambient_bleed = 0.12
+rim_opacity   = 0.25
+
+# ===========================================================================
+# SEMANTIC ROLE TIER — the design-concept's role tokens. Every render target
+# (Cockpit QML, Console .tcss, Warden UI, docs CSS) binds to these ROLES, never
+# to raw hues — that's what `verify-design-language` enforces. Values are derived
+# from [color] (duplicated as literals like [ansi], so renames don't cascade).
+# Roles: bg/text/border × elevation, plus danger/info status.
+# ===========================================================================
+
+[semantic]
+bg_primary      = "#1E1E1E"   # = bg          — base, cards, workspace tiles
+bg_secondary    = "#2B2B2B"   # = bg_alt      — containers, panels
+bg_tertiary     = "#3A3A3A"   # = bg_alt_light— chips / pills
+bg_danger       = "#3A2222"   # dark coral surface — suspended badge
+text_primary    = "#F7F6F2"   # = fg          — primary text, emphasized values
+text_secondary  = "#B8A789"   # = fg_muted    — default pill / label text
+text_tertiary   = "#8A8175"   # dim sand-gray — captions, the WS number
+text_danger     = "#E58B8B"   # light coral   — on bg_danger
+text_info       = "#8FBEEA"   # light sky     — info / hint text
+border_tertiary = "#454545"   # hairline (rendered 0.5px) — chips, cards
+border_info     = "#64A8E5"   # = secondary   — generic active-accent border
+
+[semantic_light]
+bg_primary      = "#F7F6F2"
+bg_secondary    = "#EFE9DD"
+bg_tertiary     = "#E2D9C5"
+bg_danger       = "#F3DADA"
+text_primary    = "#1E1E1E"
+text_secondary  = "#7A6142"
+text_tertiary   = "#9A8C76"
+text_danger     = "#B74A4A"
+text_info       = "#1F4F92"
+border_tertiary = "#D8CFBC"
+border_info     = "#3F8AC8"
+
+# ===========================================================================
+# COCKPIT — shell-specific knobs the GPU bar reads (pager + emphasis), so the
+# capitalized-tab choice and the concept's medium-weight feel are token-driven.
+# ===========================================================================
+
+[cockpit]
+workspace_label_case = "upper"   # upper | title | small_caps | lower (concept = lowercase)
+pager_dot            = 8         # identity-dot diameter px
+pager_active_border  = 2         # focused-tab accent border px (concept)
+pill_hairline        = 1         # chrome border px (drawn 0.5 via AA where supported)
+
+# ===========================================================================
+# ANSI 8-COLOR PALETTE (zellij theme, ghostty theme)
+# Kept separate from semantic colors so renames don't cascade.
+# ===========================================================================
+
+[ansi]
+black       = "#2B2B2B"   # Soft Black
+red         = "#D95C5C"   # Coral Red
+green       = "#C7D42B"   # Lime Green
+yellow      = "#D9892B"   # Golden Orange
+blue        = "#2961B1"   # Royal Blue
+magenta     = "#7C6ED6"   # Wisteria
+cyan        = "#64A8E5"   # Sky Blue
+white       = "#F7F6F2"   # Soft White
+
+# ===========================================================================
+# ANSI BRIGHT 8 — completes the 16-color set (ghostty palette 8-15, zellij).
+# Palette-consistent luminance lifts of the [ansi] hues so brights stay on-brand.
+# Keys are digit-free (render-templates placeholder regex is [a-z_]+ only).
+# ===========================================================================
+
+[ansi_bright]
+bright_black   = "#3A3A3A"   # Mid Charcoal (bg_alt_light) — standard bright-black
+bright_red     = "#E87C7C"   # Coral lifted
+bright_green   = "#DCE85A"   # Lime lifted
+bright_yellow  = "#E8A54E"   # Golden lifted
+bright_blue    = "#4F84CC"   # Royal lifted (distinct from bright_cyan)
+bright_magenta = "#9B8FE0"   # Wisteria lifted
+bright_cyan    = "#8FCBEC"   # Sky lifted
+bright_white   = "#FFFFFF"   # Pure white above Soft White
+
+# ===========================================================================
+# POWERLINE — the capsule/segment SHAPE, one source. Nerd-Font powerline glyphs
+# (JetBrainsMono Nerd Font) so zjstatus tabs, the tide prompt, lualine sections,
+# and the cockpit pills all draw the SAME pill. Rounded caps = the Liquid-Glass
+# capsule; chevrons = hard segment joins; thin = hairline dividers. Mirrors the
+# `~/Downloads/slicedlabs-terminal-surface.html` pill atom. Keys are [a-z_]+ only.
+# ===========================================================================
+
+[powerline]
+round_left   = ""     # U+E0B6  capsule left cap  (pill start)
+round_right  = ""     # U+E0B4  capsule right cap (pill end)
+sep_left     = ""     # U+E0B0  hard chevron ›  (left-aligned segment join)
+sep_right    = ""     # U+E0B2  hard chevron ‹  (right-aligned segment join)
+thin_left    = ""     # U+E0B1  hairline divider › (matches the cockpit hairline)
+thin_right   = ""     # U+E0B3  hairline divider ‹
+dot          = "●"     # identity pager dot (== cockpit pager_dot diameter)
+
+# ===========================================================================
+# TERMINAL — tooling knobs the pill cascade reads (extends [cockpit]). The
+# whole terminal stack speaks the desktop language; these are its few dials.
+# ===========================================================================
+
+[terminal]
+claude_pane_pct = 38         # Claude Code right-pane width in the default zellij layout
+zjstatus_height = 1          # status/tab bar rows (single-row, calm)
+pill_weight     = "medium"   # weight-500 restraint, carried from the cockpit pills

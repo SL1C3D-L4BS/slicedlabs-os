@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# sliced-menu — the workstation command palette (Mod+Alt+Space).
+#
+# Omarchy's Super+Alt+Space menu / ML4W's Settings app, but terminal/wofi-native
+# and on-brand. A nested categorized menu over EXISTING workstation commands —
+# every action shells out to the script that already owns that behaviour
+# (ricing-variant / waybar-density / waybar-hud / dev|ai-stack-{up,down} /
+# dev-k3d-{up,down} / cockpit / slicedlabs / standup-post), so the palette can
+# never drift from the system. Styling = wofi/style.css (token-rendered);
+# niri already frosts the `wofi` namespace, so it inherits the glass chrome.
+set -euo pipefail
+
+WOFI=(wofi --dmenu --insensitive --width 520 --height 420)
+menu() { local p="$1"; shift; printf '%s\n' "$@" | "${WOFI[@]}" --prompt "$p"; }
+run()  { setsid -f sh -c "$*" >/dev/null 2>&1 || true; }
+
+# Overlay HUD list straight from the waybar registry (fallback to the known four).
+OVERLAY_TABS=(media net ai agenda)
+TABS_ENV="$HOME/.config/waybar/scripts/lib/tabs.env"
+# shellcheck source=/dev/null
+[[ -f "$TABS_ENV" ]] && source "$TABS_ENV" 2>/dev/null || true
+
+top="$(menu '› ' Theme Density HUD Stacks Workspaces Music Agents)" || true
+case "$top" in
+  Theme)
+    sel="$(menu 'theme › ' Dark Light Toggle 'Schedule…')" || true
+    case "$sel" in
+      Dark)        run ricing-variant dark ;;
+      Light)       run ricing-variant light ;;
+      Toggle)      run waybar-hud theme toggle ;;
+      'Schedule…') run 'ghostty -e sh -c "${EDITOR:-nvim} $HOME/.config/slicedlabs/theme-schedule"' ;;
+    esac ;;
+  Density)
+    sel="$(menu 'density › ' Dense Spacious)" || true
+    case "$sel" in
+      Dense)    run waybar-density dense ;;
+      Spacious) run waybar-density spacious ;;
+    esac ;;
+  HUD)
+    sel="$(menu 'hud › ' "${OVERLAY_TABS[@]}")" || true
+    [[ -n "$sel" ]] && run "waybar-hud $sel" ;;
+  Stacks)
+    sel="$(menu 'stacks › ' 'dev — up' 'dev — down' 'ai — up' 'ai — down' 'k3d — up' 'k3d — down')" || true
+    case "$sel" in
+      'dev — up')   run dev-stack-up ;;
+      'dev — down') run dev-stack-down ;;
+      'ai — up')    run ai-stack-up ;;
+      'ai — down')  run ai-stack-down ;;
+      'k3d — up')   run dev-k3d-up ;;
+      'k3d — down') run dev-k3d-down ;;
+    esac ;;
+  Workspaces)
+    sel="$(menu 'go › ' engine research stream monitoring gaming coding browser 'stage all' 'stage engine' 'stage coding' 'stage research' 'stage browser' 'stage stream (OBS)' 'stage gaming (Steam)')" || true
+    case "$sel" in
+      'stage all')            run cockpit ;;
+      'stage engine')         run 'cockpit engine' ;;
+      'stage coding')         run 'cockpit coding' ;;
+      'stage research')       run 'cockpit research' ;;
+      'stage browser')        run 'cockpit browser' ;;
+      'stage stream (OBS)')   run 'niri msg action focus-workspace stream; cockpit stream' ;;
+      'stage gaming (Steam)') run 'niri msg action focus-workspace gaming; cockpit gaming' ;;
+      ?*)                     niri msg action focus-workspace "$sel" >/dev/null 2>&1 || true ;;
+    esac ;;
+  Music)
+    sel="$(menu 'music › ' 'Radio: lofi' 'Radio: drone' 'Radio: jazz' 'Cockpit (rmpc)' Pause Stop)" || true
+    case "$sel" in
+      'Radio: lofi')    run 'music radio lofi' ;;
+      'Radio: drone')   run 'music radio drone' ;;
+      'Radio: jazz')    run 'music radio jazz' ;;
+      'Cockpit (rmpc)') run 'ghostty --class=com.slicedlabs.music -e music' ;;
+      Pause)            run 'music toggle' ;;
+      Stop)             run 'music stop' ;;
+    esac ;;
+  Agents)
+    sel="$(menu 'agents › ' 'Cockpit (TUI)' Cost Agents Standup 'Ask…')" || true
+    case "$sel" in
+      'Cockpit (TUI)') run 'ghostty --class=com.slicedlabs.tui -e slicedlabs' ;;
+      Cost)            run 'ghostty -e slicedlabs cost' ;;
+      Agents)          run 'ghostty -e slicedlabs agents' ;;
+      Standup)         run standup-post ;;
+      'Ask…')
+        q="$(printf '' | wofi --dmenu --prompt 'ask architect › ')" || true
+        [[ -n "$q" ]] && run "ghostty --class=com.slicedlabs.tui -e slicedlabs ask slicedlabs_architect \"$q\"" ;;
+    esac ;;
+esac

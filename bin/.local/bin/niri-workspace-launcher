@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# niri-workspace-launcher — on first focus of an "auto" workspace (declared in
+# ~/.config/sliced-engine/workspaces.toml [meta].auto), realize its scene:
+# spawn the canonical apps and place them in their columns. Registry-driven via
+# lib/scene.sh — the same realize_scene() the `cockpit` command uses.
+#
+# Workspaces NOT in [meta].auto (engine / streaming / gaming) are intentionally
+# left alone → opt-in, never auto-spawned. Once every auto workspace has been
+# realized once, the watcher exits (a session guard prevents re-spawns).
+#
+# Listens to `niri msg --json event-stream`.
+
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# shellcheck source=/dev/null
+source "$SELF_DIR/lib/scene.sh"
+
+state_dir="${XDG_RUNTIME_DIR:-/tmp}/niri-workspace-launcher"
+mkdir -p "$state_dir"
+
+# === one-time reorder: pin the canonical WS1..8 identity order on DP-2 =======
+# Niri inserts newly-added permanent workspaces at idx=1 of their output, which
+# can put tabs out of order. We re-impose the canonical DP-2 order once per niri
+# session (monitoring lives on DP-3, so it is not in this list).
+reorder_workspaces() {
+    local want="coding,research,engine,browser,streaming,gaming,media"
+    local cur
+    cur=$(niri msg --json workspaces 2>/dev/null \
+        | jq -r '[.[] | select(.output == "DP-2") | select(.name)] | sort_by(.idx) | map(.name) | join(",")')
+    [[ "$cur" == "$want" ]] && return 0
+    local i=1 ws
+    for ws in coding research engine browser streaming gaming media; do
+        niri msg action move-workspace-to-index "$i" --reference "$ws" 2>/dev/null || true
+        ((i++))
+    done
+}
+reorder_workspaces
+
+# Auto workspaces from the registry (gaming/streaming/comms deliberately excluded).
+mapfile -t AUTO < <(scene_meta_auto)
+((${#AUTO[@]})) || exit 0   # nothing to watch
+
+realize_once() {  # realize a workspace at most once per session
+    local ws="$1"
+    [[ -f "$state_dir/$ws.spawned" ]] && return 0
+    touch "$state_dir/$ws.spawned"
+    scene_log "launcher: realize $ws"
+    realize_scene "$ws" || true
+}
+
+all_done() {
+    local ws
+    for ws in "${AUTO[@]}"; do [[ -f "$state_dir/$ws.spawned" ]] || return 1; done
+    return 0
+}
+
+# --- self-heal -----------------------------------------------------------------
+# A `.spawned` flag means "we TRIED", not "it worked". After the eager pass we verify
+# each auto workspace actually has its declared windows mapped in niri, and re-realize
+# any that don't (a lost Firefox race, a slow/failed spawn). realize_scene is
+# idempotent (skips windows already present), so this only ever FILLS GAPS — it's what
+# makes the launcher CONVERGE instead of exiting the moment the flags exist.
+_scene_app_ids() { _scene_apps "$1" | cut -d'|' -f1 | sed '/^$/d'; }
+
+ws_missing_any() {  # 0 (true) if any declared app_id for $1 has no window in niri
+    local ws="$1" a
+    while IFS= read -r a; do
+        [[ -z "$a" ]] && continue
+        [[ -z "$(_win_id "$a")" ]] && return 0
+    done < <(_scene_app_ids "$ws")
+    return 1
+}
+
+reconcile_pass() {
+    local ws
+    for ws in "${AUTO[@]}"; do
+        if ws_missing_any "$ws"; then
+            scene_log "launcher: reconcile $ws — a declared window is missing, re-realizing"
+            rm -f "$state_dir/$ws.spawned"
+            realize_once "$ws"
+        fi
+    done
+}
+
+# === Eager boot choreography ===================================================
+# The vision: the moment niri launches, the stacks FIRE — the coding cockpit, the
+# browser, and the research space — rather than waiting for first focus. Wait until
+# niri has created the named workspaces, then stage each auto scene NOW, staggered
+# (sleep 2) so we don't thunder-herd the 4c/8t CPU at login. Placement uses
+# --focus false, so nothing steals the workspace you land on. Idempotent via the
+# realize_once guard; the focus watcher below is the fallback for the rest.
+(
+    for _ in $(seq 1 40); do [[ -n "$(_ws_id "${AUTO[0]}")" ]] && break; sleep 0.25; done
+    for ws in "${AUTO[@]}"; do realize_once "$ws"; sleep 2; done
+    # Two bounded self-heal passes — re-realize anything that lost a race or mapped slow.
+    sleep 5; reconcile_pass
+    sleep 5; reconcile_pass
+) &
+eager_pid=$!
+
+niri msg --json event-stream 2>/dev/null | while IFS= read -r line; do
+    name=$(jq -r '.. | objects | select(.name? != null and .is_focused? == true) | .name' <<<"$line" 2>/dev/null | head -1 || true)
+    for ws in "${AUTO[@]}"; do
+        [[ "${name:-}" == "$ws" ]] && realize_once "$ws"
+    done
+    all_done && break
+done
+# Don't exit while the eager-boot + self-heal subshell is still converging, or the
+# orphaned reconcile passes would be cut short.
+wait "$eager_pid" 2>/dev/null || true

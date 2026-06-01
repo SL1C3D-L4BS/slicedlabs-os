@@ -1,0 +1,222 @@
+# =============================================================================
+# workspaces.toml — declarative registry for principled per-workspace "scenes".
+#
+# SINGLE SOURCE OF TRUTH for what each workspace auto-populates with. Read at
+# runtime by `lib/scene.sh` (sourced by niri-workspace-launcher + `cockpit`).
+# PLACEMENT + SIZING are declarative: niri `open-on-workspace` + `default-column-
+# width` window-rules (config.kdl) put each app on its home workspace at its width
+# at map time. scene.sh only starts services, spawns the app, and runs an
+# idempotent move-backstop. Idempotent (keyed on app_id + workspace).
+#
+#   [meta].auto   workspaces STAGED at niri launch (eager, staggered) by the
+#                 launcher + re-staged on first focus. NOT listed (engine/streaming/
+#                 gaming) stays opt-in — launch with `cockpit <ws>`.
+#
+#   [workspaces.<name>]
+#     output   the niri output it lives on (informational)
+#     layout   columns | single | delegate
+#     tiling   auto | manual — niri-autotile policy (DEFAULT auto: 1 window full,
+#              2+ half/50-50 endless). "manual" exempts a scene with declared unequal
+#              widths (research = 58/42) from the daemon. Omitted ⇒ auto.
+#     delegate (layout=delegate) a script to run instead (e.g. monitoring-stack)
+#     services systemd --user units started (idempotent, --no-block) when the scene
+#              realizes — the workspace's backing infra (e.g. dev-stack-obs for monitoring)
+#     ambient  optional mpd radio station (lofi|drone|jazz); auto-played when the scene
+#              realizes, but ONLY if nothing is already playing — low-key focus music
+#   [[workspaces.<name>.apps]]
+#     id       short label (for `cockpit --list`)
+#     app_id   the window app-id used for placement + idempotency. ghostty honors
+#              only reverse-DNS --class, so each scene terminal gets com.slicedlabs.*
+#     cmd      the spawn command (sh -c)
+#     column   left→right order (1-based)
+#     width    documented column width; the live value is mirrored into the app's
+#              niri window-rule as default-column-width (e.g. "58%" → proportion 0.58)
+#     height   documented window height (stacked layouts); declarative if used
+# =============================================================================
+
+[meta]
+auto = ["coding", "browser", "research"]
+# Eagerly STAGED at niri launch (staggered) by niri-workspace-launcher — the moment
+# you log in, the coding cockpit, the browser, and the research space fire and
+# populate in the background (placed with --focus false; first focus re-stages
+# idempotently). EVERYTHING ELSE is opt-in, summoned by typing `cockpit <ws>` in a
+# terminal: engine (Mod+Ctrl+E), monitoring (Mod+Ctrl+M — boots dev-stack-obs on
+# demand), media (Mod+Ctrl+V), streaming (Mod+Ctrl+S), gaming (Mod+Ctrl+Shift+G).
+# NOTHING monitoring/observability starts at login anymore — dev-stack-obs is no longer
+# boot-enabled; it comes up only when you open the monitoring cockpit.
+
+# --- coding: GENERALIZED dev-cockpit for ANY project idea — a 3-column desktop: the
+# --- zellij `coding` masterclass (cwd ~/Projects) + a reference-docs Firefox + a
+# --- persistent agent/notes column (claude · slicedlabs · scratch). Lighter service
+# --- set; spin up ai-stack/ollama per project. Ambient lofi when you arrive. --------
+[workspaces.coding]
+output = "DP-2"
+layout = "columns"
+tiling = "manual"   # declared 60/22/18 — exempt from auto full↔halves
+services = ["dev-stack-data", "uair"]
+ambient = "lofi"
+  [[workspaces.coding.apps]]
+  id = "cockpit"
+  app_id = "com.slicedlabs.coding"
+  cmd = "ghostty --class=com.slicedlabs.coding --working-directory=$HOME/Projects -e zj coding"
+  column = 1
+  width = "60%"
+  [[workspaces.coding.apps]]
+  id = "docs"
+  app_id = "coding-web"
+  # reference/docs browser — dedicated throwaway profile, serialized via ff-scene (the
+  # fixed launcher: stale-lock cleanup so a cold profile reliably opens a window).
+  cmd = "ff-scene --app-id coding-web --profile $HOME/.cache/ff-coding"
+  column = 2
+  width = "22%"
+  [[workspaces.coding.apps]]
+  id = "agent"
+  app_id = "com.slicedlabs.coding-side"
+  cmd = "ghostty --class=com.slicedlabs.coding-side --working-directory=$HOME/Projects -e zj agent"
+  column = 3
+  width = "18%"
+
+# --- engine: the [ENGINE]'s OWN dev cockpit — a 3-column desktop mirroring `coding`
+# --- but pointed at ~/Projects/engine: the zellij `engine-dev` masterclass + a Rust/
+# --- wgpu docs Firefox + an agent/notes column. Full ai-stack/ollama service set.
+# --- This is where the Phase-11 editor/UI will also launch. On-demand (Mod+Ctrl+E).
+[workspaces.engine]
+output = "DP-2"
+layout = "columns"
+tiling = "manual"   # declared 60/22/18
+services = ["dev-stack-data", "ai-stack", "ollama", "uair"]
+ambient = "lofi"
+  [[workspaces.engine.apps]]
+  id = "cockpit"
+  app_id = "com.slicedlabs.engine-dev"
+  cmd = "ghostty --class=com.slicedlabs.engine-dev --working-directory=$HOME/Projects/engine -e zj engine-dev"
+  column = 1
+  width = "60%"
+  [[workspaces.engine.apps]]
+  id = "docs"
+  app_id = "engine-web"
+  cmd = "ff-scene --app-id engine-web --profile $HOME/.cache/ff-engine"
+  column = 2
+  width = "22%"
+  [[workspaces.engine.apps]]
+  id = "agent"
+  app_id = "com.slicedlabs.engine-side"
+  cmd = "ghostty --class=com.slicedlabs.engine-side --working-directory=$HOME/Projects/engine -e zj agent"
+  column = 3
+  width = "18%"
+
+# --- browser: the web — Zen (primary) + Firefox, side by side -----------------
+[workspaces.browser]
+output = "DP-2"
+layout = "columns"
+  [[workspaces.browser.apps]]
+  id = "zen"
+  app_id = "zen"
+  cmd = "zen-browser"
+  column = 1
+  width = "50%"
+  [[workspaces.browser.apps]]
+  id = "firefox"
+  app_id = "firefox"
+  # via ff-scene (flock-serialized) so it never races the monitoring/research-web
+  # Firefoxes at login. No --profile ⇒ your DEFAULT profile (real bookmarks/session).
+  cmd = "ff-scene --app-id firefox"
+  column = 2
+  width = "50%"
+
+# --- monitoring (DP-2): the NATIVE observability cockpit `slicedlabs monitor` (host
+# --- vitals · services · logs · cost) + a side column (lazydocker · btop · logs).
+# --- Summoning it (Mod+5 / Mod+Ctrl+M / `cockpit monitoring`) BOOTS the observability
+# --- stack on demand via services=[dev-stack-obs] (Loki/Tempo/OTel/ClickHouse) — it is
+# --- no longer boot-enabled, so login stays lean and nothing monitoring runs until you look.
+[workspaces.monitoring]
+output = "DP-2"
+layout = "columns"
+tiling = "manual"   # declared 65/35
+services = ["dev-stack-obs"]
+  [[workspaces.monitoring.apps]]
+  id = "cockpit"
+  app_id = "com.slicedlabs.monitoring"
+  cmd = "ghostty --class=com.slicedlabs.monitoring --title=monitoring -e slicedlabs monitor"
+  column = 1
+  width = "65%"
+  [[workspaces.monitoring.apps]]
+  id = "side"
+  app_id = "com.slicedlabs.monitor-side"
+  cmd = "ghostty --class=com.slicedlabs.monitor-side --title=monitor-side -e zj monitor-side"
+  column = 2
+  width = "35%"
+
+# --- research: full-scope deep work — thinking, auditing, architecture, design-systems.
+# --- The zellij `research` cockpit (ONE terminal) holds the TUI work in tabs:
+# ---   study (vim NOTES.md │ books reader) · architect (claude │ slicedlabs) ·
+# ---   design (tokens.toml live │ render-templates/chafa) · audit (lazygit │ rg·sg·semgrep).
+# --- Alongside it: a dedicated research Firefox (own profile + app-id `research-web`,
+# --- never collides with the browser ws) and the Obsidian vault as a 3rd column.
+# --- Excalidraw is summon-on-demand (`excalidraw-desktop`) from the design tab.
+[workspaces.research]
+output = "DP-2"
+layout = "columns"
+tiling = "manual"   # keep the declared 58/42 (+ Obsidian) — exempt from auto full↔halves
+ambient = "lofi"
+  [[workspaces.research.apps]]
+  id = "study"
+  app_id = "com.slicedlabs.research"
+  cmd = "ghostty --class=com.slicedlabs.research --working-directory=$HOME/Documents/research -e zj research"
+  column = 1
+  width = "58%"
+  [[workspaces.research.apps]]
+  id = "web"
+  app_id = "research-web"
+  # dedicated profile + --no-remote, via the serialized launcher (the fix for the
+  # boot-time Firefox race that previously left this window unstaged at login).
+  cmd = "ff-scene --app-id research-web --profile $HOME/.cache/ff-research"
+  column = 2
+  width = "42%"
+  [[workspaces.research.apps]]
+  id = "vault"
+  app_id = "obsidian"
+  cmd = "obsidian"
+  column = 3
+  width = "50%"   # scrolls in as a 3rd column (Mod+L / overview); manual tiling keeps it
+
+# --- streaming: OBS Studio ----------------------------------------------------
+[workspaces.streaming]
+output = "DP-2"
+layout = "single"
+  [[workspaces.streaming.apps]]
+  id = "obs"
+  app_id = "obs"
+  cmd = "obs"
+  column = 1
+
+# --- gaming: Steam ------------------------------------------------------------
+[workspaces.gaming]
+output = "DP-2"
+layout = "single"
+  [[workspaces.gaming.apps]]
+  id = "steam"
+  app_id = "steam"
+  cmd = "steam"
+  column = 1
+
+# --- media (Violet): the active-listening cockpit — keyboard-driven Spotify
+# --- (spotify_player) beside a live cava visualizer. On-demand: Mod+8 / Mod+V focus,
+# --- Mod+Ctrl+V stages it. No ambient auto-play here — this is where YOU pick the
+# --- music. `cinema` routes Netflix/YouTube here too (opaque video, separate app-ids).
+[workspaces.media]
+output = "DP-2"
+layout = "columns"
+tiling = "manual"   # declared 60/40
+  [[workspaces.media.apps]]
+  id = "tunes"
+  app_id = "com.slicedlabs.tunes"
+  cmd = "ghostty --class=com.slicedlabs.tunes --title=tunes -e tunes"
+  column = 1
+  width = "60%"
+  [[workspaces.media.apps]]
+  id = "cava"
+  app_id = "com.slicedlabs.cava"
+  cmd = "ghostty --class=com.slicedlabs.cava --title=cava -e cava"
+  column = 2
+  width = "40%"

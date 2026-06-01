@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# install-tetragon — install Cilium Tetragon (eBPF runtime security) from the
+# OFFICIAL release. The AUR `tetragon-bin` is a different/joke binary; real
+# Tetragon ships an out-of-band tarball + install.sh (same pattern as our
+# llama.cpp / osxcross out-of-band builds). Then loads the tracked
+# TracingPolicies and (re)starts the daemon.
+#
+#   install-tetragon [vVERSION]   (default: latest release)
+set -euo pipefail
+
+VER="${1:-$(curl -fsSL https://api.github.com/repos/cilium/tetragon/releases/latest \
+        | grep -oP '"tag_name":\s*"\K[^"]+')}"
+POLICY_SRC="${DOTFILES_ROOT:-$HOME/.dotfiles}/system/etc/tetragon/tetragon.tp.d"
+
+tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+echo "==> installing Cilium Tetragon ${VER}"
+curl -fsSL "https://github.com/cilium/tetragon/releases/download/${VER}/tetragon-${VER}-amd64.tar.gz" \
+    -o "$tmp/tetragon.tar.gz"
+tar xzf "$tmp/tetragon.tar.gz" -C "$tmp"
+sudo bash -c "cd '$tmp/tetragon-${VER}-amd64' && ./install.sh"
+
+# Tracked TracingPolicies (default dir /etc/tetragon/tetragon.tp.d).
+if compgen -G "$POLICY_SRC/*.yaml" >/dev/null; then
+    sudo install -D -m644 "$POLICY_SRC"/*.yaml -t /etc/tetragon/tetragon.tp.d/
+fi
+sudo systemctl restart tetragon
+echo "==> tetragon $(systemctl is-active tetragon); policies: $(ls /etc/tetragon/tetragon.tp.d/ 2>/dev/null | tr '\n' ' ')"

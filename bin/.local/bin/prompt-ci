@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# prompt-ci — pre-commit hook that:
+#   1. Renders .claude/agents/<name>.md from prompts/roles/<name>.md.
+#   2. Re-stages the rendered files if they changed.
+#   3. Runs Phoenix eval on the changed prompts against the golden set
+#      (best-effort — skipped if Phoenix isn't up).
+#   4. Blocks the commit when eval regression > PROMPT_CI_REGRESSION_THRESHOLD
+#      (default 10).
+
+set -euo pipefail
+
+DOTFILES_ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+THRESHOLD="${PROMPT_CI_REGRESSION_THRESHOLD:-10}"
+
+cd "$DOTFILES_ROOT"
+
+# Only run when something under prompts/ changed (saves CI cost).
+if ! git diff --cached --name-only | grep -qE '^prompts/|^sliced-engine/.*team\.toml$'; then
+    exit 0
+fi
+
+echo "==> prompt-ci: rendering agent files"
+"$DOTFILES_ROOT/bin/.local/bin/render-prompts"
+
+# Re-stage rendered outputs.
+git add claude-agents/.claude/agents/ aider/.config/aider/agents/ 2>/dev/null || true
+
+# Evals — best-effort. Skip when Phoenix is down (mostly during fresh installs).
+if ! curl -sf http://localhost:6006/healthz >/dev/null 2>&1; then
+    echo "   [skip] Phoenix not running — eval skipped"
+    exit 0
+fi
+
+eval_root="$DOTFILES_ROOT/prompts/evals/golden"
+if [[ ! -d "$eval_root" ]]; then
+    echo "   [skip] no golden eval set at $eval_root"
+    exit 0
+fi
+
+echo "==> prompt-ci: running golden-set evals (threshold ${THRESHOLD}%)"
+if command -v phoenix >/dev/null 2>&1; then
+    phoenix eval roles --golden "$eval_root" --since 1d --json > /tmp/phoenix-eval.json
+    regression=$(jq -r '.regression_pct // 0' /tmp/phoenix-eval.json)
+    awk -v r="$regression" -v t="$THRESHOLD" 'BEGIN { exit (r > t) ? 1 : 0 }' || {
+        echo "   prompt-ci: regression ${regression}% > threshold ${THRESHOLD}% — commit blocked"
+        echo "   see /tmp/phoenix-eval.json"
+        exit 1
+    }
+fi
+
+echo "==> prompt-ci: ok"

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# slicedlabs-plymouth — a token-branded boot splash, SAFELY.
+#
+# This box has LUKS-encrypted root, so Plymouth renders the disk-unlock password
+# prompt at boot. A broken custom theme could lock you out of your own disk. So we
+# do NOT ship a hand-rolled password callback — we rebrand the upstream `spinner`
+# theme (its password handling is battle-tested) by only swapping the background to
+# the SlicedLabs base colour from system/tokens.toml. The risky boot-integration
+# (initramfs hook + kernel cmdline) is a SEPARATE, explicit `boot` step you run when
+# you're ready, with a console nearby.
+#
+#   slicedlabs-plymouth install   # install plymouth + create/brand the theme + set default (SAFE)
+#   slicedlabs-plymouth boot      # add plymouth-encrypt hook + `splash` + regen initramfs (LUKS-CRITICAL)
+#   slicedlabs-plymouth status    # show what's configured
+set -euo pipefail
+
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+THEME=slicedlabs
+DEST=/usr/share/plymouth/themes/$THEME
+
+# Brand background from tokens [color].bg (#1E1E1E) as a Plymouth 0xRRGGBB int.
+bg_hex() { grep -E '^bg ' "$ROOT/system/tokens.toml" | grep -oE '#[0-9A-Fa-f]{6}' | head -1 | tr -d '#'; }
+
+cmd_install() {
+    command -v plymouth >/dev/null 2>&1 || { echo "→ installing plymouth"; sudo pacman -S --needed --noconfirm plymouth; }
+    [[ -d /usr/share/plymouth/themes/spinner ]] || { echo "spinner theme missing (plymouth incomplete)"; exit 1; }
+    local bg; bg=$(bg_hex)
+    echo "→ branding spinner → $THEME (bg #$bg)"
+    sudo rm -rf "$DEST"
+    sudo cp -r /usr/share/plymouth/themes/spinner "$DEST"
+    sudo mv "$DEST/spinner.plymouth" "$DEST/$THEME.plymouth"
+    # point the theme at its own dir + swap the background to the brand base
+    sudo sed -i \
+        -e "s#/spinner#/$THEME#g" \
+        -e "s/^Name=.*/Name=SlicedLabs/" \
+        -e "s/^BackgroundStartColor=.*/BackgroundStartColor=0x$bg/" \
+        -e "s/^BackgroundEndColor=.*/BackgroundEndColor=0x$bg/" \
+        "$DEST/$THEME.plymouth"
+    sudo plymouth-set-default-theme "$THEME"   # no -R: does NOT touch initramfs yet
+    echo "✓ theme '$THEME' installed + set default (initramfs NOT modified — run 'boot' for that)"
+}
+
+cmd_boot() {
+    cat >&2 <<'WARN'
+⚠  LUKS-CRITICAL. This adds the plymouth-encrypt initramfs hook (themed disk-unlock
+   prompt) + `splash` to the kernel cmdline + regenerates the initramfs. If it goes
+   wrong you may not be able to unlock your disk at boot. A fallback initramfs is your
+   safety net. Proceed only with this understanding; re-run with `boot --yes`.
+WARN
+    [[ "${1:-}" == "--yes" ]] || { echo "aborted (no --yes)"; exit 1; }
+    sudo cp /etc/mkinitcpio.conf "/etc/mkinitcpio.conf.bak.$(date +%s)"
+    sudo cp /etc/kernel/cmdline "/etc/kernel/cmdline.bak.$(date +%s)"
+    # plymouth after udev; encrypt → plymouth-encrypt (themed LUKS prompt)
+    sudo sed -i -E 's/^(HOOKS=\(base udev)/\1 plymouth/; s/\bencrypt\b/plymouth-encrypt/' /etc/mkinitcpio.conf
+    grep -q '\bsplash\b' /etc/kernel/cmdline || sudo sed -i 's/$/ splash quiet/' /etc/kernel/cmdline
+    echo "→ regenerating initramfs (keep a live-USB handy until you've confirmed a reboot)"
+    sudo mkinitcpio -P
+    echo "✓ boot integration done. Verify a fallback initramfs exists before rebooting:"
+    ls -1 /boot/*fallback* 2>/dev/null || echo "  ⚠ NO fallback initramfs found — do NOT reboot until you have one"
+}
+
+case "${1:-status}" in
+    install) cmd_install ;;
+    boot)    shift; cmd_boot "${1:-}" ;;
+    status)
+        echo "default theme: $(plymouth-set-default-theme 2>/dev/null || echo none)"
+        grep -qE 'plymouth' /etc/mkinitcpio.conf 2>/dev/null && echo "initramfs: plymouth hook present" || echo "initramfs: no plymouth hook (boot not integrated)"
+        grep -qE '\bsplash\b' /etc/kernel/cmdline 2>/dev/null && echo "cmdline: splash present" || echo "cmdline: no splash"
+        ;;
+    *) echo "usage: slicedlabs-plymouth {install|boot [--yes]|status}" >&2; exit 2 ;;
+esac

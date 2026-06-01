@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "summary": {
+    "clean": 13,
+    "probation": 0,
+    "suspended": 0,
+    "benched": 0,
+    "retired": 0,
+    "total": 13
+  },
+  "rules": {
+    "scope_boundary": "red",
+    "undeclared_resource": "red",
+    "cost_cap": "orange",
+    "retry_loop": "orange",
+    "low_confidence": "yellow",
+    "unsupported_claim": "orange"
+  },
+  "penalty_box": {
+    "probation_runs": 3,
+    "auto_retire_on_eval_fail": true,
+    "escalation": "retire"
+  },
+  "agents": [
+    {
+      "id": "slicedlabs_accountant",
+      "name": "accountant",
+      "initials": "AC",
+      "version": "v1.0",
+      "scope": "general",
+      "declared_resources": [],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_architect",
+      "name": "architect",
+      "initials": "AR",
+      "version": "v1.0",
+      "scope": "design",
+      "declared_resources": [
+        "repo:read",
+        "web:read",
+        "memory:read"
+      ],
+      "max_cost_per_run": 2.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_critic",
+      "name": "critic",
+      "initials": "CR",
+      "version": "v1.0",
+      "scope": "general",
+      "declared_resources": [],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_design_assistant",
+      "name": "design-assistant",
+      "initials": "DA",
+      "version": "v1.0",
+      "scope": "general",
+      "declared_resources": [],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_docs_writer",
+      "name": "docs-writer",
+      "initials": "DW",
+      "version": "v1.0",
+      "scope": "general",
+      "declared_resources": [],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_engineer_1",
+      "name": "engineer-1",
+      "initials": "E1",
+      "version": "v1.0",
+      "scope": "engine",
+      "declared_resources": [
+        "repo:read",
+        "repo:write",
+        "shell:build",
+        "shell:test"
+      ],
+      "max_cost_per_run": 2.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_engineer_2",
+      "name": "engineer-2",
+      "initials": "E2",
+      "version": "v1.0",
+      "scope": "python-ai",
+      "declared_resources": [
+        "repo:read",
+        "repo:write",
+        "shell:test",
+        "web:read"
+      ],
+      "max_cost_per_run": 1.5,
+      "confidence_floor": 0.6,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_engineer_3",
+      "name": "engineer-3",
+      "initials": "E3",
+      "version": "v1.0",
+      "scope": "devops",
+      "declared_resources": [
+        "repo:read",
+        "repo:write",
+        "shell:infra",
+        "systemd:user"
+      ],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_engineer_4",
+      "name": "engineer-4",
+      "initials": "E4",
+      "version": "v1.0",
+      "scope": "general",
+      "declared_resources": [],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_librarian",
+      "name": "librarian",
+      "initials": "LI",
+      "version": "v1.0",
+      "scope": "corpus",
+      "declared_resources": [
+        "repo:read",
+        "corpus:read"
+      ],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.65,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_oracle",
+      "name": "oracle",
+      "initials": "OR",
+      "version": "v1.0",
+      "scope": "general",
+      "declared_resources": [],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_pm",
+      "name": "pm",
+      "initials": "PM",
+      "version": "v1.0",
+      "scope": "general",
+      "declared_resources": [],
+      "max_cost_per_run": 1.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "slicedlabs_researcher",
+      "name": "researcher",
+      "initials": "RE",
+      "version": "v1.0",
+      "scope": "research",
+      "declared_resources": [
+        "web:read",
+        "memory:read"
+      ],
+      "max_cost_per_run": 1.5,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    }
+  ]
+}

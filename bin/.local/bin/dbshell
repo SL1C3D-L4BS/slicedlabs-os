@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# dbshell — drop into the dev-stack database the engine uses. Connects to the
+# running container if up, else falls through to a shell with the connect hint.
+#   dbshell            → Postgres (dev-postgres)
+#   dbshell ch         → ClickHouse (dev-clickhouse)
+#   dbshell valkey     → Valkey / redis (dev-valkey)
+#   dbshell sqlite [f] → sqlite3 (in-memory or file)
+# Part of the `coding` dev-cockpit `data` tab (zellij layout `coding`).
+set -euo pipefail
+
+up() { podman ps --format '{{.Names}}' 2>/dev/null | grep -qx "$1"; }
+
+case "${1:-pg}" in
+    pg|postgres)   up dev-postgres   && exec podman exec -it dev-postgres   psql -U postgres ;;
+    ch|clickhouse) up dev-clickhouse && exec podman exec -it dev-clickhouse clickhouse-client ;;
+    valkey|redis)  up dev-valkey     && exec podman exec -it dev-valkey     valkey-cli ;;
+    sqlite)        exec sqlite3 "${2:-:memory:}" ;;
+esac
+
+echo "dbshell: target not running — start the data tier with \`dev-stack-up\` (or"
+echo "the coding scene starts dev-stack-data). Connect hints:"
+echo "  postgres   : podman exec -it dev-postgres psql -U postgres"
+echo "  clickhouse : podman exec -it dev-clickhouse clickhouse-client"
+echo "  valkey     : podman exec -it dev-valkey valkey-cli"
+exec "${SHELL:-bash}"
