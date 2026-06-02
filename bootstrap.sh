@@ -357,10 +357,11 @@ layer_D_observability() {
 }
 
 # --------------------------------------------------------------------------- #
-# LAYER S · System hardening — boot contract + firewall (reversible drop-ins)  #
+# LAYER S · System hardening — scheduler·OOM·indexer·network·firewall + boot   #
+# contract (reversible drop-ins, all tracked under system/etc/)                #
 # --------------------------------------------------------------------------- #
 layer_S_system_hardening() {
-  log "Layer S — system hardening (boot contract + firewall)"
+  log "Layer S — system hardening (scheduler · OOM · indexer · network · firewall · boot contract)"
 
   # Boot perf: cap the network-online wait (--any --timeout=5) + soften vector's
   # hard net dep, so neither sits on the boot critical-chain (was a ~10.6s DHCP
@@ -377,6 +378,46 @@ layer_S_system_hardening() {
   run sudo nft -c -f /etc/nftables.conf
   run sudo systemctl daemon-reload
   run sudo systemctl enable --now nftables.service
+
+  # --- Scheduler: scx_lavd, config-driven via /etc/default/scx (SSOT). Replaced
+  # scx_rusty, which crash-looped on this linux-cachyos-bore kernel (10-14s
+  # "runnable task stall" freezes + libbpf version skew). Fallback to in-kernel
+  # BORE: `sudo systemctl disable --now scx.service`.
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/default/scx" /etc/default/scx
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/system/scx.service" /etc/systemd/system/scx.service
+
+  # --- networkd: ethernet RequiredFamilyForOnline=ipv4 (don't block boot waiting
+  # on IPv6 to settle) + the 10-fast.conf cap raised to 20s. The old 5s cap was
+  # shorter than the ~10.6s DHCP, so wait-online FAILED every boot and marked the
+  # system `degraded` (the orange [FAILED]). wlan/wwan are already =no.
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/network/20-ethernet.network" /etc/systemd/network/20-ethernet.network
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/network/20-wlan.network" /etc/systemd/network/20-wlan.network
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/network/20-wwan.network" /etc/systemd/network/20-wwan.network
+
+  # --- OOM resilience: systemd-oomd kills the hog under pressure BEFORE the
+  # kernel OOM-killer takes out the compositor (it had killed a ghostty cockpit).
+  # session.slice is marked ManagedOOMPreference=avoid (stowed via systemd-user).
+  # zram bumped 4G -> ~15G (zstd) + zram-tuned swappiness. Mirrors Fedora defaults.
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/oomd.conf.d/10-sliced.conf" /etc/systemd/oomd.conf.d/10-sliced.conf
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/system/-.slice.d/10-oomd.conf" /etc/systemd/system/-.slice.d/10-oomd.conf
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/system/user@.service.d/10-oomd.conf" /etc/systemd/system/user@.service.d/10-oomd.conf
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/systemd/zram-generator.conf" /etc/systemd/zram-generator.conf
+  run sudo install -D -m644 "$DOTFILES_ROOT/system/etc/sysctl.d/99-zram-swappiness.conf" /etc/sysctl.d/99-zram-swappiness.conf
+  run sudo systemctl enable systemd-oomd.service
+
+  # --- Indexer: disable GNOME localsearch/tracker recursive $HOME indexing (it
+  # pegged a core with throttle 0). Nautilus is KEPT — only the miner is off.
+  # gsettings empty the index scope + mask the miners; the Hidden XDG autostart
+  # override ships in the `autostart` stow package.
+  if command -v gsettings >/dev/null 2>&1; then
+    run gsettings set org.freedesktop.Tracker3.Miner.Files index-recursive-directories "[]" || true
+    run gsettings set org.freedesktop.Tracker3.Miner.Files index-single-directories "[]"   || true
+    run gsettings set org.freedesktop.Tracker3.Miner.Files enable-monitors false            || true
+  fi
+  run systemctl --user mask localsearch-3.service localsearch-control-3.service localsearch-writeback-3.service 2>/dev/null || true
+
+  run sudo systemctl daemon-reload
+  run systemctl --user daemon-reload
 
   # Boot contract: observability is on-demand (native `slicedlabs monitor` TUI +
   # `monitoring-backends` helper); printing + battery are absent on this workstation.
@@ -665,10 +706,55 @@ layer_R_context_engineering() {
   sub "Renders .claude/agents/*.md from prompts/roles/*.md on commit."
 }
 
+# --------------------------------------------------------------------------- #
+# LAYER V · virtualization (rootless libvirt/KVM — the coding command center)  #
+# --------------------------------------------------------------------------- #
+layer_V_virtualization() {
+  log "Layer V — Virtualization (rootless libvirt/KVM · OVMF/swtpm · virtiofs · SPICE)"
+  # qemu-base, edk2-ovmf, virtiofsd, passt are already on the box (baseline); add libvirt,
+  # the desktop managers, the software-TPM, and qemu's SPICE display modules.
+  pac libvirt virt-manager virt-viewer swtpm spice-gtk qemu-ui-spice-core qemu-ui-spice-app
+  # /dev/kvm is already world-usable (0666); add the group too for correctness.
+  run sudo usermod -aG kvm "$USER" || true
+  # ROOTLESS session libvirt: the per-user daemon (virtqemud) is auto-exec'd by the libvirt
+  # client on first connect — no system service at boot, no libvirt group, no relogin needed.
+  export LIBVIRT_DEFAULT_URI=qemu:///session   # also set for shells in fish conf.d/virt.fish
+  # Establish the baseline domains (idempotent; DEFINES only — never boots a guest here).
+  if command -v vm >/dev/null 2>&1; then
+    run vm ensure || warn "vm ensure deferred — re-run \`vm ensure\` after the install settles"
+  else
+    warn "vm not on PATH yet (stow bin/) — run \`vm ensure\` once it is"
+  fi
+  sub "Summon the VM console on coding with \`coding-vm\` / Mod+Ctrl+Shift+V. \`vm --help\` for all."
+}
+
+# --------------------------------------------------------------------------- #
+# LAYER W · atomic rollback + agent capability sandbox (spec P11)              #
+# --------------------------------------------------------------------------- #
+layer_W_atomic_sandbox() {
+  log "Layer W — Atomic rollback (snapper/snap-pac) + agent capability sandbox (P11)"
+  # ATOMIC: rootfs is btrfs with snapper configs (root + home). snap-pac adds the
+  # pre/post pacman hooks → every `pacman -S/-U/-R` is bracketed by a snapshot, so any
+  # system transaction is atomically rollback-able (snapper undochange / rollback).
+  pac snap-pac
+  sub "atomic: snap-pac brackets every pacman transaction with a btrfs snapshot"
+  # CAPABILITY SANDBOX: the sl-agents.slice cgroup (stowed systemd-user unit) caps
+  # autonomous-agent CPU/mem. Pick it up now; `slc-claude --as <role>` + `sl-sandbox` use it.
+  run systemctl --user daemon-reload
+  sub "sandbox: sl-agents.slice — autonomous agents CPU/mem-capped (sl-sandbox <cmd>)"
+  # SECURE BOOT (P10): sbctl signs the bootloader + UKIs with local keys. Signing is INERT
+  # while SB is off (boot unchanged); `secureboot setup` does it. Activating SB (enroll +
+  # a firmware toggle) is the operator's deliberate, brick-aware step — never automated.
+  pac sbctl
+  sub "secure-boot: \`secureboot setup\` signs bootloader+UKIs; enable knowingly (RUNBOOK-platform)"
+  # UKI boot (systemd-boot + mkinitcpio UKI presets) is already in place — verify only.
+  command -v verify-platform >/dev/null 2>&1 && run verify-platform || true
+}
+
 # =========================================================================== #
 # Dispatcher                                                                  #
 # =========================================================================== #
-LAYER_ORDER=(0 1 2 3 4 5 6 7 8 B C E D S F G I H J K L M N R O Q P)
+LAYER_ORDER=(0 1 2 3 4 5 6 7 8 B C E D S V W F G I H J K L M N R O Q P)
 
 resolve_layer() {
   # Map "B" → "layer_B_python_ecosystem" by scanning declared functions.

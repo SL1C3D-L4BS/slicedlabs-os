@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# verify-platform — P11 OS invariants: UKI boot, atomic rollback (btrfs+snapper+snap-pac),
+# and the agent capability sandbox (sl-agents.slice). Non-destructive. verify-all (opt).
+set -uo pipefail
+fail=0
+ok(){   printf '  \033[32m✓\033[0m %s\n' "$*"; }
+no(){   printf '  \033[31m✗\033[0m %s\n' "$*" >&2; fail=1; }
+warn(){ printf '  \033[33m!\033[0m %s\n' "$*"; }
+
+# --- UKI: Unified Kernel Image boot (mkinitcpio default_uki → systemd-boot auto-discovers) ---
+# The preset is the readable, declarative truth; the ESP (/boot) needs root to read, so the
+# built-image + bootloader confirmations are best-effort via NOPASSWD `sudo -n`.
+if grep -qsE '^[[:space:]]*default_uki=' /etc/mkinitcpio.d/*.preset; then
+    ok "UKI configured (mkinitcpio default_uki preset)"
+    n=$(sudo -n sh -c 'ls /boot/EFI/Linux/*.efi 2>/dev/null' | wc -l)
+    [ "${n:-0}" -gt 0 ] && ok "UKI images built ($n in /boot/EFI/Linux)" || warn "no UKI images yet (mkinitcpio -P)"
+else no "no UKI preset (default_uki) — system is on traditional vmlinuz+initramfs boot"; fi
+sudo -n bootctl is-installed >/dev/null 2>&1 && ok "systemd-boot installed" || warn "systemd-boot not confirmed (needs root)"
+
+# --- ATOMIC: btrfs + snapper + snap-pac pacman hooks ---
+[ "$(findmnt -no FSTYPE / 2>/dev/null)" = btrfs ] && ok "rootfs is btrfs" || no "rootfs not btrfs"
+{ snapper list-configs 2>/dev/null || sudo -n snapper list-configs 2>/dev/null; } | grep -qw root \
+    && ok "snapper 'root' config present" || warn "snapper 'root' config not readable (root-only?)"
+pacman -Qq snap-pac >/dev/null 2>&1 \
+    && ok "snap-pac installed (atomic pacman snapshots)" || no "snap-pac missing — bootstrap.sh --layer W"
+ls /usr/share/libalpm/hooks/*snap-pac* >/dev/null 2>&1 \
+    && ok "snap-pac pacman hooks active" || warn "snap-pac hooks not found"
+
+# --- CAPABILITY SANDBOX: the sl-agents.slice cgroup ---
+if systemctl --user cat sl-agents.slice >/dev/null 2>&1; then
+    ok "sl-agents.slice unit present"
+    systemctl --user cat sl-agents.slice 2>/dev/null | grep -qE 'CPUQuota|MemoryMax' \
+        && ok "sandbox caps defined (CPUQuota/MemoryMax)" || no "sl-agents.slice has no CPU/mem caps"
+else no "sl-agents.slice missing (stow systemd-user + daemon-reload)"; fi
+command -v sl-sandbox >/dev/null 2>&1 && ok "sl-sandbox helper on PATH" || no "sl-sandbox missing"
+
+# --- SECURE BOOT (P10): sbctl signing readiness. Enabling SB is the operator's firmware
+#     step, so SB being OFF is NOT a failure — we verify the host is SIGNED + ready. ---
+if command -v sbctl >/dev/null 2>&1; then
+    ok "sbctl installed"
+    command -v secureboot >/dev/null 2>&1 && ok "secureboot helper on PATH" || warn "secureboot helper missing"
+    if sudo -n sbctl status >/dev/null 2>&1; then
+        sb=$(sudo -n sbctl status 2>/dev/null)
+        echo "$sb" | grep -qiE 'Secure Boot:[[:space:]]*(✓|Enabled)' \
+            && ok "Secure Boot ENABLED" || warn "Secure Boot off (enroll + firmware toggle to activate)"
+        unsigned=$(sudo -n sh -c "sbctl verify 2>/dev/null | awk '/not signed/{c++} END{print c+0}'" 2>/dev/null)
+        [ "${unsigned:-0}" -eq 0 ] && ok "all known EFI binaries signed (sbctl verify)" \
+            || warn "$unsigned EFI binary(ies) unsigned (run: secureboot setup)"
+    else warn "sbctl status needs root (NOPASSWD) — skipped signing detail"; fi
+else warn "sbctl not installed (P10 secure-boot) — bootstrap.sh --layer W"; fi
+
+[ $fail -eq 0 ] && echo "platform: UKI + atomic + sandbox + secure-boot-ready intact ✓"
+exit $fail

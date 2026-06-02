@@ -1,6 +1,8 @@
 // [ENGINE] platform — DEFAULT zellij layout (zj no-arg / default_layout "default").
-// Every plain ghostty window opens here: your shell on the left, Claude Code attached
-// and ready on the right (Track 9.2). Opt out per-window with `zj bare` or SL_NO_CLAUDE=1.
+// Every plain ghostty window opens here: your shell on the left, the governed AI
+// companion (slc-claude) attached on the right — SUSPENDED, so it costs 0 tokens
+// until you press Enter (spec §11.1). Opt out per-window with `zj bare` / `gt` /
+// SL_NO_CLAUDE=1. The pane is a Warden subject: identity, cap, signed ledger entry.
 //
 // The bar is zjstatus — Liquid-Glass capsule pills generated from system/tokens.toml
 // ([powerline] caps · [color]/[semantic] hues). One pill atom, same as the Cockpit.
@@ -45,11 +47,15 @@ layout {
         children
     }
 
-    // shell (your work) on the left; Claude Code attached on the right.
+    // shell (your work) on the left; the governed AI companion on the right —
+    // start_suspended: loads attached but runs only on Enter (0 tokens until engaged).
     tab name="shell" focus=true {
         pane split_direction="vertical" {
             pane                                                       // shell — your work
-            pane size="{{terminal.claude_pane_pct}}%" command="claude" // Claude Code, attached & ready
+            pane size="{{terminal.claude_pane_pct}}%" command="slc-claude" {
+                start_suspended true   // attached + ready; runs on Enter → 0 tokens until you engage
+                name "claude"
+            }
         }
     }
 }

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# secureboot — host UEFI Secure Boot lifecycle via sbctl (spec P10). Signs the
+# systemd-boot bootloader + the UKIs with locally-generated keys so the SlicedLabs host
+# CAN boot under Secure Boot. SAFE while SB is OFF: signatures are simply ignored, so
+# `setup` never changes how the machine boots today. ENABLING SB is your deliberate,
+# brick-aware firmware step — `enroll` is guarded to refuse unless firmware is in Setup
+# Mode, and the actual toggle lives in your firmware (see docs/RUNBOOK-platform.md).
+#
+#   secureboot status        sbctl status + SB/Setup-Mode + signed-file list
+#   secureboot setup         create keys (once) + sign bootloader + every UKI (idempotent)
+#   secureboot sign          re-sign everything sbctl tracks (also runs on kernel updates)
+#   secureboot enroll        enroll keys INTO FIRMWARE — requires Setup Mode (guarded)
+set -euo pipefail
+command -v sbctl >/dev/null 2>&1 || { echo "secureboot: sbctl not installed — bootstrap.sh --layer W" >&2; exit 1; }
+
+case "${1:-status}" in
+  status)
+    sudo sbctl status || true
+    echo "── tracked files ──"; sudo sbctl list-files 2>/dev/null || true ;;
+  setup)
+    # 1) platform keys (idempotent — sbctl no-ops if they already exist)
+    sudo sbctl create-keys
+    # 2) sign EVERY EFI binary sbctl finds unsigned — the UKIs, systemd-boot, the fallback
+    #    BOOTX64.EFI, and the EFISTUB vmlinuz kernels. `-s` records each so the sbctl pacman
+    #    hook auto-resigns it on kernel/bootloader updates.
+    n=0
+    while read -r f; do
+      [ -n "$f" ] || continue
+      sudo sbctl sign -s "$f" && n=$((n + 1))
+    done < <(sudo sbctl verify 2>/dev/null | awk '/is not signed/{print $2}')
+    echo "secureboot: keys ready + $n newly-signed; $(sudo sbctl verify 2>/dev/null | grep -c 'is signed') total signed."
+    echo "            Secure Boot is still OFF — boot is unchanged. To ACTIVATE (knowingly):"
+    echo "            reboot → firmware → put SB in Setup Mode → 'secureboot enroll' → enable SB." ;;
+  sign)
+    sudo sbctl sign-all ;;
+  enroll)
+    if sudo sbctl status 2>/dev/null | grep -qiE 'Setup Mode:[[:space:]]*(Enabled|✓)'; then
+      sudo sbctl enroll-keys --microsoft
+      echo "secureboot: keys enrolled. Now ENABLE Secure Boot in firmware + reboot. (Microsoft"
+      echo "            keys included so signed option-ROMs/Windows still boot.)"
+    else
+      echo "secureboot: firmware is NOT in Setup Mode — refusing to enroll (brick-safe)." >&2
+      echo "  Reboot into firmware, clear Secure Boot keys / enter Setup Mode, then re-run." >&2
+      exit 1
+    fi ;;
+  -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+  *) echo "usage: secureboot {status|setup|sign|enroll}" >&2; exit 2 ;;
+esac

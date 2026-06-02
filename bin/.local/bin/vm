@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# vm — libvirt/KVM control for the coding command center (rootless qemu:///session).
+#
+# Establishes + drives the workstation VMs: the SlicedLabs ISO dogfood target, a
+# persistent Arch sandbox (virtiofs-shares ~/Projects), and ad-hoc cross-platform
+# guests. All KVM-accelerated, UEFI (OVMF) + swtpm TPM2, SPICE + virtio-gpu console
+# via virt-viewer. ROOTLESS by design: qemu:///session needs no libvirt group, no
+# relogin, no root — images live under ~/.local/share/libvirt, the daemon is a
+# socket-activated --user unit. Switch to system libvirt anytime with
+# LIBVIRT_DEFAULT_URI=qemu:///system.
+#
+#   vm ensure              define the baseline domains if missing (idempotent; no boot)
+#   vm list                domains + nets (status)
+#   vm iso                 boot + console the SlicedLabs ISO (dogfood the OS)
+#   vm sandbox             boot + console the persistent Arch sandbox
+#   vm boot <domain>       start (if needed) + open the graphical console
+#   vm start|stop <domain> power control (stop = graceful shutdown)
+#   vm console <domain>    open virt-viewer (SPICE) for a running domain
+#   vm create <name> <iso> [disk_gb]   define a new guest from an install ISO
+#   vm snapshot <domain> [name]        snapshot a domain's disk(s)
+#   vm edit <domain>       virsh edit (raw XML)
+set -euo pipefail
+
+export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///session}"
+
+POOL_DIR="${VM_POOL_DIR:-$HOME/.local/share/libvirt/images}"
+ISO_DIR="${VM_ISO_DIR:-$HOME/.dotfiles/iso/out}"
+
+die() { printf 'vm: %s\n' "$*" >&2; exit 1; }
+command -v virsh >/dev/null 2>&1 || die "libvirt not installed — run: bootstrap.sh --layer V"
+
+_latest_iso() { ls -1t "$ISO_DIR"/slicedlabs-os-*.iso 2>/dev/null | head -1; }
+_have()       { virsh dominfo "$1" >/dev/null 2>&1; }
+_running()    { [ "$(virsh domstate "$1" 2>/dev/null)" = "running" ]; }
+
+# Common virt-install flags: KVM host-passthrough CPU, UEFI via the NON-secure-boot OVMF
+# (the SlicedLabs ISO isn't signed yet — secure-boot is deferred P10; the .secboot firmware
+# would refuse the unsigned bootloader), emulated TPM2, usermode net (passt — rootless
+# outbound NAT), SPICE + virtio-gpu, boot menu on.
+_OVMF_CODE="/usr/share/edk2/x64/OVMF_CODE.4m.fd"
+_OVMF_VARS="/usr/share/edk2/x64/OVMF_VARS.4m.fd"
+_VI_COMMON=(--cpu host-passthrough
+            --boot "loader=${_OVMF_CODE},loader.readonly=yes,loader.type=pflash,nvram.template=${_OVMF_VARS},bootmenu.enable=yes"
+            --tpm backend.type=emulator,model=tpm-crb,version=2.0
+            --network user,model=virtio --graphics spice --video virtio --sound none --noautoconsole)
+            # --sound none: qemu 11.0.1 SIGSEGVs initializing the SPICE audio backend
+            # (audio_init_audiodevs); these dev/test guests need no audio anyway.
+
+# virt-install runs under SYSTEM python: mise's python3 lacks PyGObject (`gi`) — the
+# classic mise PATH-shadow. virsh + virt-viewer are C binaries, so domain START + console
+# are unaffected; only definition needs this. (See memory: slicedlabs-cli-install.)
+_vi() { /usr/bin/python3 /usr/bin/virt-install "$@"; }
+
+# Define a domain WITHOUT booting it (print-xml → virsh define) — OOM-safe: nothing
+# spins up at `ensure` time; guests boot only when you summon them. Disk+cdrom installs
+# make virt-install print SEVERAL domain docs (install phase, then final); take only the
+# first <domain>…</domain> so virsh defines a single bootable guest.
+_define() {
+  local xml; xml="$(_vi "$@" --print-xml)" || return 1
+  # Force the 'none' audio backend: qemu 11.0.1 SIGSEGVs initializing the SPICE audio
+  # backend. libvirt INJECTS a default <audio type='spice'/> for spice graphics unless one
+  # is already present — so inject an explicit type='none' after <devices> (these guests
+  # need no audio). Pre-empts the default; survives define PostParse.
+  printf '%s\n' "$xml" \
+    | awk '/<domain[ >]/{f=1} f{print} /<\/domain>/{exit}' \
+    | sed 's#<devices>#&\n    <audio id="1" type="none"/>#' \
+    | virsh define /dev/stdin >/dev/null
+}
+
+ensure_iso_domain() {
+  _have slicedlabs-iso && return 0
+  local iso; iso="$(_latest_iso)" || true
+  [ -n "${iso:-}" ] || { echo "vm: no ISO in $ISO_DIR (build with iso/build.sh) — skipping iso domain"; return 0; }
+  _define --name slicedlabs-iso --osinfo archlinux --memory 4096 --vcpus 2 \
+    "${_VI_COMMON[@]}" --disk none --cdrom "$iso" --livecd
+  echo "vm: defined slicedlabs-iso → $(basename "$iso")"
+}
+
+ensure_sandbox_domain() {
+  _have arch-sandbox && return 0
+  mkdir -p "$POOL_DIR"
+  local disk="$POOL_DIR/arch-sandbox.qcow2"
+  [ -f "$disk" ] || qemu-img create -f qcow2 "$disk" 40G >/dev/null
+  local iso; iso="$(_latest_iso)" || true
+  # Persistent Arch sandbox: virtio disk + a virtiofs share of ~/Projects (needs shared
+  # memory backing). Boots the SlicedLabs ISO first time so you can install into it.
+  _define --name arch-sandbox --osinfo archlinux --memory 8192 --vcpus 4 \
+    "${_VI_COMMON[@]}" \
+    --disk path="$disk",format=qcow2,bus=virtio \
+    --filesystem "$HOME/Projects",projects,driver.type=virtiofs \
+    --memorybacking access.mode=shared,source.type=memfd \
+    ${iso:+--cdrom "$iso"}
+  echo "vm: defined arch-sandbox (40G qcow2 + virtiofs ~/Projects)"
+}
+
+console() {
+  local d="$1"
+  setsid -f virt-viewer --attach --wait --reconnect "$d" >/dev/null 2>&1
+  echo "vm: console → $d (virt-viewer)"
+}
+
+boot() {
+  local d="$1"; _have "$d" || die "no such domain: $d (try: vm ensure)"
+  _running "$d" || { virsh start "$d" >/dev/null && echo "vm: started $d"; }
+  console "$d"
+}
+
+case "${1:-list}" in
+  ensure)  ensure_iso_domain; ensure_sandbox_domain
+           virsh net-info default >/dev/null 2>&1 || true ;;
+  list|ls) echo "# domains (qemu:///session)"; virsh list --all;
+           echo; echo "# networks"; virsh net-list --all 2>/dev/null || true ;;
+  iso)     ensure_iso_domain;     boot slicedlabs-iso ;;
+  sandbox) ensure_sandbox_domain; boot arch-sandbox ;;
+  boot)    [ $# -ge 2 ] || die "usage: vm boot <domain>"; boot "$2" ;;
+  start)   [ $# -ge 2 ] || die "usage: vm start <domain>"; virsh start "$2" ;;
+  stop)    [ $# -ge 2 ] || die "usage: vm stop <domain>";  virsh shutdown "$2" ;;
+  console) [ $# -ge 2 ] || die "usage: vm console <domain>"; console "$2" ;;
+  create)  [ $# -ge 3 ] || die "usage: vm create <name> <install.iso> [disk_gb]"
+           name="$2"; iso="$3"; gb="${4:-30}"
+           _have "$name" && die "domain $name already exists"
+           mkdir -p "$POOL_DIR"; disk="$POOL_DIR/$name.qcow2"
+           [ -f "$disk" ] || qemu-img create -f qcow2 "$disk" "${gb}G" >/dev/null
+           _define --name "$name" --osinfo detect=on,name=generic --memory 4096 --vcpus 2 \
+             "${_VI_COMMON[@]}" --disk path="$disk",format=qcow2,bus=virtio \
+             --cdrom "$iso"
+           echo "vm: defined $name (${gb}G) — boot it with: vm boot $name" ;;
+  snapshot) [ $# -ge 2 ] || die "usage: vm snapshot <domain> [name]"
+           virsh snapshot-create-as --domain "$2" ${3:+--name "$3"} --disk-only --atomic
+           echo "vm: snapshot of $2 created" ;;
+  edit)    [ $# -ge 2 ] || die "usage: vm edit <domain>"; virsh edit "$2" ;;
+  gui)     setsid -f /usr/bin/python3 /usr/bin/virt-manager -c "$LIBVIRT_DEFAULT_URI" >/dev/null 2>&1
+           echo "vm: virt-manager (GUI · $LIBVIRT_DEFAULT_URI)" ;;
+  -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+  *)       die "unknown subcommand: $1 (try: vm --help)" ;;
+esac

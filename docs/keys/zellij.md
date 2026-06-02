@@ -23,4 +23,5 @@
 | `Alt+j / Alt+k` | Focus pane down / up |
 | `Alt+f` | Toggle floating panes |
 | `Alt+= / Alt+-` | Resize pane grow / shrink |
+| `Alt+] / Alt+[` | Next / previous swap layout (dominant ↔ even ↔ stacked) — cockpit §14 |
 

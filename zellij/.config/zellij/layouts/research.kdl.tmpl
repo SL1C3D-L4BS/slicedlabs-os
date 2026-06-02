@@ -61,8 +61,8 @@ layout {
     }
     tab name="architect" {
         pane split_direction="vertical" {
-            pane size="60%" command="claude"
-            pane size="40%" command="slicedlabs"
+            pane size="60%" command="slc-claude" { start_suspended true; }
+            pane size="40%" command="slicedlabs" { start_suspended true; }
         }
     }
     tab name="design" {
@@ -75,7 +75,7 @@ layout {
     }
     tab name="audit" {
         pane split_direction="vertical" {
-            pane command="lazygit"
+            pane command="lazygit" { start_suspended true; }
             pane                                              // git log · delta · rg · semgrep · ruff
         }
     }

@@ -1,16 +1,20 @@
-// GENERAL coding dev-cockpit (zj coding) — col1 of the 3-column coding desktop (the docs
-// Firefox + the `agent` side-column are separate niri windows). A complete full-stack dev
-// environment for ANY project idea, with GitHub + monitoring built in. Launched by the
-// `coding` scene (ghostty -e zj coding, cwd ~/Projects). zjstatus pill bar from tokens.toml.
+// GENERAL coding CODE cockpit (zj coding) — the editor column of the coding command
+// center. The AI team (claude │ slicedlabs) is its OWN full window now (`zj agent`),
+// and the docs Firefox is a half-width column — so THIS cockpit is pure dev: an elite,
+// editor-dominant, logically-organized surface. Launched by the `coding` scene
+// (ghostty -e zj coding, cwd ~/Projects). zjstatus pill bar from tokens.toml.
 //
-// Tabs:
-//   code    — nvim (primary) │ run/REPL + test-watch shells (AI lives in the side column)
-//   run     — build/run/test (any stack) │ lazygit │ gh-dash         ← GitHub
-//   debug   — runtime/debugger console │ logs tail + scratch
-//   data    — dbshell (dev-postgres) │ sqlite3 (scratch)
-//   obs     — lazydocker (dev-stack containers) │ btop (host)         ← monitoring
-//   mac     — ssh into the LAN MacBook Air build/test/sign node
-//   scratch — two free shells for notes / quick commands
+// Design (spec §14 — the "elite" layout): ONE dominant editor; an anchored utility row
+// of heavy TUIs that load `start_suspended` (0 CPU/tokens until you press Enter); a tight,
+// LOGICAL tab set — no arbitrary pane sprawl. Cycle pane arrangements with Alt+]/Alt+[
+// (the swap_tiled_layout block below); float a scratch shell anytime with Alt+f.
+//
+// Tabs (logical, not sprawling):
+//   code  — nvim, full pane. The editor IS the workspace.
+//   run   — build/run/test │ REPL/watch (any stack)
+//   git   — lazygit │ gh-dash            (suspended)   ← GitHub
+//   debug — runtime/debugger console │ logs tail
+//   data  — dbshell (dev-postgres) │ sqlite3 (suspended)
 layout {
     default_tab_template {
         pane size=1 borderless=true {
@@ -49,53 +53,65 @@ layout {
         children
     }
 
-    // col1 of the coding desktop — editor-centric; persistent AI is the `agent` side-column.
+    // code — the dominant editor. nvim fills the column; the run/REPL shells live one
+    // tab over (Alt+2). The editor IS the workspace.
     tab name="code" focus=true {
-        pane split_direction="vertical" {
-            pane size="65%" command="nvim"
-            pane size="35%" split_direction="horizontal" {
-                pane                               // run / REPL
-                pane                               // test-watch
-            }
-        }
+        pane command="nvim"
     }
+    // run — build / run / test (any stack) │ a REPL or test-watch shell.
     tab name="run" {
         pane split_direction="vertical" {
-            pane                                   // build / run / test (any stack)
-            pane command="lazygit"
-            pane command="gh-dash"                 // GitHub
+            pane                                   // build / run / test
+            pane                                   // REPL / watch
         }
     }
+    // git — lazygit + the gh PR/issue dashboard. Both suspended (wake on Enter).
+    tab name="git" {
+        pane split_direction="vertical" {
+            pane command="lazygit" { start_suspended true; }
+            pane command="gh-dash" { start_suspended true; }   // GitHub
+        }
+    }
+    // debug — runtime/debugger console │ logs tail.
     tab name="debug" {
         pane split_direction="vertical" {
             pane                                   // runtime / debugger console
-            pane split_direction="horizontal" {
-                pane                               // logs tail
-                pane                               // scratch
+            pane                                   // logs tail
+        }
+    }
+    // data — dev-postgres shell │ a scratch sqlite. Both suspended.
+    tab name="data" {
+        pane split_direction="vertical" {
+            pane command="dbshell" { start_suspended true; }
+            pane command="sqlite3" { start_suspended true; }
+        }
+    }
+
+    // Alt+] / Alt+[ cycle the focused tab's panes through these arrangements (spec §14
+    // "swap layouts"): dominant (big left + rest) ↔ even split ↔ stacked. Modeled on
+    // zellij's built-in default swap layouts. The base `code` tab is a single editor pane.
+    swap_tiled_layout name="dominant" {
+        tab {
+            pane split_direction="vertical" {
+                pane size="62%"
+                pane { children; }
             }
         }
     }
-    tab name="data" {
-        pane split_direction="vertical" {
-            pane command="dbshell"
-            pane command="sqlite3"
+    swap_tiled_layout name="even" {
+        tab {
+            pane split_direction="vertical" {
+                pane
+                pane { children; }
+            }
         }
     }
-    tab name="obs" {
-        pane split_direction="vertical" {
-            pane command="lazydocker"
-            pane command="btop"
-        }
-    }
-    tab name="mac" {
-        pane command="ssh" {
-            args "mac"
-        }
-    }
-    tab name="scratch" {
-        pane split_direction="vertical" {
-            pane
-            pane
+    swap_tiled_layout name="stacked" {
+        tab {
+            pane split_direction="vertical" {
+                pane
+                pane stacked=true { children; }
+            }
         }
     }
 }

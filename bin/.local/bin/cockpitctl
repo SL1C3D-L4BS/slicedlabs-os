@@ -16,6 +16,19 @@ case "$cmd" in
         exec qs -c cockpit ipc call cockpit close ;;
     control)
         exec qs -c cockpit ipc call cockpit control ;;
+    media)
+        # Actionable MPRIS transport for the media HUD (P9) — drives whatever is playing
+        # (spotify_player/mpd/browser) via playerctl. The cockpit pill reflects it live.
+        command -v playerctl >/dev/null 2>&1 || { echo "cockpitctl media: playerctl not installed" >&2; exit 1; }
+        case "${arg:-toggle}" in
+            toggle|play-pause) exec playerctl play-pause ;;
+            play)  exec playerctl play ;;
+            pause) exec playerctl pause ;;
+            next)  exec playerctl next ;;
+            prev|previous) exec playerctl previous ;;
+            stop)  exec playerctl stop ;;
+            *) echo "cockpitctl media <toggle|play|pause|next|prev|stop>" >&2; exit 2 ;;
+        esac ;;
     theme)
         f="${XDG_CACHE_HOME:-$HOME/.cache}/cockpit-theme"
         cur=$(cat "$f" 2>/dev/null || echo dark)
@@ -28,6 +41,6 @@ case "$cmd" in
         printf %s "$new" > "${XDG_CACHE_HOME:-$HOME/.cache}/waybar-theme" 2>/dev/null || true
         exec render-quickshell --variant="$new" ;;
     *)
-        echo "usage: cockpitctl {modal <name>|open <name>|close|control|theme [toggle|dark|light]}" >&2
+        echo "usage: cockpitctl {modal <name>|open <name>|close|control|media <transport>|theme [toggle|dark|light]}" >&2
         exit 2 ;;
 esac

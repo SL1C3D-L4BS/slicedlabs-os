@@ -1,0 +1,27 @@
+[Match]
+Type=ether
+# Exclude virtual Ethernet interfaces
+Kind=!*
+
+[Link]
+RequiredForOnline=routable
+# Call the link "online" once IPv4 is routable — do NOT block boot waiting for
+# IPv6 RA/DAD to settle. This is the SlicedLabs fix for the degraded boot:
+# enp0s31f6 DHCP took ~10.6s while wait-online was capped at 5s, so the unit
+# failed and marked the whole system `degraded` (the orange [FAILED] at boot).
+RequiredFamilyForOnline=ipv4
+
+[Network]
+DHCP=yes
+MulticastDNS=yes
+
+# systemd-networkd does not set per-interface-type default route metrics
+# https://github.com/systemd/systemd/issues/17698
+# Explicitly set route metric, so that Ethernet is preferred over Wi-Fi and Wi-Fi is preferred over mobile broadband.
+# Use values from NetworkManager. From nm_device_get_route_metric_default in
+# https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/blob/main/src/core/devices/nm-device.c
+[DHCPv4]
+RouteMetric=100
+
+[IPv6AcceptRA]
+RouteMetric=100

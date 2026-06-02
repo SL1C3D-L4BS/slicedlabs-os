@@ -83,19 +83,38 @@ reconcile_pass() {
     done
 }
 
-# === Eager boot choreography ===================================================
-# The vision: the moment niri launches, the stacks FIRE — the coding cockpit, the
-# browser, and the research space — rather than waiting for first focus. Wait until
-# niri has created the named workspaces, then stage each auto scene NOW, staggered
-# (sleep 2) so we don't thunder-herd the 4c/8t CPU at login. Placement uses
-# --focus false, so nothing steals the workspace you land on. Idempotent via the
-# realize_once guard; the focus watcher below is the fallback for the rest.
+# === Staggered boot choreography (Track B P3) ==================================
+# The moment niri launches, the working stacks FIRE — coding, research, browser —
+# rather than waiting for first focus. But staging is SEQUENTIAL and LOAD-GUARDED:
+# after each scene we wait until the 1-min load average settles below SL_STAGGER_LOAD
+# (or SL_STAGGER_MAX seconds elapse) before staging the next, so a heavy cockpit never
+# piles onto an already-saturated 4c/8t CPU. This + the cockpits' now-`start_suspended`
+# panes + A4's oomd/zram is what makes re-enabled autostart safe (the 2026-06-01 login
+# storm was eager panes × simultaneous staging). Placement uses --focus false, so
+# nothing steals the workspace you land on; idempotent via realize_once; the focus
+# watcher below is the fallback for the rest.
+SL_STAGGER_LOAD="${SL_STAGGER_LOAD:-6.0}"   # 1-min load ceiling (4c/8t → ~0.75×threads)
+SL_STAGGER_MAX="${SL_STAGGER_MAX:-15}"      # hard cap (s) so a stuck scene never blocks the rest
+stagger_settle() {
+    local waited=0 load
+    sleep 2   # minimum breathing room for the spawn to register
+    while load=$(awk '{print $1}' /proc/loadavg); awk -v l="$load" -v t="$SL_STAGGER_LOAD" 'BEGIN{exit !(l>t)}'; do
+        (( waited >= SL_STAGGER_MAX )) && { scene_log "launcher: stagger cap ${SL_STAGGER_MAX}s hit (load ${load} > ${SL_STAGGER_LOAD}), proceeding"; break; }
+        sleep 1; waited=$((waited+1))
+    done
+}
 (
     for _ in $(seq 1 40); do [[ -n "$(_ws_id "${AUTO[0]}")" ]] && break; sleep 0.25; done
-    for ws in "${AUTO[@]}"; do realize_once "$ws"; sleep 2; done
-    # Two bounded self-heal passes — re-realize anything that lost a race or mapped slow.
-    sleep 5; reconcile_pass
-    sleep 5; reconcile_pass
+    for ws in "${AUTO[@]}"; do realize_once "$ws"; stagger_settle; done
+    # Adaptive self-heal: converge instead of two blind `sleep 5` passes — re-check every
+    # 3s and re-realize only genuine gaps, stopping as soon as every declared window is
+    # mapped (cap ~24s). cockpit-selfheal is a further backstop after login settles.
+    for _ in $(seq 1 8); do
+        sleep 3
+        miss=0; for ws in "${AUTO[@]}"; do ws_missing_any "$ws" && miss=1; done
+        [[ "$miss" -eq 0 ]] && break
+        reconcile_pass
+    done
 ) &
 eager_pid=$!
 

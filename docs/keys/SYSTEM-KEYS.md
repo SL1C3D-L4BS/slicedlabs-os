@@ -114,6 +114,7 @@ Every keybind, every tool. Open the live searchable console with `Mod+Alt+K`. Ge
 | `Mod+Ctrl+M` | Stage scene: monitoring |
 | `Mod+Ctrl+S` | Stage scene: streaming |
 | `Mod+Ctrl+Shift+G` | Stage scene: gaming |
+| `Mod+Ctrl+Shift+V` | Summon the VM console onto coding (libvirt/KVM) |
 
 ### HUD
 
@@ -162,6 +163,9 @@ Every keybind, every tool. Open the live searchable console with `Mod+Alt+K`. Ge
 | `XF86AudioLowerVolume` | Volume down |
 | `XF86AudioMute` | Mute output |
 | `XF86AudioMicMute` | Mute microphone |
+| `XF86AudioPlay` | Play / pause (MPRIS — whatever is playing) |
+| `XF86AudioNext` | Next track (MPRIS) |
+| `XF86AudioPrev` | Previous track (MPRIS) |
 
 ### Gaming
 
@@ -224,6 +228,7 @@ Every keybind, every tool. Open the live searchable console with `Mod+Alt+K`. Ge
 | `Alt+j / Alt+k` | Focus pane down / up |
 | `Alt+f` | Toggle floating panes |
 | `Alt+= / Alt+-` | Resize pane grow / shrink |
+| `Alt+] / Alt+[` | Next / previous swap layout (dominant ↔ even ↔ stacked) — cockpit §14 |
 
 ## nvim
 
@@ -336,4 +341,8 @@ Every keybind, every tool. Open the live searchable console with `Mod+Alt+K`. Ge
 |---|---|
 | `sl` | Open the SlicedLabs TUI inline (= slicedlabs) |
 | `cb` | cargo build + write Waybar build status |
+| `slc` | Focus a workspace + realize its cockpit (slc <ws> · slc os doctor) |
+| `gt` | Plain terminal — a ghostty window with NO AI pane (zj bare) |
+| `vm` | Libvirt/KVM control: vm iso · vm sandbox · vm list · vm create |
+| `coding-vm` | Summon the VM console onto the coding workspace |
 

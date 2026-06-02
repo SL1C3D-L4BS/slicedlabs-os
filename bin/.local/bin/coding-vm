@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# coding-vm — summon the VM console onto the coding workspace (the 3rd cockpit of the
+# 2026 command center). Focuses coding, then boots + consoles a domain. The niri rule
+# for virt-viewer places its window on coding as a full column. The VM is NEVER booted
+# at login (OOM-safe) — this is the one-key on-demand summon (Mod+Ctrl+Shift+V).
+#
+#   coding-vm            → the persistent Arch sandbox (default)
+#   coding-vm iso        → dogfood the SlicedLabs ISO
+#   coding-vm <domain>   → any defined domain
+set -euo pipefail
+target="${1:-sandbox}"
+niri msg action focus-workspace coding >/dev/null 2>&1 || true
+case "$target" in
+  iso|sandbox) exec vm "$target" ;;
+  *)           exec vm boot "$target" ;;
+esac

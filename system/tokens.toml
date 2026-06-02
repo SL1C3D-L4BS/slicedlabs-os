@@ -426,6 +426,20 @@ focal_specular_speed     = 0.6
 focal_chromatic_px       = 1.4
 focal_ambient_bleed      = 0.14
 
+# Per-cockpit glass quality (spec §14 tiers) — frame-time protection. The opaque /
+# perf-sensitive workspaces drop to a cheaper shader path; the glass workspaces keep
+# the full Liquid-Glass material. Read by Glass.qml via Theme.glassQualityFor(Niri.focused);
+# unlisted workspaces fall back to [glass].quality above. (off | low | medium | high)
+[glass.per_workspace]
+coding     = "medium"
+research   = "medium"
+engine     = "low"      # Kanso build/run/profile — protect frame-time
+browser    = "medium"
+monitoring = "medium"
+streaming  = "low"      # capture path — keep the GPU for the encoder
+gaming     = "low"      # opaque, low
+media      = "low"      # opaque video
+
 [glass_light]
 ambient_bleed = 0.12
 rim_opacity   = 0.25

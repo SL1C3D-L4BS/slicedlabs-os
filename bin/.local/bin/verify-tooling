@@ -53,8 +53,12 @@ grep -lq 'location="zjstatus"' zellij/.config/zellij/layouts/*.kdl.tmpl 2>/dev/n
     && ok "zjstatus.wasm present" || no "zjstatus.wasm missing (bootstrap fetches it)"
 { [[ -f "$HOME/.cache/zellij/permissions.kdl" ]] && grep -qF 'zjstatus.wasm' "$HOME/.cache/zellij/permissions.kdl"; } \
     && ok "zjstatus permission granted (pill bar renders)" || no "zjstatus permission ungranted (run 'zj grant')"
-grep -q 'command="claude"' zellij/.config/zellij/layouts/default.kdl.tmpl \
-    && ok "default layout attaches Claude Code" || no "default layout missing Claude pane"
+# Track B P2: the default pane is the GOVERNED companion (slc-claude), SUSPENDED —
+# attached on every terminal but 0 tokens until Enter (spec §11.1; 4-core doctrine).
+{ grep -q 'command="slc-claude"' zellij/.config/zellij/layouts/default.kdl.tmpl \
+    && grep -q 'start_suspended true' zellij/.config/zellij/layouts/default.kdl.tmpl; } \
+    && ok "default layout attaches the governed AI companion (slc-claude), suspended" \
+    || no "default layout missing the suspended slc-claude pane"
 
 # 3c) new CLI render targets rendered + wired
 for t in lazygit/.config/lazygit/config.yml gh-dash/.config/gh-dash/config.yml \

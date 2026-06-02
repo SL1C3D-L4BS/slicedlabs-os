@@ -1,0 +1,13 @@
+# SlicedLabs OS — sched_ext scheduler selection (SSOT; Track A / layer_S).
+#
+# scx_lavd = Latency-Aware Virtual Deadline scheduler. Tuned for desktop +
+# gaming interactivity on the i7-6700 (4c/8t Skylake). It REPLACED scx_rusty,
+# which crash-looped on this box: "runnable task stall" of 10-14s (whole-system
+# freezes), libbpf "sub_attach not found" version mismatch against the running
+# linux-cachyos-bore kernel, and ops.init_task() -12 under memory pressure.
+#
+# To swap schedulers: edit SCX_SCHEDULER below, then `sudo systemctl restart scx`.
+# Available: scx_lavd scx_bpfland scx_flash scx_rustland scx_rusty scx_layered …
+# Fallback to in-kernel BORE: `sudo systemctl disable --now scx.service`.
+SCX_SCHEDULER=scx_lavd
+SCX_FLAGS=

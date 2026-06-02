@@ -171,6 +171,21 @@ Singleton {
     readonly property real glassFocalChromaticPx: 1.4
     readonly property real glassFocalAmbientBleed: 0.14
 
+    // ---- per-workspace glass quality ([glass.per_workspace]) ----
+    function glassQualityFor(ws) {
+        switch (ws) {
+        case "coding": return "medium";
+        case "research": return "medium";
+        case "engine": return "low";
+        case "browser": return "medium";
+        case "monitoring": return "medium";
+        case "streaming": return "low";
+        case "gaming": return "low";
+        case "media": return "low";
+        default: return glassQuality;
+        }
+    }
+
     // ---- semantic role tier ([semantic]) — bind to ROLES, not hues ----
     readonly property color semBgPrimary: "#1E1E1E"
     readonly property color semBgSecondary: "#2B2B2B"

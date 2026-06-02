@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "summary": {
-    "clean": 13,
+    "clean": 14,
     "probation": 0,
     "suspended": 0,
     "benched": 0,
     "retired": 0,
-    "total": 13
+    "total": 14
   },
   "rules": {
     "scope_boundary": "red",
@@ -19,7 +19,8 @@
   "penalty_box": {
     "probation_runs": 3,
     "auto_retire_on_eval_fail": true,
-    "escalation": "retire"
+    "escalation": "retire",
+    "retry_loop_threshold": 3
   },
   "agents": [
     {
@@ -48,6 +49,26 @@
         "memory:read"
       ],
       "max_cost_per_run": 2.0,
+      "confidence_floor": 0.55,
+      "status": "clean",
+      "severity": null,
+      "reason": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "claude",
+      "name": "claude",
+      "initials": "CL",
+      "version": "v1.0",
+      "scope": "interactive",
+      "declared_resources": [
+        "repo:read",
+        "repo:write",
+        "web:read",
+        "shell:exec",
+        "memory:read"
+      ],
+      "max_cost_per_run": 10.0,
       "confidence_floor": 0.55,
       "status": "clean",
       "severity": null,

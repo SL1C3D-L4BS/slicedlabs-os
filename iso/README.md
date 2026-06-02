@@ -38,7 +38,13 @@ qemu-system-x86_64 -enable-kvm -m 4G -smp 4 -cdrom out/*.iso
 
 ## Still to wire (handed off — needs the build host)
 
-- A first `mkarchiso` run to confirm the profile builds, then a VM boot test.
+- ~~A first `mkarchiso` run to confirm the profile builds, then a VM boot test.~~
+  **Done** — the ISO is built (`out/slicedlabs-os-2026.06.01-x86_64.iso`) and **boots
+  in the libvirt/KVM VM** under OVMF (UEFI): `vm iso` / `coding-vm iso` (see
+  `docs/RUNBOOK-vm.md`). The `slicedlabs-iso` domain is the standing dogfood target.
 - Optional: a `systemd-boot` splash + the Plymouth `slicedlabs-plymouth boot` step baked in.
 - A flagship `README.md` + `docs/SYSTEM-MAP.md` + a Nix/home-manager module for the
   declarative install path (DMS-style).
+- **Secure boot (P10 tail):** sign the bootloader/kernel + enroll keys, then point the VM
+  at `OVMF_CODE.secboot.4m.fd` (the `vm` script defaults to the non-secure OVMF today so
+  the unsigned ISO boots).

@@ -78,4 +78,7 @@
 #text(size: 9pt)[`XF86AudioLowerVolume` — Volume down] \
 #text(size: 9pt)[`XF86AudioMute` — Mute output] \
 #text(size: 9pt)[`XF86AudioMicMute` — Mute microphone] \
+#text(size: 9pt)[`XF86AudioPlay` — Play / pause (MPRIS — whatever is playing)] \
+#text(size: 9pt)[`XF86AudioNext` — Next track (MPRIS)] \
+#text(size: 9pt)[`XF86AudioPrev` — Previous track (MPRIS)] \
 #text(size: 9pt)[`Mod+F12` — Toggle MangoHud overlay (sends F12)] \

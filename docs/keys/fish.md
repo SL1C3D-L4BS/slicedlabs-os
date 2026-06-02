@@ -9,4 +9,8 @@
 |---|---|
 | `sl` | Open the SlicedLabs TUI inline (= slicedlabs) |
 | `cb` | cargo build + write Waybar build status |
+| `slc` | Focus a workspace + realize its cockpit (slc <ws> · slc os doctor) |
+| `gt` | Plain terminal — a ghostty window with NO AI pane (zj bare) |
+| `vm` | Libvirt/KVM control: vm iso · vm sandbox · vm list · vm create |
+| `coding-vm` | Summon the VM console onto the coding workspace |
 

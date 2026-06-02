@@ -35,24 +35,29 @@
 # =============================================================================
 
 [meta]
-auto = ["coding", "browser", "research"]
-# Eagerly STAGED at niri launch (staggered) by niri-workspace-launcher — the moment
-# you log in, the coding cockpit, the browser, and the research space fire and
-# populate in the background (placed with --focus false; first focus re-stages
-# idempotently). EVERYTHING ELSE is opt-in, summoned by typing `cockpit <ws>` in a
-# terminal: engine (Mod+Ctrl+E), monitoring (Mod+Ctrl+M — boots dev-stack-obs on
-# demand), media (Mod+Ctrl+V), streaming (Mod+Ctrl+S), gaming (Mod+Ctrl+Shift+G).
-# NOTHING monitoring/observability starts at login anymore — dev-stack-obs is no longer
-# boot-enabled; it comes up only when you open the monitoring cockpit.
+auto = ["coding", "research", "browser"]
+# Track B P3 (2026-06-02): the working stacks autostart again — STAGGERED. The
+# 2026-06-01 login-storm OOM (load ~23, cockpits culled) had two root causes, BOTH
+# now fixed: (1) the cockpits' heavy panes spawned EAGERLY — they now load
+# `start_suspended` (0 cost until Enter), so coding stages just nvim + shells, not
+# 7 TUIs; (2) staging thundered the CPU — niri-workspace-launcher now stages each
+# scene SEQUENTIALLY behind a load-settle guard (wait until the 1-min load drops
+# before the next), atop A4's systemd-oomd + 15.6G zram. Monitoring stays OFF this
+# list on purpose: autostarting it would boot dev-stack-obs at login (against Track
+# A's lean boot) — summon it with Mod+5. Everything else stays opt-in. Each ws is
+# also summonable / repairable on demand via `cockpit <ws>` or its bind:
+#   coding Mod+Ctrl+D · research Mod+Ctrl+C · browser Mod+Ctrl+B · engine Mod+Ctrl+E ·
+#   monitoring Mod+Ctrl+M · media Mod+Ctrl+V · streaming Mod+Ctrl+S · gaming Mod+Ctrl+Shift+G
 
-# --- coding: GENERALIZED dev-cockpit for ANY project idea — a 3-column desktop: the
-# --- zellij `coding` masterclass (cwd ~/Projects) + a reference-docs Firefox + a
-# --- persistent agent/notes column (claude · slicedlabs · scratch). Lighter service
-# --- set; spin up ai-stack/ollama per project. Ambient lofi when you arrive. --------
+# --- coding: the 2026 command center for ANY project idea. Three full-height cockpits
+# --- niri scrolls between — CODE (zj coding: nvim-dominant dev) · AI (zj agent: claude │
+# --- slicedlabs) · the VM console (summoned on demand: `coding-vm` / Mod+Ctrl+Shift+V) —
+# --- plus a half-width reference Firefox. The VM is NOT auto-booted (OOM-safe): its libvirt
+# --- domains are established; one key brings the console in. Ambient lofi when you arrive. -
 [workspaces.coding]
 output = "DP-2"
 layout = "columns"
-tiling = "manual"   # declared 60/22/18 — exempt from auto full↔halves
+tiling = "manual"   # CODE + AI full (100%) · Firefox half (50%) — niri scrolls between them
 services = ["dev-stack-data", "uair"]
 ambient = "lofi"
   [[workspaces.coding.apps]]
@@ -60,30 +65,32 @@ ambient = "lofi"
   app_id = "com.slicedlabs.coding"
   cmd = "ghostty --class=com.slicedlabs.coding --working-directory=$HOME/Projects -e zj coding"
   column = 1
-  width = "60%"
+  width = "100%"
+  [[workspaces.coding.apps]]
+  id = "agent"
+  app_id = "com.slicedlabs.coding-side"
+  cmd = "ghostty --class=com.slicedlabs.coding-side --working-directory=$HOME/Projects -e zj agent"
+  column = 2
+  width = "100%"
   [[workspaces.coding.apps]]
   id = "docs"
   app_id = "coding-web"
   # reference/docs browser — dedicated throwaway profile, serialized via ff-scene (the
   # fixed launcher: stale-lock cleanup so a cold profile reliably opens a window).
   cmd = "ff-scene --app-id coding-web --profile $HOME/.cache/ff-coding"
-  column = 2
-  width = "22%"
-  [[workspaces.coding.apps]]
-  id = "agent"
-  app_id = "com.slicedlabs.coding-side"
-  cmd = "ghostty --class=com.slicedlabs.coding-side --working-directory=$HOME/Projects -e zj agent"
   column = 3
-  width = "18%"
+  width = "50%"
+  # VM console (com.slicedlabs.coding-vm) is summoned on demand by `coding-vm` — NOT listed
+  # here, so the scene never auto-boots a guest at login. See bin/coding-vm + the niri rule.
 
-# --- engine: the [ENGINE]'s OWN dev cockpit — a 3-column desktop mirroring `coding`
-# --- but pointed at ~/Projects/engine: the zellij `engine-dev` masterclass + a Rust/
-# --- wgpu docs Firefox + an agent/notes column. Full ai-stack/ollama service set.
-# --- This is where the Phase-11 editor/UI will also launch. On-demand (Mod+Ctrl+E).
+# --- engine: the [ENGINE]'s OWN command center — mirrors `coding` but pointed at
+# --- ~/Projects/engine: CODE (zj engine-dev: nvim + bacon) · AI (zj agent: claude │
+# --- slicedlabs) · half-width Rust/wgpu docs Firefox, with the VM console summonable
+# --- (Mod+Ctrl+Shift+V). Full ai-stack/ollama service set. On-demand (Mod+Ctrl+E).
 [workspaces.engine]
 output = "DP-2"
 layout = "columns"
-tiling = "manual"   # declared 60/22/18
+tiling = "manual"   # CODE + AI full (100%) · Firefox half (50%) — niri scrolls between them
 services = ["dev-stack-data", "ai-stack", "ollama", "uair"]
 ambient = "lofi"
   [[workspaces.engine.apps]]
@@ -91,19 +98,19 @@ ambient = "lofi"
   app_id = "com.slicedlabs.engine-dev"
   cmd = "ghostty --class=com.slicedlabs.engine-dev --working-directory=$HOME/Projects/engine -e zj engine-dev"
   column = 1
-  width = "60%"
-  [[workspaces.engine.apps]]
-  id = "docs"
-  app_id = "engine-web"
-  cmd = "ff-scene --app-id engine-web --profile $HOME/.cache/ff-engine"
-  column = 2
-  width = "22%"
+  width = "100%"
   [[workspaces.engine.apps]]
   id = "agent"
   app_id = "com.slicedlabs.engine-side"
   cmd = "ghostty --class=com.slicedlabs.engine-side --working-directory=$HOME/Projects/engine -e zj agent"
+  column = 2
+  width = "100%"
+  [[workspaces.engine.apps]]
+  id = "docs"
+  app_id = "engine-web"
+  cmd = "ff-scene --app-id engine-web --profile $HOME/.cache/ff-engine"
   column = 3
-  width = "18%"
+  width = "50%"
 
 # --- browser: the web — Zen (primary) + Firefox, side by side -----------------
 [workspaces.browser]

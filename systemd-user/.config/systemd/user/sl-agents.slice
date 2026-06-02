@@ -1,0 +1,18 @@
+# sl-agents.slice — the capability-sandbox (spec P11): an OS-level cgroup that caps the
+# CPU + memory of autonomous AI agents so a runaway crew can NEVER starve the interactive
+# desktop. The hard floor beneath Warden's soft governance (Warden surfaces/benches; the
+# kernel cgroup ENFORCES). Autonomous slc-claude (`--as <role>`) and `sl-sandbox <cmd>`
+# run here; the interactive editor's claude stays unconstrained (responsive).
+#
+# 8-thread / 31 GiB host: agents get up to 4 threads + 12 GiB, low weight so they always
+# yield to interactive work under contention. Reversible — remove the file + daemon-reload.
+[Unit]
+Description=SlicedLabs autonomous-agent capability sandbox
+
+[Slice]
+CPUWeight=30
+CPUQuota=400%
+IOWeight=50
+MemoryHigh=10G
+MemoryMax=12G
+TasksMax=4096

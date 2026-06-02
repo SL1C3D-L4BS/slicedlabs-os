@@ -21,8 +21,13 @@ opt verify-keys       && run "keys SSOT"          verify-keys
 opt verify-governance && run "governance ledger"  verify-governance
 opt verify-tooling    && run "tooling cascade"    verify-tooling
 opt verify-boot-contract && run "boot contract"   verify-boot-contract
+opt verify-stabilization && run "stabilization (Track A)" verify-stabilization
 run "cockpit invariants"       verify-cockpit.sh
 opt verify-gaming.sh  && run "gaming stack"        verify-gaming.sh
+opt verify-vm.sh      && run "virtualization (VM)" verify-vm.sh
+opt verify-platform   && run "platform (UKI/atomic/sandbox)" verify-platform
+opt verify-scenes     && run "scene DSL"          verify-scenes
+opt verify-media      && run "media cockpit"      verify-media
 
 echo
 if [[ $rc -eq 0 ]]; then

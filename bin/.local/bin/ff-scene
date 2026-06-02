@@ -31,7 +31,6 @@ SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 [ -f "$SELF_DIR/lib/scene.sh" ] && source "$SELF_DIR/lib/scene.sh"
 if ! declare -f scene_log >/dev/null 2>&1; then scene_log() { echo "$*" >&2; }; fi
 
-LOCK="${XDG_RUNTIME_DIR:-/tmp}/ff-scene.lock"
 REGISTER_TIMEOUT=20   # seconds to wait for the new window to appear in niri (a COLD
                       # dedicated profile is slow to first-init; keep this ≥ the caller's
                       # poll window in lib/scene.sh, which waits 25s for the same window).
@@ -46,6 +45,13 @@ while [ $# -gt 0 ]; do
     esac
 done
 [ -n "$app_id" ] || { echo "ff-scene: --app-id <id> required" >&2; exit 2; }
+
+# Per-app-id lock (NOT one global lock): the boot's distinct Firefoxes (firefox /
+# research-web / monitoring) use ISOLATED profiles, so they need not serialize — a
+# single global lock made each wait up to REGISTER_TIMEOUT for the prior to register
+# (the slow serial login). Keying the lock on app-id lets them start concurrently; the
+# stale-lock clear + per-window register-wait below still prevent same-profile races.
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/ff-scene-${app_id}.lock"
 
 _present() {  # is a window with our app-id already mapped in niri?
     niri msg --json windows 2>/dev/null \

@@ -34,6 +34,7 @@ unsupported_claim   = "orange"  # a claim not supported by tool output (light ha
 probation_runs           = 3        # clean runs required to graduate probation
 auto_retire_on_eval_fail = true     # a failed eval while on probation → retire
 escalation               = "retire" # a second red trip during probation → retire
+retry_loop_threshold     = 3        # identical consecutive FAILING actions that trip retry_loop
 
 # --- Per-agent policy (mirrors data/team.toml; declared_resources is the
 # --- allowlist the monitor checks every action against) ---------------------
@@ -66,3 +67,14 @@ max_cost_per_run   = 1.50
 declared_resources = ["repo:read", "corpus:read"]
 scope              = "corpus"
 confidence_floor   = 0.65   # the librarian must never fabricate citations
+
+# --- The interactive companion: every terminal's `slc-claude` pane (spec §11.1).
+# --- Human-in-the-loop, so its scope is broad and its cap is per-SESSION (not the
+# --- per-task budget of the autonomous agents above). It is SURFACED in the ledger
+# --- + the Cockpit AI pill, not hard-gated — your pair-programmer is never benched
+# --- out from under you (teeth stay on the autonomous team agents). Per-cockpit
+# --- variants (claude-coding/-engine/-research) inherit these defaults until split.
+[agent.claude]
+declared_resources = ["repo:read", "repo:write", "web:read", "shell:exec", "memory:read"]
+scope              = "interactive"
+max_cost_per_run   = 10.00

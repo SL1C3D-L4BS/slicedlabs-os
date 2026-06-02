@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../generated"
+import "../services"
 
 // Glass — the Cockpit's shared Liquid Glass material (core/shaders/glass.frag).
 // Procedural specular / Fresnel rim / chromatic + edge-lensing of the current
@@ -14,10 +15,18 @@ Item {
     property vector4d wallRect: Qt.vector4d(0, 0, 1, 1)  // surface→wallpaper UV (edge-only reveal)
     property bool focal: false  // FOCAL (modals/CC/menu/lock) → dimensional Liquid Glass; bars stay calm
 
+    // Per-cockpit glass (spec §14): the FOCUSED workspace's tier picks the shader
+    // budget — engine/gaming/streaming/media drop to a cheaper path so frame-time is
+    // protected; the glass workspaces keep the full material. Reactive on Niri.focused.
     // "off" → flat frost; if the wallpaper texture isn't ready yet, fall back to low
     // (skips the sampler) so we never lens a null texture to black.
-    readonly property real _quality: Theme.glassQuality === "off" ? 0.0
-        : (Theme.glassQuality === "low" || wallImg.status !== Image.Ready) ? 0.5 : 1.0
+    readonly property string _wsQuality: Theme.glassQualityFor(Niri.focused)
+    readonly property real _quality:
+        _wsQuality === "off" ? 0.0
+        : wallImg.status !== Image.Ready ? 0.5
+        : _wsQuality === "low" ? 0.4
+        : _wsQuality === "medium" ? 0.7
+        : 1.0
 
     Image {
         id: wallImg

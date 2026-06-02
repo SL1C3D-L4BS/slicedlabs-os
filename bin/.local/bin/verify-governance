@@ -38,6 +38,17 @@ with tempfile.TemporaryDirectory() as tmp:
     if v.ok or mon.box.status("eng") != "suspended":
         fails.append("monitor: an undeclared resource did NOT suspend the agent")
 
+    # 2b) retry-loop: 3 identical FAILING actions → orange → probation (Track B P7)
+    rl = Monitor(Policy(agents={"a": AgentPolicy(declared_resources=("repo:read",))}),
+                 ledger=Ledger(td / "rl.db"), box=PenaltyBox(td / "rl.json"), rebake=False)
+    loop = AgentAction("a", resources=("repo:read",), failed=True)
+    rlv = None
+    for _ in range(3):
+        rlv = rl.check(loop)
+    if rl.box.status("a") != "probation" or rlv is None or rlv.violation is None \
+            or rlv.violation.behavior != "retry_loop":
+        fails.append("monitor: 3 identical failing actions did NOT trip retry_loop → probation")
+
 # 3) live ledger integrity (if present) + cockpit contract validity
 live = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "warden/ledger.db"
 if live.exists():

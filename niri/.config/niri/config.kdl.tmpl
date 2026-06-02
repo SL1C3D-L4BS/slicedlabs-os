@@ -477,18 +477,19 @@ spawn-at-startup "mako"
 spawn-at-startup "mako-workspace-mode"
 spawn-at-startup "swayidle" "-w"
 spawn-at-startup "sh" "-c" "easyeffects --service-mode & sleep 2 && easyeffects -l WaveXLR-Pro"
-// Coding + browser + research workspaces eager-stage their canonical surfaces at
-// login (staggered) and re-stage on first focus; the watcher exits once all are up.
+// niri-workspace-launcher: pins the canonical WS1..8 order once, then — with
+// workspaces.toml [meta].auto = [] — self-exits WITHOUT staging anything. ON-DEMAND ONLY:
+// summon cockpits with `cockpit <ws>` or Mod+Ctrl+* (see workspaces.toml). Eager staging
+// fried this 4c/8t box at login (load ~23 + OOM); re-populate [meta].auto to bring it back.
 spawn-at-startup "niri-workspace-launcher"
 // Dynamic auto-tile: lone window full → 2+ windows half (50/50), endless scroll.
 // Event-driven (idle until a window opens/closes); honours per-workspace `tiling`.
 spawn-at-startup "niri-autotile"
-// Self-heal net: once the eager-staged auto scenes SETTLE (their windows are mapped)
-// or a 25s cap elapses, idempotently realize any auto stack whose window failed to
-// materialize (slow cold boot, a lost Firefox race). Adaptive — was a blind `sleep 30`;
-// now fires as soon as staging settles (~15s sooner on a warm boot). `cockpit` skips
-// every surface already present, so this only ever FILLS GAPS. See bin/cockpit-selfheal.
-spawn-at-startup "cockpit-selfheal"
+// Self-heal net: a backstop for EAGER auto-staging — re-realized any auto scene whose
+// window failed to map. DISABLED 2026-06-01: with [meta].auto = [] nothing auto-stages, so
+// this would just `exec cockpit` into a no-op every login (and `cockpit` no-arg now realizes
+// nothing). Re-enable alongside [meta].auto if you bring eager staging back.
+// spawn-at-startup "cockpit-selfheal"
 
 // Observability cockpit — the NATIVE `slicedlabs monitor` TUI (com.slicedlabs.monitoring,
 // 65%) + a side column (com.slicedlabs.monitor-side: lazydocker · btop · logs, 35%), both
@@ -539,40 +540,57 @@ window-rule {
     open-on-workspace "research"
     default-column-width { proportion 0.5; }
 }
-// coding desktop: cockpit (60%) + reference-docs Firefox (coding-web, 22%) + agent/notes
-// (coding-side, 18%). The cockpit id is ANCHORED (^…$) so it never also matches the
-// coding-side window (whose id contains "com.slicedlabs.coding"). tiling=manual → 60/22/18.
+// coding command center: CODE cockpit (full) + AI agent window (coding-side, full) +
+// reference-docs Firefox (coding-web, half). niri scrolls between the full cockpits;
+// Firefox is the half-width sidecar. The cockpit id is ANCHORED (^…$) so it never also
+// matches the coding-side window (whose id contains "com.slicedlabs.coding"). The VM
+// console (com.slicedlabs.coding-vm) is ruled below, opaque + summoned on demand.
 window-rule {
     match app-id="^com.slicedlabs.coding$"
     open-on-workspace "coding"
-    default-column-width { proportion 0.6; }
-}
-window-rule {
-    match app-id="coding-web"
-    open-on-workspace "coding"
-    default-column-width { proportion 0.22; }
+    default-column-width { proportion 1.0; }
 }
 window-rule {
     match app-id="com.slicedlabs.coding-side"
     open-on-workspace "coding"
-    default-column-width { proportion 0.18; }
+    default-column-width { proportion 1.0; }
 }
-// engine desktop mirrors coding: cockpit engine-dev (60%) + docs engine-web (22%) + agent
-// engine-side (18%). Replaces the old broad "com.slicedlabs.engine-" match with explicit ids.
+window-rule {
+    match app-id="coding-web"
+    open-on-workspace "coding"
+    default-column-width { proportion 0.5; }
+}
+// engine command center mirrors coding: CODE engine-dev (full) + AI engine-side (full) +
+// half-width docs engine-web. Explicit anchored ids (not the old broad "engine-" match).
 window-rule {
     match app-id="^com.slicedlabs.engine-dev$"
     open-on-workspace "engine"
-    default-column-width { proportion 0.6; }
-}
-window-rule {
-    match app-id="engine-web"
-    open-on-workspace "engine"
-    default-column-width { proportion 0.22; }
+    default-column-width { proportion 1.0; }
 }
 window-rule {
     match app-id="com.slicedlabs.engine-side"
     open-on-workspace "engine"
-    default-column-width { proportion 0.18; }
+    default-column-width { proportion 1.0; }
+}
+window-rule {
+    match app-id="engine-web"
+    open-on-workspace "engine"
+    default-column-width { proportion 0.5; }
+}
+// VM console — virt-viewer (SPICE + virtio-gpu) is the coding command center's 3rd cockpit.
+// Summoned on demand by `coding-vm` (Mod+Ctrl+Shift+V), placed on coding as a full column.
+// OPAQUE (it's a live framebuffer, not a frosted terminal) and never blurred (no
+// background-effect opt-in). App-id verified live via `niri msg windows` → "virt-viewer".
+window-rule {
+    match app-id="^virt-viewer$"
+    open-on-workspace "coding"
+    default-column-width { proportion 1.0; }
+    opacity 1.0
+}
+// virt-manager (the GUI, `vm gui`) floats — a control panel, not a tiled cockpit.
+window-rule {
+    match app-id="^virt-manager$"
+    open-floating true
 }
 // media desktop: Spotify (tunes, 60%) beside a cava visualizer (40%); tiling=manual keeps
 // the 60/40. Netflix/YouTube/cinema stay full-width (opaque video, separate app-ids).
@@ -666,6 +684,7 @@ binds {
     Mod+Ctrl+M { spawn "sh" "-c" "niri msg action focus-workspace monitoring; cockpit monitoring"; }
     Mod+Ctrl+S { spawn "sh" "-c" "niri msg action focus-workspace streaming;  cockpit streaming"; }
     Mod+Ctrl+Shift+G { spawn "sh" "-c" "niri msg action focus-workspace gaming;     cockpit gaming"; }
+    Mod+Ctrl+Shift+V { spawn "sh" "-c" "$HOME/.local/bin/coding-vm"; }
     Mod+Slash { spawn "sh" "-c" "qs -c cockpit ipc call cockpit menu"; }
     Mod+Alt+K { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal keys"; }
     Mod+Alt+C { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl control"; }
@@ -689,6 +708,9 @@ binds {
     XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
     XF86AudioMute allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
     XF86AudioMicMute allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
+    XF86AudioPlay allow-when-locked=true { spawn "cockpitctl" "media" "toggle"; }
+    XF86AudioNext allow-when-locked=true { spawn "cockpitctl" "media" "next"; }
+    XF86AudioPrev allow-when-locked=true { spawn "cockpitctl" "media" "prev"; }
     Mod+Shift+G { spawn "sh" "-c" "$HOME/.config/gaming/menu.sh"; }
     Mod+Ctrl+G { spawn "sh" "-c" "$HOME/.config/gaming/gamemode-toggle.sh"; }
     Mod+F12 { spawn "ydotool" "key" "88"; }

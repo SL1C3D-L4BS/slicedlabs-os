@@ -3,6 +3,8 @@
 # stacks (coding · browser · research) EAGER-STAGE at login; everything else (incl.
 # monitoring) is on-demand via `cockpit <ws>`; the scene launcher + autotiler are
 # spawned by niri; and every auto workspace declares its scene + services.
+# Track B P1 adds: the WINDOW-MATH invariants (full-width column + presets + radius)
+# and the MUSIC posture (nothing autoplays at login; ambient only fills silence).
 # Folded into verify-all. SSOT: workspaces.toml + niri config.
 set -uo pipefail
 ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
@@ -54,5 +56,40 @@ else
     ok "dev-stack-obs NOT autostarted at login (lean boot)"
 fi
 
-[ $fail -eq 0 ] && echo "boot-contract: stacks eager-stage at login + services declared ✓"
+# 5) window math (Track B P1) — a single window opens full-width on the big monitor,
+#    Mod+R cycles presets, corners clip to the radius. niri is the SSOT.
+grep -qE 'proportion 1\.0' "$NIRI" \
+    && ok "niri opens a single window full-width (default-column-width proportion 1.0)" \
+    || no "niri default-column-width is not proportion 1.0 (windows won't open full)"
+grep -qE 'preset-column-widths' "$NIRI" \
+    && ok "niri preset-column-widths present (Mod+R cycles 0.25/0.33/0.5/0.67)" \
+    || no "niri preset-column-widths missing"
+grep -qE 'switch-preset-column-width' "$NIRI" \
+    && ok "niri Mod+R width-preset bind present" || no "niri width-preset bind missing"
+grep -qE 'geometry-corner-radius' "$NIRI" \
+    && ok "niri geometry-corner-radius set (windows clip to radius)" || no "niri corner-radius missing"
+
+# 6) music posture (Track B P1) — daemon-on-demand: NOTHING autoplays at login. mpd
+#    restores to PAUSED, no player sits in any autostart path, and the only music a
+#    scene starts is playerctl-guarded ambient that fills silence (never plays over you).
+players='mpd|mpv|spotify|playerctl|tunes|cinema|cmus|ncmpcpp|\bmusic\b'
+mpdconf="$ROOT/mpd/.config/mpd/mpd.conf"
+grep -qE '^[[:space:]]*restore_paused[[:space:]]+"yes"' "$mpdconf" 2>/dev/null \
+    && ok "mpd restore_paused=yes (restores PAUSED — no autoplay on restart)" \
+    || no "mpd may autoplay on restart (restore_paused != yes)"
+if grep -E 'spawn-at-startup' "$NIRI" | grep -vE '^[[:space:]]*//' | grep -qiE "$players"; then
+    no "a media player autostarts in niri spawn-at-startup"
+else
+    ok "no media player in niri spawn-at-startup"
+fi
+if grep -rhiE '^Exec=' "$ROOT/autostart/.config/autostart/" 2>/dev/null | grep -qiE "$players"; then
+    no "a media player is in XDG autostart (.desktop Exec)"
+else
+    ok "no media player in XDG autostart"
+fi
+grep -q 'playerctl -a status' "$ROOT/bin/.local/bin/lib/scene.sh" \
+    && ok "scene ambient is playerctl-guarded (fills silence only — never plays over you)" \
+    || no "scene ambient is NOT guarded (could autoplay over active audio)"
+
+[ $fail -eq 0 ] && echo "boot-contract: stacks eager-stage + window-math + music posture ✓"
 exit $fail

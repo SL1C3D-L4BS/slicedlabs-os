@@ -551,6 +551,14 @@ desc = "Stage scene: gaming"
 category = "Scene"
 layer = "Mod+Ctrl+Shift"
 
+[[bind]]
+tool = "niri"
+key = "Mod+Ctrl+Shift+V"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/coding-vm"'
+desc = "Summon the VM console onto coding (libvirt/KVM)"
+category = "Scene"
+layer = "Mod+Ctrl+Shift"
+
 # ---- Cockpit HUD (Quickshell) ----------------------------------------------
 [[bind]]
 tool = "niri"
@@ -741,6 +749,33 @@ key = "XF86AudioMicMute"
 action = 'spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"'
 attrs = "allow-when-locked=true"
 desc = "Mute microphone"
+category = "Audio"
+layer = "Fn"
+
+[[bind]]
+tool = "niri"
+key = "XF86AudioPlay"
+action = 'spawn "cockpitctl" "media" "toggle"'
+attrs = "allow-when-locked=true"
+desc = "Play / pause (MPRIS — whatever is playing)"
+category = "Audio"
+layer = "Fn"
+
+[[bind]]
+tool = "niri"
+key = "XF86AudioNext"
+action = 'spawn "cockpitctl" "media" "next"'
+attrs = "allow-when-locked=true"
+desc = "Next track (MPRIS)"
+category = "Audio"
+layer = "Fn"
+
+[[bind]]
+tool = "niri"
+key = "XF86AudioPrev"
+action = 'spawn "cockpitctl" "media" "prev"'
+attrs = "allow-when-locked=true"
+desc = "Previous track (MPRIS)"
 category = "Audio"
 layer = "Fn"
 
@@ -950,6 +985,14 @@ src = "default"
 tool = "zellij"
 key = "Alt+= / Alt+-"
 desc = "Resize pane grow / shrink"
+category = "Panes"
+layer = "Other"
+src = "default"
+
+[[bind]]
+tool = "zellij"
+key = "Alt+] / Alt+["
+desc = "Next / previous swap layout (dominant ↔ even ↔ stacked) — cockpit §14"
 category = "Panes"
 layer = "Other"
 src = "default"
@@ -1220,5 +1263,33 @@ layer = "Other"
 tool = "fish"
 key = "cb"
 desc = "cargo build + write Waybar build status"
+category = "Command"
+layer = "Other"
+
+[[bind]]
+tool = "fish"
+key = "slc"
+desc = "Focus a workspace + realize its cockpit (slc <ws> · slc os doctor)"
+category = "Command"
+layer = "Other"
+
+[[bind]]
+tool = "fish"
+key = "gt"
+desc = "Plain terminal — a ghostty window with NO AI pane (zj bare)"
+category = "Command"
+layer = "Other"
+
+[[bind]]
+tool = "fish"
+key = "vm"
+desc = "Libvirt/KVM control: vm iso · vm sandbox · vm list · vm create"
+category = "Command"
+layer = "Other"
+
+[[bind]]
+tool = "fish"
+key = "coding-vm"
+desc = "Summon the VM console onto the coding workspace"
 category = "Command"
 layer = "Other"

@@ -99,6 +99,7 @@
 | `Mod+Ctrl+M` | Stage scene: monitoring |
 | `Mod+Ctrl+S` | Stage scene: streaming |
 | `Mod+Ctrl+Shift+G` | Stage scene: gaming |
+| `Mod+Ctrl+Shift+V` | Summon the VM console onto coding (libvirt/KVM) |
 
 ### HUD
 
@@ -147,6 +148,9 @@
 | `XF86AudioLowerVolume` | Volume down |
 | `XF86AudioMute` | Mute output |
 | `XF86AudioMicMute` | Mute microphone |
+| `XF86AudioPlay` | Play / pause (MPRIS — whatever is playing) |
+| `XF86AudioNext` | Next track (MPRIS) |
+| `XF86AudioPrev` | Previous track (MPRIS) |
 
 ### Gaming
 

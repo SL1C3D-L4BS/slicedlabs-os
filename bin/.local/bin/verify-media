@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# verify-media — P9 media-cockpit invariants: the on-demand players exist, the media
+# workspace is declared, and the NO-AUTOPLAY posture holds (mpd restores PAUSED). The
+# autostart-path no-player guard lives in verify-boot-contract. Non-destructive.
+set -uo pipefail
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"; cd "$ROOT"
+fail=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$*"; }
+no(){ printf '  \033[31m✗\033[0m %s\n' "$*" >&2; fail=1; }
+
+for t in tunes cinema music; do
+    command -v "$t" >/dev/null 2>&1 && ok "$t on PATH (on-demand cockpit)" || no "$t missing"
+done
+
+python3 - <<'PY' && ok "media workspace declared (tunes + cava)" || no "media workspace missing/incomplete"
+import os, tomllib, sys
+d = tomllib.load(open(os.path.expanduser("~/.config/sliced-engine/workspaces.toml"), "rb"))
+m = d["workspaces"].get("media", {})
+ids = {a.get("id") for a in m.get("apps", [])}
+sys.exit(0 if (m and "tunes" in ids) else 1)
+PY
+
+grep -qE '^[[:space:]]*restore_paused[[:space:]]+"yes"' mpd/.config/mpd/mpd.conf \
+    && ok "mpd restore_paused=yes (no autoplay on restart)" || no "mpd not set to restore paused"
+
+# cockpit media control surface (Control Center is the actionable MPRIS HUD)
+grep -rqiE 'mpris|player|Media' quickshell/.config/quickshell/cockpit/bars/ControlCenter.qml 2>/dev/null \
+    && ok "cockpit Control Center carries the MPRIS/media HUD" || no "cockpit media HUD not found"
+command -v playerctl >/dev/null 2>&1 && ok "playerctl present (transport for cockpitctl media)" || no "playerctl missing"
+
+[ $fail -eq 0 ] && echo "media: cockpit present + no-autoplay posture intact ✓"
+exit $fail

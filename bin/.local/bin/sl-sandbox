@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# sl-sandbox — run a command inside the capability-sandbox cgroup (sl-agents.slice):
+# CPU/memory-capped at the OS level so an autonomous agent (or any heavy job) can never
+# starve the interactive desktop. The hard floor under Warden's soft governance (P11).
+#
+#   sl-sandbox <command> [args…]      e.g.  sl-sandbox slicedlabs crew build-feature
+#
+# Best-effort: if the user cgroup lacks delegated controllers the caps are advisory, but
+# the command still runs. SL_SANDBOX=0 in the environment is honored by slc-claude to opt
+# an autonomous session back out.
+set -euo pipefail
+[ $# -ge 1 ] || { echo "usage: sl-sandbox <command> [args…]" >&2; exit 2; }
+exec systemd-run --user --slice=sl-agents.slice --scope --quiet --collect -- "$@"

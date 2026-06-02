@@ -1,14 +1,19 @@
-// [ENGINE] dev-cockpit (zj engine-dev) — col1 of the 3-column engine desktop (the docs
-// Firefox + the `agent` side-column are separate niri windows). Pointed at ~/Projects/
-// engine by the `engine` scene. zjstatus pill bar from tokens.toml (engine-coral accent).
+// [ENGINE] CODE cockpit (zj engine-dev) — the editor column of the engine command center,
+// pointed at ~/Projects/engine by the `engine` scene. Mirrors `coding` (the AI team is its
+// own full `zj agent` window; docs Firefox is a half-width column) — so this is pure Rust
+// dev: an elite, editor-dominant, logically-organized surface. zjstatus pill bar from
+// tokens.toml (engine-coral accent).
+//
+// Design (spec §14): ONE dominant editor; an anchored utility row that loads start_suspended
+// (0 CPU/tokens until Enter); a tight LOGICAL tab set. Alt+]/Alt+[ cycle pane arrangements;
+// Alt+f floats a scratch shell.
 //
 // Tabs:
-//   code    — nvim (primary) │ run/REPL + test-watch shells (AI lives in the side column)
-//   infra   — bacon │ lazygit │ gh-dash
-//   debug   — runtime/debugger console │ logs tail + scratch
-//   data    — dbshell (dev-postgres) │ sqlite3 (scratch)
-//   mac     — ssh into the LAN MacBook Air build/test/sign node
-//   scratch — two free shells for notes / quick commands
+//   code  — nvim, full pane. The editor IS the workspace.
+//   build — bacon (continuous cargo check/test) │ run/REPL   (bacon suspended — CPU-heavy)
+//   git   — lazygit │ gh-dash            (suspended)
+//   debug — runtime/debugger console │ logs tail
+//   data  — dbshell (dev-postgres) │ sqlite3 (suspended)
 layout {
     default_tab_template {
         pane size=1 borderless=true {
@@ -47,47 +52,62 @@ layout {
         children
     }
 
-    // col1 of the engine desktop — editor-centric; persistent AI is the `agent` side-column.
+    // code — the dominant editor. nvim fills the column.
     tab name="code" focus=true {
+        pane command="nvim"
+    }
+    // build — bacon (continuous cargo check/test, CPU-heavy → suspended) │ run/REPL.
+    tab name="build" {
         pane split_direction="vertical" {
-            pane size="65%" command="nvim"
-            pane size="35%" split_direction="horizontal" {
-                pane                               // run / REPL
-                pane                               // test-watch
-            }
+            pane command="bacon" { start_suspended true; }
+            pane                                   // run / REPL
         }
     }
-    tab name="infra" {
+    // git — lazygit + the gh PR/issue dashboard. Both suspended.
+    tab name="git" {
         pane split_direction="vertical" {
-            pane command="bacon"                   // continuous cargo check/test
-            pane command="lazygit"
-            pane command="gh-dash"
+            pane command="lazygit" { start_suspended true; }
+            pane command="gh-dash" { start_suspended true; }
         }
     }
+    // debug — runtime/debugger console │ logs tail.
     tab name="debug" {
         pane split_direction="vertical" {
             pane                                   // runtime / debugger console
-            pane split_direction="horizontal" {
-                pane                               // logs tail
-                pane                               // scratch
+            pane                                   // logs tail
+        }
+    }
+    // data — dev-postgres shell │ a scratch sqlite. Both suspended.
+    tab name="data" {
+        pane split_direction="vertical" {
+            pane command="dbshell" { start_suspended true; }
+            pane command="sqlite3" { start_suspended true; }
+        }
+    }
+
+    // Alt+] / Alt+[ swap layouts (spec §14): dominant (big left + rest) ↔ even ↔ stacked.
+    swap_tiled_layout name="dominant" {
+        tab {
+            pane split_direction="vertical" {
+                pane size="62%"
+                pane { children; }
             }
         }
     }
-    tab name="data" {
-        pane split_direction="vertical" {
-            pane command="dbshell"
-            pane command="sqlite3"
+    swap_tiled_layout name="even" {
+        tab {
+            pane split_direction="vertical" {
+                pane
+                pane { children; }
+            }
         }
     }
-    tab name="mac" {
-        pane command="ssh" {
-            args "mac"
-        }
-    }
-    tab name="scratch" {
-        pane split_direction="vertical" {
-            pane
-            pane
+    swap_tiled_layout name="stacked" {
+        tab {
+            pane split_direction="vertical" {
+                pane
+                pane stacked=true { children; }
+            }
         }
     }
 }

@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""slc-claude — Warden-governed Claude Code launcher (spec §11.1 / §12).
+
+Every AI pane in the SlicedLabs terminal surface invokes `slc-claude` instead of
+raw `claude`, so each session is a Warden SUBJECT: it carries an identity, a cost
+cap from the governance SSOT, a signed session-start record in the hash-chained
+ledger (provenance/audit), and a Penalty-Box check — then it `exec`s the real
+`claude`. Zero behaviour change to your session; full provenance around it.
+
+Identity: `$SL_AGENT` (default "claude"); pass `--as <agent>` to override per cockpit.
+
+Everything governance-related is best-effort and NON-fatal: a broken ledger, a
+missing package, or a benched identity must never stop your editor's AI from
+opening. Hard enforcement (suspend-on-trip) lives on the autonomous team agents
+via `Monitor.check`; this interactive companion is SURFACED, not gated. Run raw
+`claude` to skip governance entirely; `gt` opens a terminal with no AI pane at all.
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+
+
+def _govern(agent: str, claude_args: list[str]) -> None:
+    """Identity + cap + signed session-start + penalty-box heads-up. All local +
+    instant (SQLite/JSON/TOML) — no network on the hot path (the live $spend gauge
+    is the Cockpit's job)."""
+    from slicedlabs_team.warden import Ledger, PenaltyBox, load_policy
+
+    cap = load_policy().for_agent(agent).max_cost_per_run
+    status = PenaltyBox().status(agent)
+    Ledger().append(agent, "session_start", {"cmd": "claude", "args": claude_args})
+
+    banner = f"⬡ Warden · agent={agent} · cap=${cap:.2f}/run · ledger ✓"
+    if status and status != "clean":
+        # Visible, not blocking: governance is never invisible, but the human's
+        # pair-programmer stays available (rehab the identity in the Penalty Box).
+        banner += f"  ·  ⚠ penalty-box: {status} (rehab: Mod+Alt+P)"
+    sys.stderr.write(f"\033[2m{banner}\033[0m\n")
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    agent = os.environ.get("SL_AGENT") or "claude"
+    if len(args) >= 2 and args[0] == "--as":
+        agent, args = args[1], args[2:]
+    try:
+        _govern(agent, args)
+    except Exception:  # noqa: BLE001 — governance must never block the editor's AI
+        pass
+    _exec_claude(agent, args)
+    return 127  # unreachable unless execvp itself fails
+
+
+def _exec_claude(agent: str, args: list[str]) -> None:
+    """Exec the real `claude`. AUTONOMOUS identities (anything but the interactive
+    default "claude") run inside the capability-sandbox cgroup (sl-agents.slice) — the
+    OS-level CPU/memory floor beneath Warden (spec P11). The interactive editor's AI
+    stays unconstrained for responsiveness. SL_SANDBOX=1 opts interactive in; =0 opts
+    autonomous out. Falls back to a direct exec if systemd-run is unavailable."""
+    cmd = ["claude", *args]
+    flag = os.environ.get("SL_SANDBOX")
+    want = flag == "1" or (flag != "0" and agent != "claude")
+    if want and shutil.which("systemd-run"):
+        os.execvp("systemd-run", [
+            "systemd-run", "--user", "--slice=sl-agents.slice",
+            "--scope", "--quiet", "--collect", "--", *cmd,
+        ])
+    os.execvp("claude", cmd)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -82,6 +82,7 @@ def main() -> int:
     opacity = t["opacity"]
     blur = t["blur"]
     glass = merged(t, "glass", "glass_light", variant)
+    glass_per_ws = glass.pop("per_workspace", {})  # per-cockpit quality → glassQualityFor()
     semantic = merged(t, "semantic", "semantic_light", variant)
     cockpit = t.get("cockpit", {})
 
@@ -147,6 +148,13 @@ def main() -> int:
         else:
             esc = str(v).replace("\\", "\\\\").replace('"', '\\"')
             L.append(f'    readonly property string {name}: "{esc}"')
+    # per-workspace glass quality → a switch function (mirrors brand()); default = the
+    # global glassQuality. Glass.qml calls glassQualityFor(Niri.focused) for the live tier.
+    L += ["", "    // ---- per-workspace glass quality ([glass.per_workspace]) ----",
+          "    function glassQualityFor(ws) {", "        switch (ws) {"]
+    for ws, q in glass_per_ws.items():
+        L.append(f'        case "{ws}": return "{q}";')
+    L += ["        default: return glassQuality;", "        }", "    }"]
     L += ["", "    // ---- semantic role tier ([semantic]) — bind to ROLES, not hues ----"]
     for k, v in semantic.items():
         name = "sem" + camel(k)[0].upper() + camel(k)[1:]

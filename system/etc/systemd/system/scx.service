@@ -1,0 +1,18 @@
+[Unit]
+Description=sched_ext userspace scheduler (scx_lavd)
+Documentation=https://github.com/sched-ext/scx
+After=multi-user.target
+
+[Service]
+# Scheduler is config-driven via /etc/default/scx (SlicedLabs cascade SSOT) — a
+# setting, not a hardcode. scx_lavd replaced scx_rusty (crash-looped here; see
+# /etc/default/scx). EnvironmentFile is co-installed by bootstrap layer_S.
+# NOTE: systemd forbids a variable as the ExecStart executable, so we expand via
+# `sh -c` + `exec` (exec hands MainPID straight to the scheduler, no stray shell).
+EnvironmentFile=/etc/default/scx
+ExecStart=/bin/sh -c 'exec /usr/bin/$SCX_SCHEDULER $SCX_FLAGS'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

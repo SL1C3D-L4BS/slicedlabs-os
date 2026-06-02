@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# verify-stabilization — Track A invariants: the box stays fast, calm, and
+# OOM-resilient. Asserts the root causes found in the live audit stay fixed:
+#   localsearch indexer off · scx_lavd (not crash-looping rusty) · system not
+#   degraded · systemd-oomd guarding the session · zram right-sized · git bounded
+#   · the dev data tier is genuinely off-boot. Folded into verify-all.
+# SSOT: system/etc/{default/scx,systemd/*,sysctl.d/*}, git/.config/git/config.
+set -uo pipefail
+fail=0
+ok() { echo "  ✓ $1"; }
+no() { echo "  ✗ $1" >&2; fail=1; }
+
+# 1) system not degraded (the orange [FAILED] gate)
+st=$(systemctl is-system-running 2>/dev/null || true)
+case "$st" in
+  running|starting) ok "system state: $st (not degraded)" ;;
+  *)                no "system state: $st" ;;
+esac
+
+# 2) localsearch/tracker recursive indexing is OFF (Nautilus kept)
+if command -v gsettings >/dev/null 2>&1; then
+  idx=$(gsettings get org.freedesktop.Tracker3.Miner.Files index-recursive-directories 2>/dev/null || echo '?')
+  case "$idx" in "@as []"|"[]") ok "tracker index scope empty" ;; *) no "tracker still indexing: $idx" ;; esac
+fi
+if pgrep -x localsearch-3 >/dev/null 2>&1 || pgrep -x localsearch-ext >/dev/null 2>&1; then
+  no "a localsearch miner is running"
+else
+  ok "no localsearch miner running"
+fi
+
+# 3) scheduler: scx_lavd active, OR sched_ext disabled (BORE fallback) — never rusty
+if [ "$(cat /sys/kernel/sched_ext/state 2>/dev/null)" = "enabled" ]; then
+  sched=$(cat /sys/kernel/sched_ext/root/ops 2>/dev/null || echo '?')
+  case "$sched" in
+    lavd*)  ok "scheduler: scx_lavd active" ;;
+    rusty*) no "scx_rusty active — the crash-looping scheduler (want lavd)" ;;
+    *)      ok "sched_ext active ($sched) — not rusty" ;;
+  esac
+else
+  ok "sched_ext disabled — in-kernel BORE (acceptable fallback)"
+fi
+
+# 4) systemd-oomd guarding (kill the hog, not the cockpit)
+[ "$(systemctl is-active systemd-oomd.service 2>/dev/null)" = active ] \
+  && ok "systemd-oomd active" || no "systemd-oomd not active"
+
+# 5) zram right-sized (>= 8G; was a 4G default that filled)
+zb=$(cat /sys/block/zram0/disksize 2>/dev/null || echo 0)
+if [ "${zb:-0}" -ge 8589934592 ]; then ok "zram $((zb/1073741824))G (>= 8G)"; else no "zram too small (${zb} bytes)"; fi
+
+# 6) zram-tuned swappiness
+sw=$(cat /proc/sys/vm/swappiness 2>/dev/null || echo '?')
+[ "$sw" = 180 ] && ok "vm.swappiness=180 (zram-tuned)" || no "vm.swappiness=$sw (want 180)"
+
+# 7) git pack memory bounded (the 3GB-git OOM)
+[ -n "$(git config --get pack.windowMemory 2>/dev/null)" ] \
+  && ok "git pack memory bounded ($(git config --get pack.windowMemory))" \
+  || no "git pack memory unbounded"
+
+# 8) dev data tier is genuinely off-boot (these three conditions guarantee it)
+[ "$(systemctl --user is-enabled podman-restart.service 2>/dev/null)" != enabled ] \
+  && ok "podman-restart (user) not enabled" || no "podman-restart enabled — containers would restore at boot"
+dsd=$(systemctl --user is-enabled dev-stack-data.service 2>/dev/null); dsd=${dsd:-unknown}
+[ "$dsd" != enabled ] && ok "dev-stack-data not boot-enabled ($dsd)" || no "dev-stack-data enabled at boot"
+
+[ $fail -eq 0 ] && echo "stabilization: fast, calm, OOM-resilient ✓"
+exit $fail

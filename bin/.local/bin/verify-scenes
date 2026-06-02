@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# verify-scenes — the scene-DSL gate (spec P11): validate the workspaces.toml registry
+# (the declarative scene "DSL" read by lib/scene.sh) against its schema, so drift is
+# caught here rather than as a silently-unstaged window at login. Non-destructive.
+set -uo pipefail
+REG="${SCENE_REG:-$HOME/.config/sliced-engine/workspaces.toml}"
+python3 - "$REG" <<'PY'
+import sys, tomllib
+p = sys.argv[1]
+try:
+    d = tomllib.load(open(p, "rb"))
+except Exception as e:
+    print(f"  \033[31m✗\033[0m cannot parse {p}: {e}", file=sys.stderr); sys.exit(1)
+
+fail = 0
+def ok(m): print(f"  \033[32m✓\033[0m {m}")
+def no(m):
+    global fail; fail = 1; print(f"  \033[31m✗\033[0m {m}", file=sys.stderr)
+
+VALID_OUT    = {"DP-2", "DP-3"}
+VALID_LAYOUT = {"columns", "single", "delegate"}
+VALID_TILING = {"auto", "manual"}
+meta = d.get("meta", {})
+ws   = d.get("workspaces", {})
+ok(f"workspaces.toml parses ({len(ws)} workspaces)")
+
+for a in meta.get("auto", []):
+    (ok if a in ws else no)(f"meta.auto '{a}' references a defined workspace")
+
+for name, w in ws.items():
+    (ok if w.get("output") in VALID_OUT else no)(f"{name}.output={w.get('output')!r} valid")
+    lay = w.get("layout")
+    (ok if lay in VALID_LAYOUT else no)(f"{name}.layout={lay!r} valid")
+    (ok if w.get("tiling", "auto") in VALID_TILING else no)(f"{name}.tiling valid")
+    if lay == "delegate":
+        (ok if w.get("delegate") else no)(f"{name} sets a delegate script"); continue
+    apps = w.get("apps", [])
+    if not apps:
+        no(f"{name} declares no apps"); continue
+    ids  = [a.get("app_id") for a in apps]
+    (ok if len(set(ids)) == len(ids) else no)(f"{name} app_ids unique")
+    (ok if all(isinstance(a.get("column"), int) for a in apps) else no)(f"{name} apps have integer columns")
+    for a in apps:
+        miss = [k for k in ("id", "app_id", "cmd", "column") if a.get(k) in (None, "")]
+        if miss: no(f"{name}.{a.get('id','?')} missing {miss}")
+
+print("scenes: workspaces.toml DSL valid ✓" if not fail else "scenes: INVALID",
+      file=(sys.stderr if fail else sys.stdout))
+sys.exit(1 if fail else 0)
+PY
