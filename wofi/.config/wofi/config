@@ -2,8 +2,8 @@
 ## Styling lives in style.css (rendered from style.css.tmpl).
 show=drun
 prompt=›
-width=520
-height=380
+width=760
+height=560
 location=center
 allow_images=true
 image_size=24

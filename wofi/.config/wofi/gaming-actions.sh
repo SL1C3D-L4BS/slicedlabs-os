@@ -19,7 +19,7 @@ choice=$(printf '%s\n' \
     "Toggle GameMode" \
     "Toggle gamescope wrap (next launch)" \
     "Toggle MangoHud (F12)" \
-    | wofi --dmenu --prompt "PLAY: " --width 480 --height 360 --insensitive)
+    | wofi --dmenu --prompt "PLAY: " --width 760 --height 560 --insensitive 2>/dev/null)
 
 case "$choice" in
     "Steam")                  steam & ;;

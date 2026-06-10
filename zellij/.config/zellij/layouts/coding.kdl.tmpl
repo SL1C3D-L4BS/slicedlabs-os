@@ -1,20 +1,24 @@
-// GENERAL coding CODE cockpit (zj coding) — the editor column of the coding command
-// center. The AI team (claude │ slicedlabs) is its OWN full window now (`zj agent`),
-// and the docs Firefox is a half-width column — so THIS cockpit is pure dev: an elite,
-// editor-dominant, logically-organized surface. Launched by the `coding` scene
-// (ghostty -e zj coding, cwd ~/Projects). zjstatus pill bar from tokens.toml.
+// coding COMMAND CENTER (zj coding) — the dense, single-window cockpit from the
+// mockup (~/Downloads/0.png). ONE niri-full column that holds the whole surface:
 //
-// Design (spec §14 — the "elite" layout): ONE dominant editor; an anchored utility row
-// of heavy TUIs that load `start_suspended` (0 CPU/tokens until you press Enter); a tight,
-// LOGICAL tab set — no arbitrary pane sprawl. Cycle pane arrangements with Alt+]/Alt+[
-// (the swap_tiled_layout block below); float a scratch shell anytime with Alt+f.
+//   ┌ Neovim (dominant) ─────────┬ rail ┬ Sli labs ┬ Claude ┐
+//   │                            │ Tree │ (susp)   │ (susp) │
+//   │                            │ Git  │          │        │
+//   │                            │ Run  │          │        │
+//   ├ Debugger console ┬ Logger ─┴──────┴──────────┴────────┤
+//   │                  │ console                            │
+//   └──────────────────┴────────────────────────────────────┘
 //
-// Tabs (logical, not sprawling):
-//   code  — nvim, full pane. The editor IS the workspace.
-//   run   — build/run/test │ REPL/watch (any stack)
-//   git   — lazygit │ gh-dash            (suspended)   ← GitHub
-//   debug — runtime/debugger console │ logs tail
-//   data  — dbshell (dev-postgres) │ sqlite3 (suspended)
+// Folds in what used to be a separate `zj agent` column (the AI pair) and the
+// hidden `debug`/`run`/`git` tabs. The AI panes + anything heavy load
+// start_suspended → 0 CPU / 0 tokens until you press Enter, so the dense look
+// costs ~nothing at stage time (safe on 4c/8t + oomd + zram). Launched by the
+// `coding` scene (ghostty -e zj coding, cwd ~/Projects). The Vim / VM / Firefox /
+// CI-Github columns are SEPARATE niri columns (their own layouts) that niri
+// scrolls to. zjstatus pill bar + per-pane rounded frames carry the coding hue.
+//
+// Zen focus: Ctrl+p then f fullscreens the focused pane (e.g. Neovim). Float a
+// scratch shell with Alt+f. pane_frames (config.kdl) draw the titled rounded frame.
 layout {
     default_tab_template {
         pane size=1 borderless=true {
@@ -26,8 +30,8 @@ layout {
                 format_precedence "lrc"
                 border_enabled "false"
 
-                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
-                tab_active    "#[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.coding}},bold] {{powerline.dot}} {index} {name} #[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.coding}},bold] {{powerline.dot}} {name} #[fg=#{{color_raw.coding}},bg={{color.bg}}]{{powerline.round_right}}"
                 tab_separator "#[bg={{color.bg}}] "
 
                 mode_normal       "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
@@ -53,65 +57,98 @@ layout {
         children
     }
 
-    // code — the dominant editor. nvim fills the column; the run/REPL shells live one
-    // tab over (Alt+2). The editor IS the workspace.
-    tab name="code" focus=true {
-        pane command="nvim"
-    }
-    // run — build / run / test (any stack) │ a REPL or test-watch shell.
-    tab name="run" {
-        pane split_direction="vertical" {
-            pane                                   // build / run / test
-            pane                                   // REPL / watch
-        }
-    }
-    // git — lazygit + the gh PR/issue dashboard. Both suspended (wake on Enter).
-    tab name="git" {
-        pane split_direction="vertical" {
-            pane command="lazygit" { start_suspended true; }
-            pane command="gh-dash" { start_suspended true; }   // GitHub
-        }
-    }
-    // debug — runtime/debugger console │ logs tail.
-    tab name="debug" {
-        pane split_direction="vertical" {
-            pane                                   // runtime / debugger console
-            pane                                   // logs tail
-        }
-    }
-    // data — dev-postgres shell │ a scratch sqlite. Both suspended.
-    tab name="data" {
-        pane split_direction="vertical" {
-            pane command="dbshell" { start_suspended true; }
-            pane command="sqlite3" { start_suspended true; }
+    // deck — the mockup command center, all visible at once. Outer = 3 columns
+    // (left block · Sli labs · Claude); the left block stacks editor+rail over the
+    // two consoles. Heavy/AI panes start_suspended (0 cost until Enter).
+    tab name="deck" focus=true {
+        // EDITOR ROW (top) over a calm full-width CONSOLE strip (bottom). Proportions from
+        // tokens [layout] — Neovim dominant + slim rail/AI columns. Heavy/AI panes start_suspended.
+        pane split_direction="horizontal" {
+            pane size="{{layout.deck_top}}%" split_direction="vertical" {
+                pane size="{{layout.editor_major}}%" command="nvim" { name "Neovim"; }
+                // rail — Tree · Git · Run, stacked. Seeded snapshots, then an interactive shell.
+                pane size="{{layout.rail}}%" split_direction="horizontal" {
+                    pane name="Tree" command="fish" {
+                        args "-C" "eza --tree --level=2 --icons --git 2>/dev/null"
+                    }
+                    pane name="Git" command="fish" {
+                        args "-C" "git -c color.ui=always status -sb 2>/dev/null; and git -c color.ui=always log --oneline -8 2>/dev/null"
+                    }
+                    pane name="Run" command="sl-run"   // project-aware build/test/run/REPL
+                }
+                // AI pair — Sli labs (in-house team) then Claude, both slim + suspended (0 cost until Enter).
+                pane size="{{layout.aux_slim}}%" command="slicedlabs" {
+                    start_suspended true
+                    name "AI · Sli labs"
+                }
+                pane command="slc-claude" {
+                    start_suspended true
+                    name "AI · Claude"
+                }
+            }
+            // consoles — LIVE, full-width bottom strip. Debugger (gdb/lldb/dlv/rust-gdb; nvim F5 = DAP
+            // via lldb-dap) · Logger (live project logs / user journal → lnav).
+            pane size="{{layout.console_h}}%" split_direction="vertical" {
+                pane name="Debugger console" command="sl-debug"
+                pane name="Logger console" command="sl-log"
+            }
         }
     }
 
-    // Alt+] / Alt+[ cycle the focused tab's panes through these arrangements (spec §14
-    // "swap layouts"): dominant (big left + rest) ↔ even split ↔ stacked. Modeled on
-    // zellij's built-in default swap layouts. The base `code` tab is a single editor pane.
-    swap_tiled_layout name="dominant" {
-        tab {
-            pane split_direction="vertical" {
-                pane size="62%"
-                pane { children; }
+    // Classic tabs RESTORED (their original functionality) — the bar's {tabs} renders
+    // each as a selectable pill alongside `deck`. Heavy panes stay start_suspended.
+    tab name="code" {
+        pane command="nvim" { name "Neovim"; }
+    }
+    tab name="run" {
+        pane split_direction="vertical" {
+            pane name="build · test" command="sl-run"
+            pane name="REPL · watch" command="sl-run" {
+                args "watch"
+                start_suspended true
             }
         }
     }
-    swap_tiled_layout name="even" {
-        tab {
-            pane split_direction="vertical" {
-                pane
-                pane { children; }
-            }
+    tab name="git" {
+        pane split_direction="vertical" {
+            pane command="lazygit" { start_suspended true; name "lazygit"; }
+            pane command="gh-dash" { start_suspended true; name "gh-dash"; }
         }
     }
-    swap_tiled_layout name="stacked" {
-        tab {
-            pane split_direction="vertical" {
-                pane
-                pane stacked=true { children; }
-            }
+    tab name="debug" {
+        pane split_direction="vertical" {
+            pane name="debugger" command="sl-debug" { start_suspended true; }
+            pane name="logs" command="sl-log" { start_suspended true; }
         }
+    }
+    // ── IDE pillars (the VS Code ring, owned + project-scoped). Suspended → 0 cost until Enter. ──
+    tab name="problems" {
+        pane name="diagnostics" command="sl-diag" { start_suspended true; }
+    }
+    tab name="test" {
+        pane name="tests" command="sl-test" { args "list"; start_suspended true; }
+    }
+    tab name="search" {
+        pane name="find" command="sl-find" { args "-i"; start_suspended true; }
+    }
+    tab name="tasks" {
+        pane name="tasks" command="sl-task" { start_suspended true; }
+    }
+    tab name="profile" {
+        pane name="profiler" command="sl-profile" { start_suspended true; }
+    }
+    tab name="data" {
+        pane split_direction="vertical" {
+            pane command="dbshell" { start_suspended true; name "dbshell"; }
+            pane command="sqlite3" { start_suspended true; name "sqlite3"; }
+        }
+    }
+    // ssh — the MacBook Air LAN build/test/sign node (Host `mac`, ~/.ssh/config). RESTORED.
+    tab name="ssh" {
+        pane command="ssh" { args "mac"; name "mac · MacBook Air"; }
+    }
+    // term — a plain working terminal on the main-screen cockpit.
+    tab name="term" {
+        pane name="terminal"
     }
 }

@@ -1,0 +1,13 @@
+# SlicedLabs · body · © 2026 SlicedLabs
+# The mark's living gradients: one wheel step per minute (a full revolution
+# of the 16-frame cycle ≈ every 16 minutes, forever).
+[Unit]
+Description=SlicedLabs mark wallpaper cycle (1/min wheel step)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

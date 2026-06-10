@@ -1,0 +1,19 @@
+# Static information about the filesystems.
+# See fstab(5) for details.
+
+# <file system> <dir> <type> <options> <dump> <pass>
+# /dev/mapper/ArchinstallVg-root
+UUID=aa5f6958-85ff-4dc8-ba0f-d59dae971cbd	/         	btrfs     	rw,relatime,compress=zstd:3,ssd,space_cache=v2,subvol=/@	0 0
+
+# /dev/mapper/ArchinstallVg-root
+UUID=aa5f6958-85ff-4dc8-ba0f-d59dae971cbd	/home     	btrfs     	rw,relatime,compress=zstd:3,ssd,space_cache=v2,subvol=/@home	0 0
+
+# /dev/mapper/ArchinstallVg-root
+UUID=aa5f6958-85ff-4dc8-ba0f-d59dae971cbd	/var/cache/pacman/pkg	btrfs     	rw,relatime,compress=zstd:3,ssd,space_cache=v2,subvol=/@pkg	0 0
+
+# /dev/mapper/ArchinstallVg-root
+UUID=aa5f6958-85ff-4dc8-ba0f-d59dae971cbd	/var/log  	btrfs     	rw,relatime,compress=zstd:3,ssd,space_cache=v2,subvol=/@log	0 0
+
+# /dev/nvme0n1p1
+UUID=5967-3136      	/boot     	vfat      	rw,relatime,fmask=0137,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2
+

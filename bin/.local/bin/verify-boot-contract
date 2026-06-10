@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-boot-contract — the login boot contract holds (Track 9.4): the working
 # stacks (coding · browser · research) EAGER-STAGE at login; everything else (incl.
 # monitoring) is on-demand via `cockpit <ws>`; the scene launcher + autotiler are
@@ -17,12 +18,12 @@ no() { echo "  ✗ $1" >&2; fail=1; }
 
 py() { python3 -c "$1" 2>/dev/null; }
 
-# 1) [meta].auto eager-stages coding, browser, research
+# 1) [meta].auto is EMPTY — project-scoped lean login (2026-06-03). Nothing eager-stages;
+#    each project-scoped ws is summoned BOUND to a project via `cockpit <ws>`. A non-empty
+#    auto would reintroduce the context-free "generalized station" + the login-storm risk.
 auto=$(py "import tomllib;print(' '.join(tomllib.load(open('$REG','rb'))['meta']['auto']))")
-for ws in coding browser research; do
-    echo " $auto " | grep -q " $ws " && ok "eager-stages '$ws' at login" \
-        || no "'$ws' missing from [meta].auto ($auto)"
-done
+[ -z "${auto// /}" ] && ok "lean login: [meta].auto empty (project-scoped summon)" \
+    || no "[meta].auto must be empty for project-scoped lean login (got: $auto)"
 
 # 2) niri spawns the scene launcher + autotiler at startup. monitoring is NOT eager —
 #    the webstack/monitoring-stack era ended 2026-05-31; it's an on-demand DP-2 cockpit.
@@ -33,11 +34,12 @@ done
 echo " $auto " | grep -q " monitoring " && no "monitoring must NOT be eager (should be on-demand)" \
     || ok "monitoring is on-demand (not in [meta].auto)"
 
-# 3) every auto workspace declares a scene (apps or a delegate)
-for ws in coding browser research; do
-    n=$(py "import tomllib;w=tomllib.load(open('$REG','rb'))['workspaces'].get('$ws',{});print(len(w.get('apps',[])) or (1 if w.get('delegate') else 0))")
-    [ "${n:-0}" -ge 1 ] && ok "'$ws' declares its scene (${n} surface/s)" \
-        || no "'$ws' declares no scene"
+# 3) project-scoped workspaces declare project_scoped + default_project + a scene, so a
+#    summon binds the whole deck to a project (the new contract replacing eager-staging).
+for ws in coding engine research; do
+    ps=$(py "import tomllib;w=tomllib.load(open('$REG','rb'))['workspaces'].get('$ws',{});print(1 if w.get('project_scoped') and w.get('default_project') and (w.get('apps') or w.get('delegate')) else 0)")
+    [ "${ps:-0}" = "1" ] && ok "'$ws' project-scoped (default_project + scene)" \
+        || no "'$ws' missing project_scoped/default_project/scene"
 done
 
 # 4) coding stack starts its backing services; monitoring is a DP-2 cockpit that boots

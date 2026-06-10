@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """claude-post-tool — PostToolUse hook script.
 
 Appends every tool call to ~/.cache/slicedlabs/audit.ndjson. Best-effort —

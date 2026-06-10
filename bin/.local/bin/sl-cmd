@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-cmd — the coding command palette (VS Code's Ctrl+Shift+P, owned). A wofi/fzf picker over the
+# project's IDE actions; runs the chosen one in the bound project ($SL_PROJECT). Bind to a key
+# (e.g. Mod+Shift+P) for a GUI palette, or run inline in a deck pane.
+set -uo pipefail
+have() { command -v "$1" >/dev/null 2>&1; }
+PROJ="${SL_PROJECT:-$PWD}"
+
+# Ordered action list → command (each runs in $PROJ). Pillars mirror the deck tabs.
+labels=(
+    "Build" "Test — run" "Test — list" "Problems — diagnostics" "Search — interactive"
+    "Tasks…" "Run / dev server" "Watch — continuous build" "Debug" "Git — lazygit"
+    "CI / PRs — gh-dash" "Audit — review/security" "Profile — flamegraph" "REPL"
+)
+cmd_for() { case "$1" in
+    "Build") echo "sl-run build" ;; "Test — run") echo "sl-test" ;; "Test — list") echo "sl-test list" ;;
+    "Problems — diagnostics") echo "sl-diag" ;; "Search — interactive") echo "sl-find -i" ;;
+    "Tasks…") echo "sl-task pick" ;; "Run / dev server") echo "sl-run run" ;;
+    "Watch — continuous build") echo "sl-run watch" ;; "Debug") echo "sl-debug" ;;
+    "Git — lazygit") echo "lazygit" ;; "CI / PRs — gh-dash") echo "gh-dash" ;;
+    "Audit — review/security") echo "sl-audit" ;; "Profile — flamegraph") echo "sl-profile" ;;
+    "REPL") echo "sl-run repl" ;;
+esac; }
+
+[ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] && { grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0; }
+
+sel="$(printf '%s\n' "${labels[@]}" | {
+    if [ -t 0 ] && [ -t 1 ] && have fzf; then fzf --prompt="⌘ $(basename "$PROJ") › "
+    elif have wofi; then wofi --dmenu --insensitive --width 760 --height 560 --prompt "⌘ $(basename "$PROJ") › " 2>/dev/null
+    else echo ""; fi
+})"
+[ -n "$sel" ] || exit 0
+cmd="$(cmd_for "$sel")"; [ -n "$cmd" ] || exit 0
+
+if [ -t 1 ]; then (cd "$PROJ" && exec sh -c "$cmd")
+else setsid -f ghostty --class=com.slicedlabs.coding-cmd --working-directory="$PROJ" \
+        -e sh -c "$cmd; exec ${SHELL:-/usr/bin/fish}" >/dev/null 2>&1; fi

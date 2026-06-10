@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # monitoring-stack — opens the NATIVE observability cockpit (`slicedlabs monitor`).
 #
 # This REPLACED the old Firefox webstack (Grafana/Prometheus/Pyroscope/Alloy tabs):
@@ -22,6 +23,7 @@ fi
 
 # Export the workspace identity hue so the cockpit (and the terminal's tooling)
 # breathe monitoring-green even when launched outside the scene choreography.
-export SL_IDENTITY="$(sl-identity monitoring 2>/dev/null || echo '#639922')"
+SL_IDENTITY="$(sl-identity monitoring 2>/dev/null || echo '#639922')"  # SC2155: assign then export
+export SL_IDENTITY
 
 exec ghostty --class="$APP_ID" --title=monitoring -e slicedlabs monitor

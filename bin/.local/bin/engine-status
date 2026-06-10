@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # engine-status — snapshot the [ENGINE] repo's working state into a JSON
 # sidecar consumed by waybar (workspace status chip) and OBS overlays
 # (browser-source status panel). Cheap; safe to run on a 2-5s timer.
@@ -11,7 +12,7 @@
 # `target/.rustc_info.json` is newer than the latest committed source file.
 set -euo pipefail
 
-REPO="${ENGINE_REPO:-${HOME}/Projects/engine}"
+REPO="${ENGINE_REPO:-${HOME}/SlicedLabs/tools/slicedengine}"
 OUT="${ENGINE_STATUS_OUT:-/tmp/engine-status.json}"
 
 emit() {

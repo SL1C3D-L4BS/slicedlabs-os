@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # backup-borg — point-in-time backup to a removable LUKS-encrypted disk.
 # Designed for two USB drives rotated weekly, one offsite. Self-contained:
 # unlocks LUKS, mounts, snapshots, prunes, unmounts, locks.
@@ -84,6 +85,14 @@ borg create --verbose --filter=AME --list --stats --show-rc --compression=zstd,9
     --exclude "${HOME}/.config/mozilla*/Cache*" \
     --exclude "${HOME}/.config/discord/Cache*" \
     --exclude "${HOME}/.config/Code/Cache*" \
+    --exclude "${HOME}/SlicedLabs/vendor/llama.cpp" \
+    --exclude "${HOME}/SlicedLabs/vendor/FlameGraph" \
+    --exclude "${HOME}/SlicedLabs/vendor/bpf-tools" \
+    --exclude "${HOME}/SlicedLabs/vendor/osxcross" \
+    --exclude "${HOME}/SlicedLabs/vendor/go" \
+    --exclude "${HOME}/SlicedLabs/vendor/slang-build" \
+    --exclude "${HOME}/SlicedLabs/vendor/_reference" \
+    --exclude "${HOME}/SlicedLabs/lab" \
     "${REPO}::${SNAP}" \
     "${HOME}/.dotfiles" \
     "${HOME}/.password-store" \
@@ -94,9 +103,7 @@ borg create --verbose --filter=AME --list --stats --show-rc --compression=zstd,9
     "${HOME}/.config/easyeffects" \
     "${HOME}/.config/wireplumber" \
     "${HOME}/.claude/.credentials.json" \
-    "${HOME}/Projects" \
-    "${HOME}/Resources" \
-    "${HOME}/discord-mcp" \
+    "${HOME}/SlicedLabs" \
     "${HOME}/Pictures/Screenshots" \
     2>&1
 
@@ -107,5 +114,10 @@ borg prune --list --keep-daily=7 --keep-weekly=4 --keep-monthly=12 "${REPO}"
 
 log "Compact (reclaim space)"
 BORG_PASSPHRASE="${PASS_VALUE}" borg compact "${REPO}"
+
+# Record a success marker (consumed by verify-backup for offsite freshness).
+STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/backup-borg"
+mkdir -p "${STATE_DIR}"
+printf '%s %s\n' "$(date -Is)" "${LABEL}::${SNAP}" > "${STATE_DIR}/last-backup"
 
 log "Done. Snapshot: ${SNAP}"

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # ds4-pair.sh — Phase 9 helper for DualShock 4 / DualSense Bluetooth pairing.
 #
 # USB pad? You don't need this — plug in the USB cable. The hid_playstation

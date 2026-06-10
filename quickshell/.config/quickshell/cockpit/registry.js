@@ -1,5 +1,6 @@
+// SlicedLabs · body · © 2026 SlicedLabs
 .pragma library
-// Tab → chip-script registry (paths relative to ~/.config/waybar/scripts/).
+// Tab → chip-script registry (paths relative to ~/.config/quickshell/cockpit/scripts/).
 // Mirrors the old Waybar config.jsonc module map — the data plumbing is reused
 // verbatim; the cockpit just execs these and renders the JSON they emit.
 var TABS = {

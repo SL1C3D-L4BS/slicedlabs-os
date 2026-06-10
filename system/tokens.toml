@@ -1,3 +1,4 @@
+# SlicedLabs · body · © 2026 SlicedLabs
 # Single source of truth for design tokens across the workstation.
 # Nature-inspired palette · perfect-fifth modular scale (1.5) · 8pt grid.
 #
@@ -8,9 +9,13 @@
 # the [color_light] / [color_raw_light] / etc. blocks instead of the dark
 # defaults; templates need no changes for variant support.
 #
-# Workspace identities cascade everywhere (Waybar tab headers, Niri focus
-# rings, MangoHud, Starship). Hue story: cool blues for work (engine,
-# comms) → warm triad for signaling (stream, monitoring, gaming).
+# Workspace identities cascade everywhere (Cockpit pager + tabs, Niri focus
+# rings, MangoHud, Starship). Liquid Retina v3 hue story: eight identity
+# spokes spread across the OKLCH wheel at matched lightness (blue/purple for
+# thought · orange/red for heat · teal/green for flow · magenta/gold for
+# play), interleaved by six [family] accent hues. Tonal ramps (50…900) are
+# DERIVED at render time from these anchors by lib/color.py — anchors are the
+# only stored truth. Design law: library/codex/20-architect/design-language.md
 
 # ===========================================================================
 # COLOR — DARK VARIANT (default)
@@ -33,18 +38,20 @@ tertiary    = "#D9892B"   # Golden Orange — tertiary accent
 error       = "#D95C5C"   # Coral Red — danger / critical status
 success     = "#C7D42B"   # Lime Green — success status
 
-# Workspace identity ramp — OKLCH, lightness L≈0.622 held EVEN across all eight
-# hues (the perceptual payoff: equal-weight dots, distinct hue). These are the
-# cockpit pager dots/tabs and cascade to focus rings + scenes. Anchors come from
-# the design concept; `color.py --selftest` guarantees the exact sRGB bake.
-coding      = "oklch(0.62325 0.14864 251.503)"   # #378ADD blue    — WS1
-research    = "oklch(0.62320 0.15015 284.719)"   # #7F77DD violet  — WS2
-engine      = "oklch(0.62271 0.16827 38.262)"    # #D85A30 coral   — WS3
-browser     = "oklch(0.62306 0.12317 165.499)"   # #1D9E75 teal    — WS4
-monitoring  = "oklch(0.62227 0.15627 131.487)"   # #639922 green   — WS5
-streaming   = "oklch(0.62245 0.16662 2.522)"     # #D4537E magenta — WS6
-gaming      = "oklch(0.62339 0.18772 24.724)"    # #E24B4A red     — WS7
-media       = "oklch(0.62218 0.13039 67.215)"    # #BA7517 amber   — WS8
+# Workspace identity ramp — OKLCH, lightness L≈0.623 held EVEN across all eight
+# hues (the perceptual payoff: equal-weight dots, distinct hue). Liquid Retina
+# v3 wheel: spokes spread to a 27° minimum hue gap (was 13.6°) with richer
+# purple/green/orange presence. These are the cockpit pager dots/tabs and
+# cascade to focus rings + scenes; `color.py --selftest` guarantees the exact
+# sRGB bake and the derived ramp law.
+coding      = "oklch(0.62354 0.14977 249.807)"   # #308BDD blue    — WS1
+research    = "oklch(0.62183 0.16503 299.925)"   # #976BDA purple  — WS2
+engine      = "oklch(0.62315 0.14704 52.190)"    # #CA691F orange  — WS3
+browser     = "oklch(0.62268 0.10311 179.786)"   # #279B89 teal    — WS4
+monitoring  = "oklch(0.62402 0.16564 142.041)"   # #419F39 green   — WS5
+streaming   = "oklch(0.62249 0.16903 350.032)"   # #CE5495 magenta — WS6
+gaming      = "oklch(0.62324 0.18785 25.070)"    # #E24B49 red     — WS7
+media       = "oklch(0.62240 0.11725 88.284)"    # #A4821F gold    — WS8
 
 # Overlay HUD-tab identities — summoned by keybind, not workspaces (violet slot
 # now belongs to research; these fill teal / orchid / rose).
@@ -65,6 +72,22 @@ earth       = "#7A6142"   # Earth Brown — heavy borders, separators
 wisteria    = "#7C6ED6"   # Wisteria — special-state accent (profiling, heaptrack)
 honey       = "#D6BF3A"   # Warm Honey — caution tier (pre-alert)
 brick       = "#8E3A32"   # Deep Brick — critical tier (above coral)
+
+# ===========================================================================
+# FAMILY — Liquid Retina v3 extended accent families. Six half-spoke hues
+# interleaving the identity wheel at the SAME perceptual lightness (L≈0.623):
+# the vocabulary for semantic tiers, glass tints, gradients, and bright
+# accents. Chrome-only — never repoint [ansi] here. Each family also derives
+# a 50…900 tonal ramp at render time ({{ramp.lavender_300}} etc.).
+# ===========================================================================
+
+[family]
+lavender  = "oklch(0.62373 0.16331 274.759)"   # #6C7BE8 — between coding and research
+orchid    = "oklch(0.62356 0.16443 329.740)"   # #BC5DB6 — between research and streaming (deeper sibling of the ai HUD hue)
+jade      = "oklch(0.62398 0.11331 159.722)"   # #3D9C6F — between browser and monitoring
+lime      = "oklch(0.62254 0.11855 119.959)"   # #7E9136 — between monitoring and media
+tangerine = "oklch(0.62408 0.15631 40.114)"    # #D36035 — between gaming and engine (the old coral lives on)
+gold      = "oklch(0.62237 0.10218 95.192)"    # #9A8636 — between media and lime
 
 [color_css]
 backdrop      = "rgba(30, 30, 30, 0.85)"      # bg @ 85% — Waybar/Mako overlay
@@ -89,14 +112,14 @@ tertiary    = "D9892B"
 error       = "D95C5C"
 success     = "C7D42B"
 # identity ramp (bare hex = OKLCH ramp baked by color.py; keep in sync via render)
-coding      = "378ADD"
-research    = "7F77DD"
-engine      = "D85A30"
-browser     = "1D9E75"
-monitoring  = "639922"
-streaming   = "D4537E"
-gaming      = "E24B4A"
-media       = "BA7517"
+coding      = "308BDD"
+research    = "976BDA"
+engine      = "CA691F"
+browser     = "279B89"
+monitoring  = "419F39"
+streaming   = "CE5495"
+gaming      = "E24B49"
+media       = "A4821F"
 selection   = "1A3D6F"
 inactive    = "3D3528"
 warm_shadow = "1A1612"
@@ -134,14 +157,14 @@ tertiary    = "#B9682A"   # Burnt Orange — darker than Golden for light bg
 error       = "#B74A4A"   # Clay Red — darker than Coral
 success     = "#9DAE21"   # Lime Green darkened (Lime on white burns)
 # identity ramp — light variant (L=0.52 for contrast on the light base)
-coding      = "oklch(0.52000 0.14864 251.503)"   # #0B6ABB — WS1
-research    = "oklch(0.52000 0.15015 284.719)"   # #6258BA — WS2
-engine      = "oklch(0.52000 0.16827 38.262)"    # #B43902 — WS3
-browser     = "oklch(0.52000 0.12317 165.499)"   # #007E57 — WS4
-monitoring  = "oklch(0.52000 0.15627 131.487)"   # #467A00 — WS5
-streaming   = "oklch(0.52000 0.16662 2.522)"     # #B03160 — WS6
-gaming      = "oklch(0.52000 0.18772 24.724)"    # #BD242C — WS7
-media       = "oklch(0.52000 0.13039 67.215)"    # #995700 — WS8
+coding      = "oklch(0.52000 0.14977 249.807)"   # #006BBA — WS1
+research    = "oklch(0.52000 0.16503 299.925)"   # #794CB8 — WS2
+engine      = "oklch(0.52000 0.14704 52.190)"    # #A74A00 — WS3
+browser     = "oklch(0.52000 0.10311 179.786)"   # #007C6B — WS4
+monitoring  = "oklch(0.52000 0.16564 142.041)"   # #1A7F11 — WS5
+streaming   = "oklch(0.52000 0.16903 350.032)"   # #AB3376 — WS6
+gaming      = "oklch(0.52000 0.18785 25.070)"    # #BD242B — WS7
+media       = "oklch(0.52000 0.11725 88.284)"    # #856400 — WS8
 net         = "#1F7A73"   # Deep Seafoam — net HUD
 ai          = "#9A4089"   # Deep Orchid — AI HUD
 agenda      = "#B85F86"   # Deep Rose — agenda HUD
@@ -159,6 +182,15 @@ earth       = "#7A6142"
 wisteria    = "#5A4AA8"   # Deep Violet — darker than Wisteria for light
 honey       = "#B89F2E"   # Muted Mustard — darker than Honey for light
 brick       = "#8E3A32"
+
+# Family accents — light variant (same hues at L=0.52, like the identities)
+[family_light]
+lavender  = "oklch(0.52000 0.16331 274.759)"   # #505BC5
+orchid    = "oklch(0.52000 0.16443 329.740)"   # #9A3D95
+jade      = "oklch(0.52000 0.11331 159.722)"   # #117C51
+lime      = "oklch(0.52000 0.11855 119.959)"   # #61720D
+tangerine = "oklch(0.52000 0.15631 40.114)"    # #AF3F0C
+gold      = "oklch(0.52000 0.10218 95.192)"    # #7B680E
 
 [color_css_light]
 backdrop      = "rgba(247, 246, 242, 0.85)"
@@ -181,14 +213,14 @@ secondary   = "3F8AC8"
 tertiary    = "B9682A"
 error       = "B74A4A"
 success     = "9DAE21"
-coding      = "0B6ABB"
-research    = "6258BA"
-engine      = "B43902"
-browser     = "007E57"
-monitoring  = "467A00"
-streaming   = "B03160"
-gaming      = "BD242C"
-media       = "995700"
+coding      = "006BBA"
+research    = "794CB8"
+engine      = "A74A00"
+browser     = "007C6B"
+monitoring  = "1A7F11"
+streaming   = "AB3376"
+gaming      = "BD242B"
+media       = "856400"
 selection   = "BED7F4"
 inactive    = "D3C399"
 warm_shadow = "EFE9DD"
@@ -207,18 +239,18 @@ notify_critical    = "#B74A4A80"
 
 # ===========================================================================
 # TYPOGRAPHY — modular scale, ratio 1.5 (perfect fifth)
-# Base UI = 11px; mono = 13px; tab-header = 14px; heading = 16px; display = 24px
+# Base UI = 14px; mono = 16px; tab-header = 18px; heading = 20px; display = 30px  (Comfortable, 2026-06-03)
 # ===========================================================================
 
 [font]
 mono        = "JetBrainsMono Nerd Font"
-mono_size   = 13
+mono_size   = 16
 display     = "Geist Mono"
-ui_size     = 11
-ui_size_sm  = 9          # tooltips, captions, sub-labels
-ui_size_lg  = 14         # Waybar tab headers (bold) — 11 × 1.25 ≈ 14
-heading_md  = 16         # section headings in editors/launchers
-display_lg  = 24         # lockscreen, splash (reserved)
+ui_size     = 14
+ui_size_sm  = 11         # tooltips, captions, sub-labels
+ui_size_lg  = 18         # Waybar tab headers (bold)
+heading_md  = 20         # section headings in editors/launchers
+display_lg  = 30         # lockscreen, splash (reserved)
 
 # Weight tiers — Geist Mono axis (Light→Black). Hierarchy rides WEIGHT, not colour.
 weight_dim      = 300    # inactive tab names / de-emphasis (Light)
@@ -260,6 +292,7 @@ media      = "󰎆"
 net        = "󰛳"
 ai         = "󰚩"
 agenda     = "󰃭"
+market     = "󰟇"   # SlicedLabs Marketplace (nf-md-store) — the layer users pull from
 
 # Shared metric glyphs — used across module scripts
 clock     = "󰥔"
@@ -285,9 +318,15 @@ spend     = "󰉁"
 play      = "󰐊"
 pause     = "󰏤"
 speaker   = "󰕾"
+skip_prev = "󰒮"
+skip_next = "󰒭"
+spotify   = "󰓇"
 firewall  = "󰞀"
 warden    = "󰒃"
 route     = "󰑪"
+bluetooth           = "󰂯"   # adapter on, idle
+bluetooth_off       = "󰂲"   # adapter off / unavailable
+bluetooth_connected = "󰂱"   # a device is connected
 rust      = "🦀"   # language symbol — the one content glyph outside Waybar (starship)
 
 # ===========================================================================
@@ -401,30 +440,44 @@ saturation    = 1.2          # blurred-bg saturation (1.5 default → muted for 
 
 [glass]
 quality             = "high"  # high | low | off  (off ⇒ flat frosted = today's cssChip)
-refraction_px       = 2       # near-flat — only the faintest edge bend
-rim_width           = 1.0     # hairline border only (ref AuroraSurface outline)
-rim_opacity         = 0.14
-specular_intensity  = 0.0     # NO sheen / light-beam — flat by request
-specular_speed      = 0.0     # 0 = no motion; the glass is static by design
-chromatic_px        = 0.0     # no rim aberration — clean flat surface
-ambient_bleed       = 0.10    # active brand-hue tint (subtle / monochrome-leaning)
-tint_opacity        = 0.85    # == opacity.window_focused
+look                = "dark"  # dark | light | clear — the material look (Liquid Retina v3);
+                              # clear overlays [glass_clear]/[opacity_clear] at render time
+refraction_px       = 6       # real edge lensing on the always-on chrome (v3: was 2)
+rim_width           = 1.25    # grazing-light rim (v3: was 1.0 hairline)
+rim_opacity         = 0.18    # v3: was 0.14
+specular_intensity  = 0.12    # gentle STATIC top sheen (v3: was 0.0 flat) — speed stays 0 on bars
+specular_speed      = 0.0     # 0 = no motion on base chrome; the sweep is a focal/ultra trait
+chromatic_px        = 0.6     # sub-pixel rim aberration (v3: was 0.0)
+ambient_bleed       = 0.12    # active brand-hue tint (v3: was 0.10)
+tint_opacity        = 0.82    # slightly clearer body (v3: was 0.85)
+rim_brand_mix       = 0.35    # v3: rim light picks up the brand hue (0 = pure white rim)
 corner_continuous   = 1       # 1 = squircle (continuous) corners
 noise               = 0.02    # == blur.noise (anti-banding)
 reduce_transparency = 0       # a11y: 1 ⇒ force opaque frost + drop refraction
 reduce_motion       = 0       # a11y: 1 ⇒ freeze specular / breathing
 contrast_floor      = 4.5     # WCAG-AA min text contrast the material must never break
 
-# FOCAL surfaces (modals · Control Center · menu · lock) get TRUE Liquid Glass:
+# FOCAL surfaces (menu · Marketplace · secondary panels) get TRUE Liquid Glass:
 # stronger wallpaper lensing + a slow moving specular sweep + a subtle chromatic
-# rim, composited over niri's real blur. The always-on bars keep the calm baseline
-# above — you read text through them all day. Glass.qml `focal: true` opts in.
-focal_refraction_px      = 9
+# rim, composited over niri's real blur. The always-on bars keep the calm-but-
+# liquid baseline above — you read text through them all day.
+focal_refraction_px      = 10
 focal_rim_opacity        = 0.22
-focal_specular_intensity = 0.38
+focal_specular_intensity = 0.42
 focal_specular_speed     = 0.6
 focal_chromatic_px       = 1.4
 focal_ambient_bleed      = 0.14
+
+# ULTRA tier (v3) — the showpiece material for Stack modals · Control Center ·
+# permission gates · lock chrome: strongest lensing, visible chromatic edge,
+# slow liquid sweep. Glass.qml `tier: "ultra"` opts in; reduce_transparency /
+# reduce_motion still flatten/freeze it (the a11y law outranks the showpiece).
+ultra_refraction_px      = 14
+ultra_rim_opacity        = 0.30
+ultra_specular_intensity = 0.55
+ultra_specular_speed     = 0.35
+ultra_chromatic_px       = 2.2
+ultra_ambient_bleed      = 0.18
 
 # Per-cockpit glass quality (spec §14 tiers) — frame-time protection. The opaque /
 # perf-sensitive workspaces drop to a cheaper shader path; the glass workspaces keep
@@ -443,6 +496,22 @@ media      = "low"      # opaque video
 [glass_light]
 ambient_bleed = 0.12
 rim_opacity   = 0.25
+
+# CLEAR look (v3) — the see-through Liquid Retina variant: thinner tint, more
+# wallpaper, calmer bleed. Overlaid onto [glass] when [glass].look = "clear"
+# (render-templates / render-quickshell --look=clear).
+[glass_clear]
+tint_opacity   = 0.55
+refraction_px  = 8
+ambient_bleed  = 0.06
+rim_opacity    = 0.22
+
+# Opacity companions for the clear look — windows let more wallpaper through.
+[opacity_clear]
+window_focused   = 0.78
+window_unfocused = 0.78
+window_floating  = 0.82
+ghostty_bg       = 0.80
 
 # ===========================================================================
 # SEMANTIC ROLE TIER — the design-concept's role tokens. Every render target
@@ -490,6 +559,32 @@ pager_active_border  = 2         # focused-tab accent border px (concept)
 pill_hairline        = 1         # chrome border px (drawn 0.5 via AA where supported)
 
 # ===========================================================================
+# MODAL — the SlicedLabs userspace modal design language (one ModalShell per popup).
+# ONE ModalShell.qml consumes these; EVERY popup wears them — Control Center, Keys,
+# the command palette, notifications, and hermes. Numbers only here; colours come
+# from [semantic]/[color] (approve = success, deny = error). Doctrine + anatomy:
+# library/codex/20-architect/modal-design-language.md  (Canon §III.7, §VIII.17).
+# ===========================================================================
+
+[modal]
+radius          = 16      # the floating-pill corner (softer than radius_lg=12)
+pad             = 20      # inner content padding (5 × grid)
+gap             = 12      # intra-modal element gap (3 × grid)
+width_sm        = 520     # compact — palette, confirms, hermes ask
+width           = 640     # default — Control Center, chat
+width_lg        = 820     # wide — Keys browser, history, results
+max_height_frac = 0.82    # cap panel height to this fraction of the screen height
+header_height   = 40      # title row
+tab_height      = 36      # TabStrip
+input_height    = 42      # InputBar
+row_height      = 32      # list rows (history, results, devices)
+enter_scale     = 0.96    # entrance: rise 96%→100% (calmer than the old 0.93)
+backdrop_dim    = 0.55    # scrim opacity over the desktop behind the pill
+hairline        = 0.08    # white-alpha divider / hairline border (matches existing modals)
+fill_subtle     = 0.04    # row / chip subtle fill
+fill_hover      = 0.12    # hover fill
+
+# ===========================================================================
 # ANSI 8-COLOR PALETTE (zellij theme, ghostty theme)
 # Kept separate from semantic colors so renames don't cascade.
 # ===========================================================================
@@ -507,7 +602,8 @@ white       = "#F7F6F2"   # Soft White
 # ===========================================================================
 # ANSI BRIGHT 8 — completes the 16-color set (ghostty palette 8-15, zellij).
 # Palette-consistent luminance lifts of the [ansi] hues so brights stay on-brand.
-# Keys are digit-free (render-templates placeholder regex is [a-z_]+ only).
+# Placeholder grammar (v3): [a-z_][a-z0-9_]* — digits allowed (ramp steps);
+# these keys stay spelled-out for readability.
 # ===========================================================================
 
 [ansi_bright]
@@ -525,7 +621,7 @@ bright_white   = "#FFFFFF"   # Pure white above Soft White
 # (JetBrainsMono Nerd Font) so zjstatus tabs, the tide prompt, lualine sections,
 # and the cockpit pills all draw the SAME pill. Rounded caps = the Liquid-Glass
 # capsule; chevrons = hard segment joins; thin = hairline dividers. Mirrors the
-# `~/Downloads/slicedlabs-terminal-surface.html` pill atom. Keys are [a-z_]+ only.
+# `~/Downloads/slicedlabs-terminal-surface.html` pill atom. Keys: [a-z_][a-z0-9_]*.
 # ===========================================================================
 
 [powerline]
@@ -543,6 +639,20 @@ dot          = "●"     # identity pager dot (== cockpit pager_dot diameter)
 # ===========================================================================
 
 [terminal]
-claude_pane_pct = 38         # Claude Code right-pane width in the default zellij layout
+claude_pane_pct = 30         # Claude Code right-pane width in the default zellij layout (slim · 2026-06-03)
 zjstatus_height = 1          # status/tab bar rows (single-row, calm)
 pill_weight     = "medium"   # weight-500 restraint, carried from the cockpit pills
+
+# ===========================================================================
+# LAYOUT — cockpit pane proportions (the spatial SSOT). Golden-ratio rhythm; the
+# zellij deck .tmpl files reference these so every cockpit breathes on ONE scale.
+# Tune here + re-render — never hardcode a pane ratio in a layout again.
+# ===========================================================================
+[layout]
+phi_major     = 62           # golden 2-pane split — primary (editor/content)
+phi_minor     = 38           # golden 2-pane split — secondary (preview/assistant)
+editor_major  = 66           # dominant editor in a deck's top row
+rail          = 12           # slim nav rail (Tree/Git/Run · Bacon)
+aux_slim      = 11           # slim AI / assistant column
+deck_top      = 78           # deck editor-row height
+console_h     = 22           # full-width console strip height (= 100 − deck_top)

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-odysseus-wrap — the L4 governance-wrap gate (Canon §IV.9 own/quarantine, §IV.10
+# governed-always). Asserts every Surface capability is wrapped in the Gateway + Warden: the
+# two attestation rails exist, every effect rides its rail (Completion→interpret,
+# Action→record_action), the Gateway is the one model path, and the allowed-vendor boundary
+# holds. PATH shim to the repo-side checker (tools/wrapcheck.py) so the logic travels with the
+# code while the canon name lives here — the owned tree never names the studied reference
+# (Canon §VIII.15; verify-slicedlabs enforces it). Override the repo with $SLICEDLABS_STACK.
+#
+# If the repo is not checked out on this host the gate is SKIPPED (green) — same posture as
+# verify-slicedlabs / verify-all's optional tier. Spec: tools/surface/docs/governance-wrap.md.
+set -uo pipefail
+REPO="${SLICEDLABS_STACK:-$HOME/SlicedLabs/tools/surface}"
+CHECK="$REPO/tools/wrapcheck.py"
+if [[ ! -f "$CHECK" ]]; then
+  printf '  \033[33m•\033[0m verify-odysseus-wrap: slicedlabs-stack not on this host — skipped\n'
+  exit 0
+fi
+echo "verify-odysseus-wrap — L4 · governance wrap"
+# Stdlib-only checker → plain python3 (prefer the surface uv env if present, for parity).
+if command -v uv >/dev/null 2>&1 && [[ -f "$REPO/surface/pyproject.toml" ]]; then
+  (cd "$REPO/surface" && uv run python "$CHECK"); exit $?
+fi
+exec python3 "$CHECK"

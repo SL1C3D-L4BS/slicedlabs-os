@@ -1,0 +1,27 @@
+# [ENGINE] platform — curated audit ruleset (spec XVIII.13 · Tier 2).
+# Low-noise by design: identity/privilege/boot-chain/firewall WRITES + kernel
+# module syscalls. No execve auditing (too noisy for a dev box). -e 1 keeps
+# rules mutable; flipping to -e 2 (immutable until reboot) is the operator's
+# lockdown call. Tracked in dotfiles → /etc/audit/rules.d/slicedlabs.rules.
+-D
+-b 8192
+--backlog_wait_time 60000
+-f 1
+
+# identity & privilege
+-w /etc/passwd -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/sudoers -p wa -k privilege
+-w /etc/sudoers.d/ -p wa -k privilege
+
+# boot chain + firewall + service definitions
+-w /boot -p wa -k bootchain
+-w /etc/nftables.conf -p wa -k firewall
+-w /etc/systemd/ -p wa -k services
+-w /etc/audit/ -p wa -k auditconfig
+
+# kernel module loading
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k modules
+
+-e 1

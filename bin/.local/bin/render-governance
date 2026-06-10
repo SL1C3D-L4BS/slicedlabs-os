@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """render-governance — bake the Warden Penalty Box contract from the SSOTs.
 
 The THIRD render target of the design language (Cockpit shell + Console TUIs are

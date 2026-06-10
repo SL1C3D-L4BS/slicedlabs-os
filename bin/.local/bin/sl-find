@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-find — unified project search: text (ripgrep) · structural (ast-grep) · semantic (semgrep).
+# Runs in $SL_PROJECT / cwd. Owned terminal-native "Search across files".
+#   sl-find <query>          ripgrep text search (default; respects .gitignore)
+#   sl-find --ast <pattern>  ast-grep structural search (e.g. '$X.unwrap()')
+#   sl-find --sem <rule>     semgrep (rule id, config file, or 'auto')
+#   sl-find -i <query>       interactive: fzf over live ripgrep, preview + jump
+set -uo pipefail
+have() { command -v "$1" >/dev/null 2>&1; }
+case "${1:-}" in
+    --ast)   shift; have sg || { echo "sl-find: ast-grep (sg) not installed"; exit 1; }; sg run -p "$*" ;;
+    --sem)   shift; have semgrep || { echo "sl-find: semgrep not installed"; exit 1; }; semgrep --config "${1:-auto}" --error 2>/dev/null ;;
+    -i)      shift; { have rg && have fzf; } || { echo "sl-find: -i needs rg + fzf"; exit 1; }
+             rg --line-number --no-heading --color=always "${*:-.}" 2>/dev/null \
+               | fzf --ansi --delimiter=: \
+                     --preview 'bat --style=numbers --color=always --highlight-line {2} {1} 2>/dev/null || sed -n "{2}p" {1}' \
+                     --preview-window 'up,60%' ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    "")      echo "usage: sl-find <query> | --ast <pattern> | --sem <rule> | -i <query>" ;;
+    *)       have rg || { echo "sl-find: ripgrep not installed"; exit 1; }; rg --line-number --heading --color=always "$@" ;;
+esac

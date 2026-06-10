@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # engine-snapshot — daily reminder to commit or stash long-lived dirty WIP.
 # Designed to be run by a systemd --user timer (every few hours). Looks at
 # /tmp/engine-status.json (produced by `engine-status`) and counts dirty

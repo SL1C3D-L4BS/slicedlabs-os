@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # manim-render — render a Manim scene with sane defaults for [ENGINE] explainers.
 #
 #   manim-render <scene.py> [SceneClass] [-q l|m|h|k] [-t] [-- <extra manim args>]

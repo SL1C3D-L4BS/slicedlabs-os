@@ -1,8 +1,11 @@
+# SlicedLabs · body · packages.txt — repo-explicit packages (pacman). Restore: pacman -S --needed -
+# AUR/foreign packages live in packages-aur.txt. Regenerate: pacman -Qqe ∖ -Qqm.
 7zip
 aarch64-linux-gnu-gcc
 age
 alacritty
 amdgpu_top
+archiso
 aria2
 asciinema
 atuin
@@ -29,6 +32,7 @@ cachyos-mirrorlist
 cachyos-v3-mirrorlist
 cachyos-v4-mirrorlist
 caddy
+calf
 cargo-audit
 cargo-deny
 cargo-expand
@@ -39,6 +43,7 @@ cargo-nextest
 cargo-semver-checks
 cava
 ccache
+chafa
 clang
 cloudflared
 cmake
@@ -57,10 +62,12 @@ dust
 easyeffects
 efibootmgr
 eza
+fastfetch
 fd
 firefox
 fish
 flite
+foliate
 fuzzel
 fzf
 gamemode
@@ -71,6 +78,7 @@ git-delta
 git-filter-repo
 github-cli
 gitleaks
+git-lfs
 glow
 goverlay
 gradle
@@ -102,12 +110,16 @@ lib32-vulkan-icd-loader
 lib32-vulkan-radeon
 libappindicator
 libpulse
+libvirt
 linux-cachyos-bore
 linux-cachyos-bore-headers
 linux-firmware
+linux-lts
+linux-lts-headers
 linux-zen
 lld
 lldb
+lnav
 lsp-plugins
 luarocks
 lutris
@@ -142,9 +154,8 @@ obs-studio
 obs-studio-plugin-browser
 obs-vkcapture
 oha
-ollama-rocm
-ollama-vulkan
 openssh
+pandoc-cli
 paru
 pass
 pavucontrol
@@ -153,6 +164,7 @@ pipewire
 pipewire-alsa
 pipewire-jack
 pipewire-pulse
+plymouth
 podman
 podman-compose
 pre-commit
@@ -163,13 +175,23 @@ prometheus-node-exporter
 python-bcc
 python-pipx
 python-websockets
+qemu-base
+qemu-hw-display-virtio-gpu
+qemu-hw-display-virtio-gpu-gl
+qemu-hw-display-virtio-vga
+qemu-hw-display-virtio-vga-gl
+qemu-ui-gtk
+qemu-ui-spice-app
+qemu-ui-spice-core
 qemu-user-static
 qemu-user-static-binfmt
 qpwgraph
-qt6-shadertools
 qt6ct
+quickshell-git
+realtime-privileges
 reflector
 remmina
+renderdoc
 ripgrep
 rmpc
 rocm-hip-sdk
@@ -180,6 +202,7 @@ rocm-smi-lib
 rsync
 ruff
 rustup
+sbctl
 sccache
 scx-scheds
 sd
@@ -191,6 +214,7 @@ smartmontools
 snap-pac
 snapper
 sops
+spice-gtk
 starship
 steam
 stow
@@ -198,6 +222,7 @@ sudo
 swaybg
 swayidle
 swaylock-effects
+swtpm
 syft
 sysstat
 system-config-printer
@@ -213,12 +238,16 @@ ttf-jetbrains-mono-nerd
 typst
 ufw
 unzip
+usbguard
 uv
 v4l2loopback-dkms
 valgrind
+vector
 vegeta
 vhs
 vim
+virt-manager
+virt-viewer
 vkbasalt-cli
 vulkan-radeon
 vulkan-tools
@@ -230,6 +259,7 @@ watchexec
 wget
 wine
 wireguard-tools
+wireless-regdb
 wireplumber
 wl-clipboard
 wlogout
@@ -244,6 +274,8 @@ xwayland-satellite
 yasm
 ydotool
 yq
+zathura
+zathura-pdf-mupdf
 zellij
 zen-browser-bin
 zls

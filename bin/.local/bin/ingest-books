@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# ingest-books — bulk-ingest ~/Resources/books/ into Qdrant collection `books`.
-# Writes a status summary to ~/.cache/slicedlabs-corpus.json on completion.
-
-set -euo pipefail
-exec python3 -m slicedlabs_team.ingest.books "$@"
+# SlicedLabs · tools · © 2026 SlicedLabs
+# ingest-books — RETIRED 2026-06-06. The 93-book corpus is REFERENCE, not data
+# (Canon §VII; library/codex/20-architect/decision-ai-everywhere). We do NOT ingest
+# or vectorize the books — the library trains the builder; the gates encode the
+# result. Knowledge ingestion is code + notes + public data only. Intentional no-op.
+echo "ingest-books: retired — the corpus is reference, not data (Canon §VII). No-op." >&2
+exit 0

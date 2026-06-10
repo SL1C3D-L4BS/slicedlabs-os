@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-theme — the one whole-system appearance switcher (Liquid Retina v3).
+# Supersedes ricing-variant (now a compat shim onto this).
+#
+# Usage:
+#   sl-theme                      # toggle dark <-> light
+#   sl-theme dark|light           # pick a variant (standard look)
+#   sl-theme clear                # the see-through look on the dark palette
+#   sl-theme <any> --glass off|low|medium|high   # render-time glass override
+#   sl-theme <any> --with-wallpaper              # also re-render brand wallpapers
+#
+# Renders the WHOLE cascade (templates + quickshell + textual) then live-reloads
+# sequenced for the 4-core box: the cockpit hot-reloads on Theme.qml change, so
+# no quickshell restart is needed. State: ~/.cache/sl-theme ("variant look glass");
+# ~/.cache/ricing-variant + ~/.cache/cockpit-theme stay coherent for old readers.
+set -euo pipefail
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+STATE="$CACHE_DIR/sl-theme"
+
+MODE=""
+GLASS=""
+WALL=0
+for a in "$@"; do
+    case "$a" in
+        dark|light|clear|toggle) MODE="$a" ;;
+        --glass=*) GLASS="${a#--glass=}" ;;
+        --glass) ;; # value comes as the next arg — handled below
+        off|low|medium|high) GLASS="$a" ;;
+        --with-wallpaper) WALL=1 ;;
+        -h|--help) sed -n '3,16p' "$0"; exit 0 ;;
+        *) echo "sl-theme: unknown arg '$a' (see --help)" >&2; exit 2 ;;
+    esac
+done
+
+read -r cur_variant cur_look _ < <(cat "$STATE" 2>/dev/null || echo "dark standard -")
+case "${MODE:-toggle}" in
+    dark)  VARIANT=dark;  LOOK=standard ;;
+    light) VARIANT=light; LOOK=standard ;;
+    clear) VARIANT=dark;  LOOK=clear ;;
+    toggle)
+        if [ "$cur_variant" = dark ] && [ "$cur_look" = standard ]; then
+            VARIANT=light; LOOK=standard
+        else
+            VARIANT=dark; LOOK=standard
+        fi ;;
+esac
+
+if [ -n "$GLASS" ]; then
+    case "$GLASS" in off|low|medium|high) ;; *)
+        echo "sl-theme: --glass must be off|low|medium|high" >&2; exit 2 ;;
+    esac
+fi
+
+echo "sl-theme: variant=$VARIANT look=$LOOK${GLASS:+ glass=$GLASS}"
+
+# 1) render the whole cascade (the cockpit hot-reloads on Theme.qml write)
+render-templates --variant="$VARIANT" --look="$LOOK"
+GLASS_QUALITY="${GLASS:-}" render-quickshell --variant="$VARIANT" --look="$LOOK"
+render-textual >/dev/null
+
+# 2) persist state (+ legacy readers stay coherent)
+printf '%s %s %s\n' "$VARIANT" "$LOOK" "${GLASS:--}" > "$STATE"
+printf %s "$VARIANT" > "$CACHE_DIR/ricing-variant"
+printf %s "$VARIANT" > "$CACHE_DIR/cockpit-theme"
+
+# 3) sequenced live reloads (gentle on the 4c/8t box)
+niri msg action load-config-file >/dev/null 2>&1 || true
+sleep 0.3
+makoctl reload 2>/dev/null || true
+
+# 4) optional: re-render the brand wallpapers in the new palette (Inkscape — slow)
+if [ "$WALL" -eq 1 ]; then
+    render-brand && engine-wallpaper 2>/dev/null || true
+fi
+
+notify-send "SlicedLabs" "Theme: $VARIANT/$LOOK${GLASS:+ · glass $GLASS}" 2>/dev/null || true
+echo "sl-theme: done"

@@ -1,0 +1,17 @@
+[Unit]
+Description=ntfy — SlicedLabs sovereign push server (always-on alerting)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/ntfy serve --config %h/.config/ntfy/server.yml
+Restart=on-failure
+RestartSec=5
+# Hardening — a push relay needs almost nothing.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/ntfy
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

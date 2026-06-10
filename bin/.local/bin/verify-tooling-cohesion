@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-tooling-cohesion — keep the owned bin tools shellcheck-clean (cohesion;
+# TOOLING-ARCHITECTURE L12, Canon §II.4 "every subsystem disciplined"). A new
+# warning fails here, so the custom-tooling layer can't silently rot.
+set -uo pipefail
+BIN="${DOTFILES_ROOT:-$HOME/.dotfiles}/bin/.local/bin"
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+command -v shellcheck >/dev/null 2>&1 || { no "shellcheck not installed"; exit 1; }
+
+rc=0; dirty=0; total=0
+for f in "$BIN"/*; do
+    [ -f "$f" ] || continue
+    head -1 "$f" 2>/dev/null | grep -qE "bash|/sh$|/sh " || continue
+    total=$((total + 1))
+    n=$(shellcheck -S warning "$f" 2>/dev/null | grep -c "SC[0-9]")
+    if [ "$n" -gt 0 ]; then rc=1; dirty=$((dirty + 1)); no "$(basename "$f"): $n shellcheck warning(s)"; fi
+done
+
+# Design cohesion: the owned picker is wofi (token-styled · the sliced-menu / gaming-actions
+# pattern), never raw fuzzel (unthemed → off the design language, + single-instance-lock fragile).
+# Flag any tool that reaches for fuzzel in code (full-comment lines excused).
+fz=""
+for f in "$BIN"/*; do
+    [ -f "$f" ] || continue
+    [ "$(basename "$f")" = "verify-tooling-cohesion" ] && continue   # the detector names fuzzel in its own pattern
+    grep -vE '^[[:space:]]*#' "$f" 2>/dev/null | grep -qE '\bfuzzel\b' && fz="$fz $(basename "$f")"
+done
+if [ -n "${fz// /}" ]; then rc=1; no "raw fuzzel (off-design) in:$fz — use wofi (sliced-menu pattern)"; else ok "owned picker = wofi (no raw fuzzel)"; fi
+
+if [ $rc -eq 0 ]; then ok "$total owned bin tools shellcheck-clean (warning-level)"; echo "tooling cohesion: clean ✓"
+else echo "tooling cohesion: $dirty tool(s) with warnings — run shellcheck" >&2; fi
+exit $rc

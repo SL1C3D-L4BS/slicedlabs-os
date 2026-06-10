@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-alert-health — the always-on watchdog. Cheap, non-root checks for the
+# silent-failure conditions that matter when nobody's looking: a crashed
+# service (incl. backup-borg or ntfy itself), a filling disk. Fires sl-alert
+# (ntfy + Discord) on any problem. Run by sl-alert-health.timer; safe to run
+# by hand. Stays quiet when all is well (no alert = good).
+set -uo pipefail
+
+problems=()
+
+# 1) failed systemd units — system + user (catches backup-borg, ntfy, scenes…)
+fs="$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | paste -sd, -)"
+[ -n "$fs" ] && problems+=("failed system units: ${fs}")
+fu="$(systemctl --user --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | paste -sd, -)"
+[ -n "$fu" ] && problems+=("failed user units: ${fu}")
+
+# 2) disk pressure on the roots that matter (>= 90%)
+while read -r pct tgt; do
+  p="${pct%\%}"
+  [ -n "$p" ] && [ "$p" -ge 90 ] 2>/dev/null && problems+=("disk ${pct} full on ${tgt}")
+done < <(df --output=pcent,target / /home 2>/dev/null | tail -n +2)
+
+# 3) fire (or stay silent)
+if [ "${#problems[@]}" -gt 0 ]; then
+  msg="$(printf '%s\n' "${problems[@]}")"
+  sl-alert -p high -t "Founder · health" -g rotating_light "$msg" || true
+  echo "sl-alert-health: ${#problems[@]} problem(s) reported" >&2
+  exit 1
+fi
+exit 0

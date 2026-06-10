@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-obs — keyboard OBS control for the studio broadcast tab, over obs-websocket v5.
+# A thin wrapper on obs-ws-query (the auth+request client). Drives the OBS GUI you summon
+# on the studio's column 2 — switch scenes, toggle record/stream, watch status — hands on
+# the keyboard. obs-websocket is enabled in the OBS profile (verify-studio asserts it).
+#
+#   sl-obs            live status loop (default; the broadcast pane runs this)
+#   sl-obs status     one-shot: scene · recording · streaming
+#   sl-obs scenes     list program scenes
+#   sl-obs scene <n>  switch program scene
+#   sl-obs record     toggle recording
+#   sl-obs stream     toggle streaming
+set -uo pipefail
+
+q() { obs-ws-query "$@" 2>/dev/null; }
+_down() { printf '\033[33mOBS not reachable\033[0m — summon OBS (studio column 2) + enable obs-websocket.\n'; }
+
+status() {
+    local r s sc rec rt str scene
+    r="$(q GetRecordStatus)" || { _down; return 2; }
+    s="$(q GetStreamStatus)" || true
+    sc="$(q GetCurrentProgramScene)" || true
+    rec="$(jq -r '.outputActive // false' <<<"$r" 2>/dev/null || echo false)"
+    rt="$(jq -r '.outputTimecode // ""' <<<"$r" 2>/dev/null || echo '')"
+    str="$(jq -r '.outputActive // false' <<<"$s" 2>/dev/null || echo false)"
+    scene="$(jq -r '.currentProgramSceneName // "?"' <<<"$sc" 2>/dev/null || echo '?')"
+    printf '  scene    %s\n' "$scene"
+    printf '  record   %s\n' "$([ "$rec" = true ] && echo "● REC ${rt}" || echo "○ idle")"
+    printf '  stream   %s\n' "$([ "$str" = true ] && echo "● LIVE"      || echo "○ offline")"
+}
+
+case "${1:-watch}" in
+    status) status ;;
+    scenes) q GetSceneList | jq -r '.scenes[].sceneName' 2>/dev/null || _down ;;
+    scene)  [ -n "${2:-}" ] || { echo "usage: sl-obs scene <name>" >&2; exit 1; }
+            q SetCurrentProgramScene "{\"sceneName\":\"$2\"}" >/dev/null && echo "→ scene: $2" || _down ;;
+    record) q ToggleRecord >/dev/null && echo "⏺ record toggled" || _down ;;
+    stream) q ToggleStream >/dev/null && echo "📡 stream toggled" || _down ;;
+    watch)
+        command -v obs-ws-query >/dev/null 2>&1 || { echo "sl-obs: obs-ws-query missing" >&2; exit 1; }
+        while true; do
+            clear 2>/dev/null || true
+            printf '\033[1m▶ OBS · studio broadcast\033[0m   (sl-obs scene <n> · record · stream)\n\n'
+            status || true
+            sleep 2
+        done ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *) echo "sl-obs: unknown '$1' (try --help)" >&2; exit 1 ;;
+esac

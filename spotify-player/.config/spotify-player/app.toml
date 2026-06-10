@@ -1,0 +1,13 @@
+# SlicedLabs spotify_player config (the `media` workspace cockpit via `tunes`).
+# MPRIS media-control ON lights the Cockpit media HUD (playerctl/MPRIS path).
+# First run prompts for Spotify login (Premium) + a developer client_id — a
+# one-time setup spotify_player walks you through.
+theme = "slicedlabs"          # SlicedLabs palette (theme.toml, rendered from tokens)
+enable_media_control = true   # MPRIS → Cockpit media HUD + `tunes` transport
+enable_notify = false         # the Cockpit owns notifications
+
+[device]
+name = "SlicedLabs"
+device_type = "computer"
+bitrate = 320                 # Premium
+audio_cache = true

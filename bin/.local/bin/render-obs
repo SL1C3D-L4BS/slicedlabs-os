@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# render-obs — brand-styled OBS overlays from the tokens SSOT (a CONSUMER of the design
+# language, never a new one). Generates transparent PNGs OBS image sources reference:
+# a lower-third (name/title strip), a chapter card, and a LIVE badge — all in the SlicedLabs
+# identity (colours read from system/tokens.toml). Re-run after a token change to re-skin
+# every overlay; that is how the studio stays on-brand without forking the design.
+#
+#   render-obs [--name N] [--title T] [--accent engine|ai|research|...] [--out DIR]
+# Defaults: name/title from the bound studio lesson (.slproject), accent=engine,
+# out=~/.local/share/sliced/obs-overlays.
+set -euo pipefail
+
+TOKENS="${SL_TOKENS:-$HOME/.dotfiles/system/tokens.toml}"
+OUT="${XDG_DATA_HOME:-$HOME/.local/share}/sliced/obs-overlays"
+NAME=""; TITLE="SlicedLabs"; ACCENT_KEY="engine"
+die() { printf 'render-obs: %s\n' "$*" >&2; exit 1; }
+
+while [ $# -gt 0 ]; do case "$1" in
+    --name) NAME="${2:-}"; shift 2 ;;
+    --title) TITLE="${2:-}"; shift 2 ;;
+    --accent) ACCENT_KEY="${2:-engine}"; shift 2 ;;
+    --out) OUT="${2:-$OUT}"; shift 2 ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "unknown arg: $1" ;;
+esac; done
+
+command -v typst >/dev/null 2>&1 || die "typst required"
+
+# Name/accent default to the bound studio lesson (consume the per-project context).
+if [ -z "$NAME" ]; then
+    lesson="$(sl-project bound streaming 2>/dev/null || true)"
+    if [ -n "$lesson" ] && [ -f "$lesson/.slproject" ]; then
+        NAME="$(python3 -c "import tomllib;print(tomllib.load(open('$lesson/.slproject','rb')).get('name',''))" 2>/dev/null || true)"
+        ACCENT_KEY="$(python3 -c "import tomllib;print(tomllib.load(open('$lesson/.slproject','rb')).get('hue','engine'))" 2>/dev/null || echo engine)"
+    fi
+    [ -n "$NAME" ] || NAME="SlicedLabs"
+fi
+
+hex() { # <key> <fallback-with-#>  -> a validated #RRGGBB (only 6-hex token values; else fallback)
+    python3 - "$TOKENS" "$1" "$2" <<'PY'
+import sys, tomllib, re
+key, fb = sys.argv[2], sys.argv[3]
+try: d = tomllib.load(open(sys.argv[1], "rb"))
+except Exception: print(fb); sys.exit()
+for blk in ("color_raw", "color"):
+    v = (d.get(blk) or {}).get(key)
+    if v and re.fullmatch(r"#?[0-9a-fA-F]{6}", str(v)):
+        print("#" + str(v).lstrip("#")); break
+else:
+    print(fb)
+PY
+}
+ACCENT="$(hex "$ACCENT_KEY" '#D85A30')"
+FG="$(hex text '#E8E6E1')"; BG="$(hex bg '#0E0E10')"
+mkdir -p "$OUT"
+
+# transparent-background overlays (fill: none) — OBS composites them over the capture.
+_render() { # <basename> <typst-body>
+    local f="$OUT/$1.typ"
+    { printf '#set page(width: 1920pt, height: 1080pt, margin: 0pt, fill: none)\n'
+      printf '#let accent = rgb("%s")\n#let fg = rgb("%s")\n#let bg = rgb("%s")\n' "$ACCENT" "$FG" "$BG"
+      printf '%s\n' "$2"; } > "$f"
+    typst compile --format png "$f" "$OUT/$1.png" 2>&1 | head -3 || true
+    rm -f "$f"
+    [ -f "$OUT/$1.png" ] && printf '  ✓ %s.png\n' "$1"
+}
+
+printf 'render-obs → %s  (accent %s · %s)\n' "$OUT" "$ACCENT_KEY" "$ACCENT"
+_render lower-third "#place(bottom + left, dy: -120pt, dx: 120pt)[
+  #box(fill: bg.transparentize(15%), inset: 28pt, radius: 10pt)[
+    #stack(spacing: 8pt,
+      text(fill: accent, weight: \"bold\", size: 52pt)[$NAME],
+      text(fill: fg, size: 32pt)[$TITLE])]
+  #v(6pt); #box(fill: accent, width: 360pt, height: 8pt, radius: 4pt)]"
+_render chapter-card "#place(center + horizon)[
+  #align(center)[#text(fill: accent, weight: \"bold\", size: 120pt)[$NAME]
+  #v(20pt); #text(fill: fg, size: 48pt)[$TITLE]]]"
+_render live-badge "#place(top + right, dy: 60pt, dx: -60pt)[
+  #box(fill: accent, inset: (x: 24pt, y: 12pt), radius: 8pt)[
+    #text(fill: bg, weight: \"bold\", size: 36pt)[● LIVE]]]"
+echo "  point OBS image sources at these; re-run render-obs after a token change."

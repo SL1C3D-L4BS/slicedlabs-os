@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """slicedlabs-spend — print "<today_spend> <soft_cap>" for the Cockpit AI pill.
 
 Cheap single-shot the cockpit's Spend service execs on a timer; reuses the cost-cap

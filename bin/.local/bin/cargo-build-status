@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # cargo-build-status — thin wrapper around cargo {build,check,test,clippy}
 # that writes a structured JSON status to ~/.cache/engine-build-status, used
 # by the waybar workstation widget + coding-build chip.

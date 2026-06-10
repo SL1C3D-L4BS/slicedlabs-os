@@ -1,0 +1,21 @@
+# spotify_player — explicit, documented playback bindings. Everything else stays
+# spotify_player's defaults (press ? in-app for the full keymap). Tracked here and
+# symlinked to ~/.config/spotify-player/keymap.toml (validated with `features`).
+[[keymaps]]
+command = "ResumePause"
+key_sequence = "space"
+[[keymaps]]
+command = "NextTrack"
+key_sequence = "n"
+[[keymaps]]
+command = "PreviousTrack"
+key_sequence = "p"
+[[keymaps]]
+command = "Shuffle"
+key_sequence = "C-s"
+[[keymaps]]
+command = "Repeat"
+key_sequence = "C-r"
+[[keymaps]]
+command = "PlayRandom"
+key_sequence = "z"

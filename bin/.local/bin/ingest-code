@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # ingest-code — tree-sitter chunked code → Qdrant collection `code`.
 set -euo pipefail
 exec python3 -m slicedlabs_team.ingest.code "$@"

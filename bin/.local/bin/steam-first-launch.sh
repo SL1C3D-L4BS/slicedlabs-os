@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # steam-first-launch.sh — Phase 4 helper.
 #
 # Two stages, picks up where you are:

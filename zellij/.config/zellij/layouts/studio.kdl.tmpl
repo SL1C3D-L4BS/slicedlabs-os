@@ -1,0 +1,83 @@
+// studio — the TEACHING STUDIO deck (com.slicedlabs.studio, on the WS6 "streaming" slot).
+// The lesson command center for SlicedLabs' YouTube education (science · engineering · art ·
+// technology · physics · AI). Launched `zj studio`, cwd = the bound lesson ($SL_PROJECT, a
+// `sl-teach`/sl-project of type=lesson). Every tab carries live, lesson-scoped functionality:
+//
+//   script    — the lesson script (nvim SCRIPT.md): what you say, the teleprompter source
+//   animate   — manim scene (nvim scene.py │ render shell + media)         [physics/math]
+//   slides    — typst deck (nvim SLIDES.typ │ typst watch → live PDF)      [talking-head]
+//   demo      — terminal demo (nvim demo.tape │ vhs/asciinema recorder)    [tech/eng]
+//   broadcast — OBS control over obs-websocket (sl-obs: scene · record · status)
+//   assets    — the lesson asset tree (live)
+//
+// Heavy/long-running panes (typst watch, sl-obs) load start_suspended → 0 cost until Enter,
+// so the dense deck is free to stage (4c/8t + oomd + zram). NEUTRAL bar (rides the WS6 hue).
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {mode} {tabs}"
+                format_center ""
+                format_right  "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{icon.clock}} {datetime} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{powerline.dot}} {name} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal   "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked   "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="script" focus=true {
+        pane command="nvim" {
+            args "SCRIPT.md"
+            name "lesson script"
+        }
+    }
+    tab name="animate" {
+        pane split_direction="vertical" {
+            pane size="{{layout.phi_major}}%" command="nvim" { args "scene.py"; name "manim scene"; }
+            pane size="{{layout.phi_minor}}%" command="fish" {
+                args "-C" "eza --icons media 2>/dev/null | head; echo '— manim -pql scene.py <Scene> · sl-teach render --manim'"
+            }
+        }
+    }
+    tab name="slides" {
+        pane split_direction="vertical" {
+            pane size="{{layout.phi_major}}%" command="nvim" { args "SLIDES.typ"; name "typst slides"; }
+            pane size="{{layout.phi_minor}}%" name="typst watch" command="typst" {
+                args "watch" "SLIDES.typ"
+                start_suspended true   // live PDF on save — 0 cost until Enter
+            }
+        }
+    }
+    tab name="demo" {
+        pane split_direction="vertical" {
+            pane size="{{layout.phi_major}}%" command="nvim" { args "demo.tape"; name "vhs tape"; }
+            pane size="{{layout.phi_minor}}%" command="fish" {
+                args "-C" "eza --icons *.cast *.gif *.mp4 2>/dev/null; echo '— vhs demo.tape · asciinema rec demo.cast'"
+            }
+        }
+    }
+    tab name="broadcast" {
+        pane name="OBS · obs-websocket" command="sl-obs" {
+            start_suspended true   // connects to OBS over obs-websocket → 0 calls until Enter
+        }
+    }
+    tab name="assets" {
+        pane command="fish" {
+            args "-C" "eza --tree --level=2 --icons --git 2>/dev/null; or ls; echo '— sl-teach render · sl-teach thumbnail · sl-teach chapters'"
+        }
+    }
+}

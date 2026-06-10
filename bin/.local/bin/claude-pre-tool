@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """claude-pre-tool — PreToolUse hook script.
 
 Claude Code invokes this script before every tool call (when wired in

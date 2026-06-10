@@ -1,10 +1,11 @@
+// SlicedLabs · body · © 2026 SlicedLabs
 pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
 
 // Niri service — the cockpit's compositor link. Parses `niri msg event-stream`
-// for workspaces + focused window, and writes ~/.cache/waybar-active-tab so the
+// for workspaces + focused window, and writes ~/.cache/cockpit-active-tab so the
 // reused (guarded) chip scripts keep working. Replaces waybar-tab-watcher.
 Singleton {
     id: root
@@ -78,7 +79,7 @@ Singleton {
     Process { id: writer }
     function setActive(name) {
         writer.command = ["bash", "-c",
-            "printf %s '" + name + "' > \"${XDG_CACHE_HOME:-$HOME/.cache}/waybar-active-tab\""]
+            "printf %s '" + name + "' > \"${XDG_CACHE_HOME:-$HOME/.cache}/cockpit-active-tab\""]
         writer.running = true
     }
     function restore() { setActive(root.focused) }

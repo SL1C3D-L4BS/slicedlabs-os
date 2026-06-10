@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """warden — manual control plane for the local AI-governance Penalty Box.
 
 Until the async monitor lands, this is how an agent gets benched or reinstated:

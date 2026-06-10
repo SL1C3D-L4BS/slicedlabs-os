@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-backup — the offsite/DR invariant: the whole body is in the backup
+# set, the mechanism is drill-proven, and it can't silently regress to the
+# stale source set that once omitted ~/SlicedLabs (the 2026-06-08 bug).
+# Production-archive freshness is a WARN, not a fail — it depends on the LUKS
+# drive being connected / the rsync.net leg, which are operator-gated.
+# Folded into verify-all.
+# SSOT: bin/.local/bin/backup-borg(+ -drill) · systemd-user/backup-borg.{service,timer}
+#       · system/recovery.md · marker ${XDG_STATE_HOME}/backup-borg/{last-drill,last-backup}.
+set -uo pipefail
+fail=0
+ok()   { echo "  ✓ $1"; }
+no()   { echo "  ✗ $1" >&2; fail=1; }
+warn() { echo "  ⚠ $1"; }
+
+BB="${HOME}/.local/bin/backup-borg"
+STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/backup-borg"
+now=$(date +%s)
+age_days() { echo $(( ( now - $(date -d "$1" +%s 2>/dev/null || echo "$now") ) / 86400 )); }
+
+# 1) the backup script exists and is syntactically valid
+if [ -x "$BB" ] && bash -n "$BB" 2>/dev/null; then ok "backup-borg present + valid"; else no "backup-borg missing or invalid"; fi
+
+# 2) regression guard — the body IS in the set, the stale roots are NOT
+grep -q '"${HOME}/SlicedLabs"' "$BB" 2>/dev/null \
+  && ok "SlicedLabs body is in the backup source set" \
+  || no "SlicedLabs body MISSING from the backup set (the 2026-06-08 stale-path regression)"
+if grep -qE '"\$\{HOME\}/(Projects|Resources|discord-mcp)"' "$BB" 2>/dev/null; then
+  no "stale pre-migration roots (Projects/Resources/discord-mcp) back in the set"
+else
+  ok "no stale pre-migration roots in the set"
+fi
+
+# 3) the timer is armed (runs daily when the drive is connected)
+en=$(systemctl --user is-enabled backup-borg.timer 2>/dev/null || echo disabled)
+[ "$en" = enabled ] && ok "backup-borg.timer enabled" || no "backup-borg.timer not enabled ($en)"
+
+# 4) the restore-drill has run + passed recently (mechanism proven)
+if [ -r "${STATE_DIR}/last-drill" ]; then
+  d=$(age_days "$(cat "${STATE_DIR}/last-drill")")
+  [ "$d" -le 90 ] && ok "restore-drill passed ${d}d ago (<= 90)" || no "restore-drill stale (${d}d > 90) — run backup-borg-drill"
+else
+  no "no restore-drill marker — run backup-borg-drill"
+fi
+
+# 5) production-archive freshness — WARN only (operator/hardware-gated)
+if [ -r "${STATE_DIR}/last-backup" ]; then
+  b=$(age_days "$(cut -d' ' -f1 "${STATE_DIR}/last-backup")")
+  [ "$b" -le 8 ] && ok "last production backup ${b}d ago" \
+    || warn "last production backup ${b}d ago — connect the LUKS drive (or wire rsync.net) to refresh offsite"
+else
+  warn "no production backup yet — connect engine-backup-a + run backup-borg, or wire the rsync.net leg"
+fi
+
+[ $fail -eq 0 ] && echo "backup: body in the set · mechanism drill-proven · timer armed ✓"
+exit $fail

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-gaming.sh — Phase 12 end-to-end checks for the gaming stack.
 #
 # Every check prints PASS/FAIL with a one-line reason. A summary at the end
@@ -19,6 +20,9 @@ b() { printf '\033[1m%s\033[0m'   "$*"; }
 ok()    { printf '  %s %s\n' "$(g 'PASS')" "$1"; PASS=$((PASS+1)); }
 fail()  { printf '  %s %s\n' "$(r 'FAIL')" "$1"; FAIL=$((FAIL+1)); }
 warn()  { printf '  %s %s\n' "$(y 'WARN')" "$1"; WARN=$((WARN+1)); }
+# info: advisory only (does NOT count as a warning). For intentionally on-demand
+# state — Canon §V resource budget: a lean stack is correct, not a problem.
+info()  { printf '  \033[36mINFO\033[0m %s\n' "$1"; }
 sect()  { printf '\n%s\n' "$(b "$1")"; }
 
 # ---------- 1. Kernel/user limits ----------
@@ -28,7 +32,9 @@ if id -nG | grep -qw input;    then ok "user in input group";    else fail "miss
 if id -nG | grep -qw gamemode; then ok "user in gamemode group"; else fail "missing 'gamemode' group — re-login needed"; fi
 
 rt=$(prlimit --rtprio --output=SOFT --noheadings 2>/dev/null | tr -d ' ')
-if [[ "$rt" == "20" ]]; then ok "rtprio soft-limit = 20"; else fail "rtprio = ${rt:-?} (expected 20 from limits.d/99-gaming.conf — re-login?)"; fi
+# ≥ 20: @gamemode grants 20 (limits.d/99-gaming.conf); @realtime grants 98
+# (limits.d/99-realtime-privileges.conf) — the higher pro-audio ceiling wins and is fine.
+if [[ "$rt" =~ ^[0-9]+$ ]] && (( rt >= 20 )); then ok "rtprio soft-limit = $rt (≥ 20)"; else fail "rtprio = ${rt:-?} (expected ≥ 20 from limits.d — re-login?)"; fi
 
 nof=$(prlimit --nofile --output=SOFT --noheadings 2>/dev/null | tr -d ' ')
 if (( nof >= 524288 )); then ok "nofile soft-limit ≥ 524288 ($nof)"; else fail "nofile = ${nof:-?} (expected ≥ 524288)"; fi
@@ -81,13 +87,13 @@ done
 # ---------- 5. Waybar gaming tab ----------
 sect "Waybar gaming tab"
 
-state_file="${XDG_CACHE_HOME:-$HOME/.cache}/waybar-active-tab"
+state_file="${XDG_CACHE_HOME:-$HOME/.cache}/cockpit-active-tab"
 prev_state=$(cat "$state_file" 2>/dev/null || echo "")
 echo gaming > "$state_file"
 
 scripts=(cpu_temp gpu gamemode ds4 status mangohud_toggle launcher)
 for s in "${scripts[@]}"; do
-    out=$("$HOME/.config/waybar/scripts/gaming/$s.sh" 2>/dev/null)
+    out=$("$HOME/.config/quickshell/cockpit/scripts/gaming/$s.sh" 2>/dev/null)
     if [[ -n "$out" ]] && printf '%s' "$out" | jq -e . &>/dev/null; then
         ok "$s.sh emits valid JSON"
     else
@@ -96,31 +102,18 @@ for s in "${scripts[@]}"; do
 done
 [[ -n "$prev_state" ]] && echo "$prev_state" > "$state_file"
 
-# mangohud-toggle + quick-launcher were intentionally moved off the bar into the
-# Mod+Shift+G fuzzel action menu, so they are no longer bar chips.
-for mod in custom/gaming-status custom/gpu-stats custom/cpu-temp custom/gamemode custom/ds4-battery; do
-    grep -q "\"$mod\"" "$HOME/.config/waybar/config.jsonc" \
-        && ok "Waybar wires $mod" \
-        || fail "Waybar missing $mod"
-done
+# Gaming chips are now Cockpit (quickshell) tiles, not Waybar bar modules — their
+# data scripts live in ~/.config/quickshell/cockpit/scripts/gaming/ (verified above).
 
-# ---------- 5b. Tab system ----------
+# ---------- 5b. Tab system (Cockpit) ----------
 sect "Tab system (workspace-driven)"
-
-grep -q '"output": "HDMI-A-1"' "$HOME/.config/waybar/config.jsonc" \
-    && ok "Waybar pinned to HDMI-A-1 only" \
-    || fail "Waybar not pinned to HDMI-A-1 (would also render on 24\" portrait)"
-
-[[ -x "$HOME/.local/bin/waybar-tab-watcher" ]] \
-    && ok "waybar-tab-watcher exists + executable" \
-    || fail "missing $HOME/.local/bin/waybar-tab-watcher"
 
 systemctl --user is-active quickshell.service &>/dev/null \
     && ok "quickshell.service active (Cockpit — supersedes waybar-tab-watcher)" \
     || fail "quickshell.service not active (systemctl --user start it)"
 
-if [[ -f "$HOME/.cache/waybar-active-tab" ]]; then
-    cur_tab=$(<"$HOME/.cache/waybar-active-tab")
+if [[ -f "$HOME/.cache/cockpit-active-tab" ]]; then
+    cur_tab=$(<"$HOME/.cache/cockpit-active-tab")
     case "$cur_tab" in
         coding|research|engine|browser|monitoring|streaming|gaming|media|net|ai|agenda)
             ok "active-tab cache populated: $cur_tab"
@@ -130,23 +123,23 @@ if [[ -f "$HOME/.cache/waybar-active-tab" ]]; then
             ;;
     esac
 else
-    fail "$HOME/.cache/waybar-active-tab missing"
+    fail "$HOME/.cache/cockpit-active-tab missing"
 fi
 
 for tab_script in \
-    "$HOME/.config/waybar/scripts/tabs/header.sh" \
-    "$HOME/.config/waybar/scripts/engine/target.sh" \
-    "$HOME/.config/waybar/scripts/engine/tests.sh" \
-    "$HOME/.config/waybar/scripts/comms/discord.sh" \
-    "$HOME/.config/waybar/scripts/comms/notifs.sh" \
-    "$HOME/.config/waybar/scripts/comms/mail.sh" \
-    "$HOME/.config/waybar/scripts/stream/obs.sh" \
-    "$HOME/.config/waybar/scripts/stream/mic.sh" \
-    "$HOME/.config/waybar/scripts/stream/uptime.sh" \
-    "$HOME/.config/waybar/scripts/monitoring/top-cpu.sh" \
-    "$HOME/.config/waybar/scripts/monitoring/top-mem.sh" \
-    "$HOME/.config/waybar/scripts/monitoring/failed-units.sh" \
-    "$HOME/.config/waybar/scripts/monitoring/net-io.sh"
+    "$HOME/.config/quickshell/cockpit/scripts/tabs/header.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/engine/target.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/engine/tests.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/comms/discord.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/comms/notifs.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/comms/mail.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/stream/obs.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/stream/mic.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/stream/uptime.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/monitoring/top-cpu.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/monitoring/top-mem.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/monitoring/failed-units.sh" \
+    "$HOME/.config/quickshell/cockpit/scripts/monitoring/net-io.sh"
 do
     [[ -x "$tab_script" ]] || fail "missing or not executable: $tab_script"
 done
@@ -155,7 +148,7 @@ all_ok=true
 for s in tabs/header engine/target engine/tests comms/discord comms/notifs comms/mail \
          stream/obs stream/mic stream/uptime monitoring/top-cpu monitoring/top-mem \
          monitoring/failed-units monitoring/net-io; do
-    [[ -x "$HOME/.config/waybar/scripts/$s.sh" ]] || all_ok=false
+    [[ -x "$HOME/.config/quickshell/cockpit/scripts/$s.sh" ]] || all_ok=false
 done
 $all_ok && ok "all 13 tab-module scripts present + executable"
 
@@ -261,48 +254,10 @@ if [[ -f /var/lib/snapper/configs/root ]]; then
     [[ -n "$last" ]] && printf '  %s latest snapper snapshot: %s\n' "$(g 'INFO')" "$last"
 fi
 
-# ---------- Waybar redesign (fused tabs · HUD overlays · daemon · theme) ----------
-sect "Waybar redesign"
+# ---------- 5c. Cockpit chip scripts (the data layer the tiles exec) ----------
+sect "Cockpit chip scripts"
 
-WB="$HOME/.config/waybar"
-TM="$WB/style.css.tmpl"; CT="$WB/config.jsonc.tmpl"
-
-python3 - <<'PY' 2>/dev/null && ok "tabs.toml parses · 11 tabs (7 ws + 4 overlay)" || fail "tabs.toml invalid or wrong tab count"
-import tomllib, sys, pathlib
-r = tomllib.loads(pathlib.Path.home().joinpath(".config/waybar/tabs.toml").read_text())
-o = r["meta"]["order"]
-ws = [t for t in o if r["tabs"][t]["kind"] == "workspace"]
-ov = [t for t in o if r["tabs"][t]["kind"] == "overlay"]
-sys.exit(0 if len(o) == 11 and len(ws) == 7 and len(ov) == 4 else 1)
-PY
-
-[[ -f "$WB/scripts/lib/tabs.env" ]] && ok "tabs.env generated" || fail "tabs.env missing (run render-waybar)"
-[[ -f "$WB/scripts/lib/glyphs.sh" ]] && grep -q '^G_OK=' "$WB/scripts/lib/glyphs.sh" && ok "glyphs.sh rendered from [icon]" || fail "glyphs.sh missing/unrendered"
-
-for m in center tab-modules; do grep -q "GENERATED:$m" "$CT" && ok "config marker GENERATED:$m" || fail "config missing GENERATED:$m"; done
-for m in base-selectors header-selectors module-padding lift fusion; do grep -q "GENERATED:$m" "$TM" && ok "css marker GENERATED:$m" || fail "css missing GENERATED:$m"; done
-
-u=$(grep -c '{{' "$WB/config.jsonc" "$WB/style.css" 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
-(( u == 0 )) && ok "rendered config/style: no unresolved {{tokens}}" || fail "$u unresolved tokens — run render-waybar && render-templates"
-
-python3 - <<'PY' 2>/dev/null && ok "clock in right cluster (centre freed for the active tab)" || fail "clock not relocated to modules-right"
-import re, json, sys, pathlib
-t = pathlib.Path.home().joinpath(".config/waybar/config.jsonc").read_text()
-t = re.sub(r'/\*.*?\*/', '', t, flags=re.S); t = re.sub(r'//[^\n]*', '', t); t = re.sub(r',(\s*[\]}])', r'\1', t)
-d = json.loads(t)
-sys.exit(0 if "clock" in d["modules-right"] and "clock" not in d["modules-center"] else 1)
-PY
-
-for kf in pulse-build pulse-rec pulse-live glow-urgent tab-in; do
-    grep -q "@keyframes $kf" "$WB/style.css" && ok "keyframe $kf present" || fail "keyframe $kf missing"
-done
-
-caps=$(grep -cE '#custom-tab-[a-z]+-header \{ background:' "$WB/style.css")
-(( caps == 11 )) && ok "11 brand-cap fusion rules" || fail "expected 11 cap rules, found $caps"
-urg=$(grep -cE '#custom-tab-[a-z]+-header\.urgent' "$WB/style.css")
-(( urg == 11 )) && ok "11 cap urgent-glow rules" || fail "expected 11 urgent rules, found $urg"
-
-for t in media net ai agenda; do grep -q "custom/tab-$t-header" "$WB/config.jsonc" && ok "HUD tab '$t' wired into config" || fail "HUD tab '$t' missing from config"; done
+WB="$HOME/.config/quickshell/cockpit"   # the Cockpit owns the chip scripts (waybar bar retired)
 
 miss=0
 for s in media/now.sh media/easyeffects.sh media/sink.sh net/vpn.sh net/firewall.sh net/route.sh net/link.sh ai/spend.sh ai/agents.sh ai/pomo.sh agenda/next.sh agenda/standup.sh alerts.sh; do
@@ -314,11 +269,11 @@ ss=0
 for s in scene bitrate uptime; do grep -q '"class":"empty"' "$WB/scripts/stream/$s.sh" && ss=$((ss+1)); done
 (( ss == 3 )) && ok "stream scripts emit placeholders when OBS down (stable fusion)" || fail "stream placeholder fix incomplete ($ss/3)"
 
-for f in waybard waybar-hud standup-post; do [[ -x "$HOME/.local/bin/$f" ]] && ok "$f present + executable" || fail "$HOME/.local/bin/$f missing/non-exec"; done
+[[ -x "$HOME/.local/bin/standup-post" ]] && ok "standup-post present + executable" || fail "$HOME/.local/bin/standup-post missing/non-exec"
 systemctl --user is-active --quiet quickshell.service && ok "quickshell.service active (Cockpit)" || fail "quickshell.service not active"
 command -v verify-cockpit.sh >/dev/null && ok "verify-cockpit.sh present (run it for the Cockpit HUD)" || warn "verify-cockpit.sh missing"
 
-th=$(cat "$HOME/.cache/waybar-theme" 2>/dev/null || echo "")
+th=$(cat "$HOME/.cache/cockpit-theme" 2>/dev/null || echo "")
 [[ "$th" == dark || "$th" == light ]] && ok "theme state valid ($th)" || warn "theme state unset (defaults dark)"
 hb=$(grep -c 'cockpitctl' "$HOME/.config/niri/config.kdl" 2>/dev/null)
 (( hb >= 6 )) && ok "niri cockpit binds present ($hb)" || fail "niri cockpitctl binds missing ($hb<6)"
@@ -328,14 +283,14 @@ pgrep -f 'qs -c cockpit' >/dev/null && ok "cockpit (qs) process alive" || fail "
 # ---------- Full-stack: engine cascade · slicedlabs · containers · design ----------
 sect "Full-stack: engine + slicedlabs + design system"
 
-for t in render-waybar render-engine-palette waybar-hud waybard ai-stack-up dev-stack-up; do
+for t in render-engine-palette ai-stack-up dev-stack-up; do
     command -v "$t" >/dev/null 2>&1 && ok "$t on PATH" || fail "$t not on PATH (stow bin?)"
 done
 
-PAL="$HOME/Projects/engine/crates/engine-ui/src/theme/palette.rs"
+PAL="$HOME/SlicedLabs/tools/slicedengine/crates/engine-ui/src/theme/palette.rs"
 [[ -f "$PAL" ]] && grep -q 'PRIMARY' "$PAL" && ok "engine palette.rs generated (tokens → Rust)" || fail "engine palette.rs missing/empty"
-if [[ -d "$HOME/Projects/engine" ]] && command -v cargo >/dev/null 2>&1; then
-    ( cd "$HOME/Projects/engine" && cargo build -q -p engine-ui -p engine-editor >/dev/null 2>&1 ) \
+if [[ -d "$HOME/SlicedLabs/tools/slicedengine" ]] && command -v cargo >/dev/null 2>&1; then
+    ( cd "$HOME/SlicedLabs/tools/slicedengine" && cargo build -q -p engine-ui -p engine-editor >/dev/null 2>&1 ) \
         && ok "engine-ui + engine-editor build green" || fail "engine crates fail to build"
 fi
 
@@ -345,7 +300,7 @@ slicedlabs agents --format json 2>/dev/null | jq -e '.active!=null' >/dev/null 2
     && ok "slicedlabs agents --format json valid" || fail "slicedlabs agents missing/broken"
 
 up=$(podman ps -q 2>/dev/null | wc -l)
-(( up >= 13 )) && ok "container stack: $up up (≥13)" || warn "container stack: $up up — run dev-stack-up && ai-stack-up --profile memory --profile kg"
+(( up >= 13 )) && ok "container stack: $up up (≥13)" || info "container stack: $up up (lean; full stack on-demand via dev-stack-up && ai-stack-up --profile memory --profile kg)"
 # dev/ai-stack are STAGED ON-DEMAND by workspace scenes (workspaces.toml services=…),
 # per the lean-boot contract — NOT auto-started. So assert the units are installed and
 # loadable (scenes can stage them), never that they're 'enabled' for boot.
@@ -353,6 +308,7 @@ systemctl --user cat dev-stack.service ai-stack.service >/dev/null 2>&1 \
     && ok "dev/ai-stack units installed (on-demand, staged by scenes)" \
     || fail "dev/ai-stack units missing — scenes can't stage them"
 
+# shellcheck disable=SC2044  # .tmpl paths are repo-controlled — no spaces to word-split on
 draw=$(cd "$HOME/.dotfiles" && for f in $(find . -name '*.tmpl' ! -path '*brand-assets*' ! -path '*wallpaper*'); do sed 's/{{[^}]*}}//g' "$f" | grep -oiE '#[0-9a-f]{6}\b'; done | wc -l)
 (( draw == 0 )) && ok "templates: 0 raw #hex (token-pure)" || fail "$draw raw #hex literals in templates"
 # (starship retired in favour of tide — its old glyph check is gone; the token-pure
@@ -361,25 +317,16 @@ draw=$(cd "$HOME/.dotfiles" && for f in $(find . -name '*.tmpl' ! -path '*brand-
 # ---------- 2026 build-out: bar centering · scenes · palette · TUI · media ----------
 sect "2026 build-out: bar · scenes · palette · cockpit · media"
 
-WB_CSS="$HOME/.config/waybar/style.css"
 SLT="$HOME/.dotfiles/slicedlabs-team/slicedlabs_team"
-# Center-visibility guard (2026-05-29 regression): modules-center is a GTK
-# center-widget whose usable width is (bar − 2×left), so a big min-width on the
-# left cluster clips every tab cluster to invisibility. Assert it stays absent.
-grep -Eq 'min-width: *[0-9]{3,}px' "$WB_CSS" 2>/dev/null \
-    && fail "oversized min-width in waybar CSS — clips the centered tab cluster (the 2026-05-29 regression)" \
-    || ok "no oversized min-width (center cluster not reserve-clipped)"
-# Cap centring lead is a MARGIN (counterweights data chips to centre the brand
-# word); it must NOT be a min-width (that would clip — see guard above).
-grep -Eq '#custom-tab-engine-header \{.*margin: [0-9]+px 0 [0-9]+px [0-9]+px' "$WB_CSS" 2>/dev/null \
-    && ok "engine cap has a left-margin centring lead (not a min-width)" || fail "engine cap margin missing/malformed"
+# (Waybar bar retired → its CSS center-visibility / cap-margin guards are gone; the
+#  Cockpit owns the bar now. The token-purity guard below still applies.)
 grep -Eq '^[[:space:]]*(left_reserve|bar_center)[[:space:]]*=' "$HOME/.dotfiles/system/tokens.toml" \
     && fail "left_reserve/bar_center reintroduced in tokens — they clip the center" \
     || ok "tokens: cap-centering tokens retired (no left_reserve/bar_center assignment)"
 
 REG="$HOME/.config/sliced-engine/workspaces.toml"
-python3 -c "import tomllib,sys; sys.exit(0 if tomllib.load(open('$REG','rb')).get('meta',{}).get('auto') else 1)" 2>/dev/null \
-    && ok "workspaces.toml parses with [meta].auto" || fail "workspaces.toml missing/invalid"
+python3 -c "import tomllib,sys; sys.exit(0 if isinstance(tomllib.load(open('$REG','rb')).get('meta',{}).get('auto'), list) else 1)" 2>/dev/null \
+    && ok "workspaces.toml parses ([meta].auto is a list; empty = lean project-scoped login)" || fail "workspaces.toml missing/invalid"
 [[ -f "$HOME/.local/bin/lib/scene.sh" ]] && ok "lib/scene.sh linked" || fail "lib/scene.sh missing"
 for t in cockpit sliced-menu dev-stack-down ai-stack-down manim-render; do
     command -v "$t" >/dev/null 2>&1 && ok "$t on PATH" || fail "$t not on PATH (stow bin?)"
@@ -392,7 +339,7 @@ command -v music >/dev/null 2>&1 && systemctl --user is-active mpd.service >/dev
 { [ -f "$HOME/.config/quickshell/cockpit/generated/Theme.qml" ] && ! grep -q '{{' "$HOME/.config/quickshell/cockpit/generated/Theme.qml"; } \
     && ok "token SSOT: cockpit Theme.qml in sync (no unresolved tokens)" || fail "cockpit Theme.qml drift — run render-quickshell"
 systemctl is-active vector >/dev/null 2>&1 \
-    && ok "observability: vector shipping journald -> Loki" || warn "vector not active (Loki log shipping)"
+    && ok "observability: vector shipping journald -> Loki" || info "vector off (on-demand obs; start via dev-stack-up)"
 systemctl is-active tetragon >/dev/null 2>&1 \
     && ok "runtime security: Cilium Tetragon active (eBPF)" || warn "tetragon not active"
 { systemctl is-enabled nftables >/dev/null 2>&1 && ! systemctl is-enabled ufw >/dev/null 2>&1; } \
@@ -402,8 +349,9 @@ grep -q 'id="control"' "$SLT/tui.py" 2>/dev/null \
     && ok "slicedlabs TUI Control tab present" || fail "TUI Control tab missing"
 grep -q 'invoke_without_command=True' "$SLT/cli.py" 2>/dev/null \
     && ok "bare slicedlabs → inline TUI (cli callback)" || fail "inline-TUI callback missing"
-grep -q 'def enforce' "$SLT/hooks/cost_cap.py" 2>/dev/null && grep -q 'enforce(' "$SLT/cli.py" 2>/dev/null \
-    && ok "cost-cap enforce() defined + wired into cli" || fail "cost-cap enforcement not wired"
+grep -q 'def enforce' "$SLT/hooks/cost_cap.py" 2>/dev/null \
+    && { grep -q 'enforce(' "$SLT/gateway.py" 2>/dev/null || grep -q 'enforce(' "$SLT/cli.py" 2>/dev/null; } \
+    && ok "cost-cap enforce() defined + wired at the gateway chokepoint" || fail "cost-cap enforcement not wired"
 
 for t in manim typst vhs asciinema d2; do
     command -v "$t" >/dev/null 2>&1 && ok "$t installed" || fail "$t missing"

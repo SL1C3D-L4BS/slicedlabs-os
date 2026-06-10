@@ -15,10 +15,12 @@ SRC="${DOTFILES_ROOT:-$HOME/.dotfiles}"
 DEST="${1:-/tmp/slicedlabs-showcase}"
 
 # ONLY clearly public-safe paths. Missing entries are skipped; everything not listed is
-# excluded by omission. (No claude-memory, no slicedlabs-team submodule, no recovery.md.)
+# excluded by omission. (No claude-memory, no slicedlabs-team submodule, no recovery.md; docs now live in the private codex.)
 ALLOW=(
-  bin niri quickshell zellij ghostty mako fish wofi swaylock waybar bat lazygit gh-dash
-  btop starship sliced-engine iso nix docs podman-compose systemd-user
+  bin niri quickshell zellij ghostty mako fish wofi swaylock wlogout bat lazygit gh-dash
+  btop starship sliced-engine iso nix podman-compose systemd-user
+  fastfetch cava qt6ct gtk MangoHud spotify-player nvim vim
+  obs/.config/obs-studio/themes
   system/tokens.toml system/keys.toml system/governance.toml system/services.txt
   system/user-services.txt system/packages.txt system/python-stack.txt
   system/aur-packages.txt system/.gitleaks.toml system/brand-assets system/etc system/git-hooks

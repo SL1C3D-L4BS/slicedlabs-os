@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-alerting — the always-on alerting invariant: a sovereign push path
+# (ntfy) reaches the Founder even with the heavy obs stack down, the watchdog
+# is armed, and the publisher is sound. The phone-app subscription + the Discord
+# webhook secret are operator last-miles → WARN, not fail.
+# SSOT: bin/.local/bin/{sl-alert,sl-alert-health} · systemd-user/{ntfy,sl-alert-health}.*
+#       · ~/.config/alert/{config,discord-webhook}.
+set -uo pipefail
+fail=0
+ok()   { echo "  ✓ $1"; }
+no()   { echo "  ✗ $1" >&2; fail=1; }
+warn() { echo "  ⚠ $1"; }
+
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}/alert"
+# shellcheck source=/dev/null
+[ -r "${CFG}/config" ] && . "${CFG}/config"
+NTFY_URL="${NTFY_URL:-http://127.0.0.1:8090}"
+NTFY_TOPIC="${NTFY_TOPIC:-founder-alerts}"
+
+# 1) the publisher + watchdog are present and valid
+for t in sl-alert sl-alert-health; do
+  p="${HOME}/.local/bin/${t}"
+  [ -x "$p" ] && bash -n "$p" 2>/dev/null && ok "${t} present + valid" || no "${t} missing or invalid"
+done
+
+# 2) ntfy is installed and serving (health endpoint — no notification sent)
+command -v ntfy >/dev/null 2>&1 && ok "ntfy installed" || no "ntfy not installed"
+[ "$(systemctl --user is-active ntfy.service 2>/dev/null)" = active ] \
+  && ok "ntfy.service active" || no "ntfy.service not active"
+if curl -fsS --max-time 4 "${NTFY_URL}/v1/health" 2>/dev/null | grep -q '"healthy":true'; then
+  ok "ntfy reachable + healthy (${NTFY_URL})"
+else
+  no "ntfy health endpoint not reachable at ${NTFY_URL}/v1/health"
+fi
+
+# 3) the watchdog timer is armed
+en=$(systemctl --user is-enabled sl-alert-health.timer 2>/dev/null || echo disabled)
+[ "$en" = enabled ] && ok "sl-alert-health.timer enabled" || no "sl-alert-health.timer not enabled ($en)"
+
+# 4) operator last-miles — WARN only
+if grep -q '^https://' "${CFG}/discord-webhook" 2>/dev/null; then
+  ok "Discord mirror configured"
+else
+  warn "Discord webhook not set — sops-edit alert/.config/alert/discord-webhook.sops + render-secrets (ntfy still fires)"
+fi
+echo "  ⓘ phone last-mile: install the ntfy app + subscribe to topic '${NTFY_TOPIC}' at ${NTFY_URL}"
+
+[ $fail -eq 0 ] && echo "alerting: sovereign push live · watchdog armed ✓"
+exit $fail

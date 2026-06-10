@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
+# render-marketplace — bake system/marketplace.toml (SSOT) → the cockpit's
+# generated/marketplace.json, read by services/Market.qml. Computes each item's `installed`
+# from its `detect` shell test, and bakes only the display fields (detect/install stay in the
+# SSOT for sl-pull). Part of the render-* cascade (siblings: render-quickshell, render-governance).
+from __future__ import annotations
+import json
+import os
+import subprocess
+import sys
+import pathlib
+
+try:
+    import tomllib  # py3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
+
+ROOT = pathlib.Path(os.environ.get("DOTFILES_ROOT", os.path.expanduser("~/.dotfiles")))
+SRC = ROOT / "system" / "marketplace.toml"
+OUT = ROOT / "quickshell" / ".config" / "quickshell" / "cockpit" / "generated" / "marketplace.json"
+
+_DISPLAY = ("id", "name", "glyph", "category", "version", "summary", "cmd")
+
+
+def _detect(item: dict) -> bool:
+    """Run the item's detect test (exit 0 ⇒ installed). No detect ⇒ trust `installed`."""
+    test = item.get("detect")
+    if not test:
+        return bool(item.get("installed", False))
+    try:
+        return subprocess.run(["bash", "-c", test], timeout=10,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def main() -> int:
+    if not SRC.exists():
+        print(f"render-marketplace: missing SSOT {SRC}", file=sys.stderr)
+        return 1
+    raw = tomllib.loads(SRC.read_text(encoding="utf-8")).get("item", [])
+    items = []
+    for it in raw:
+        row = {k: it.get(k, "") for k in _DISPLAY}
+        row["installed"] = _detect(it)
+        items.append(row)
+    # stable display order: installed first, then by category, then name
+    items.sort(key=lambda i: (not i["installed"], i["category"], i["name"]))
+    categories = sorted({i["category"] for i in items if i["category"]})
+    baked = {
+        "schema_version": 1,
+        "count": len(items),
+        "installed": sum(1 for i in items if i["installed"]),
+        "categories": categories,
+        "items": items,
+    }
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(baked, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"render-marketplace: {OUT.relative_to(ROOT)} — {len(items)} items, "
+          f"{baked['installed']} installed, {len(categories)} categories")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

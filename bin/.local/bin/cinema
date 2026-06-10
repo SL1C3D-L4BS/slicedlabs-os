@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # cinema — open a streaming-video service in its own app-id window on the `media`
 # workspace. Named `cinema` (NOT `watch` — that shadows coreutils). Each service
 # gets a reverse-DNS app-id + its own profile, so niri routes it to `media` and

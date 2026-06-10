@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """sl-identity <workspace> — print that workspace's identity hex (#RRGGBB).
 
 The focused-workspace accent for the tooling cascade: scene.sh exports it as

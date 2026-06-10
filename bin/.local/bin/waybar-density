@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # waybar-density — toggle Waybar between dense (32px) and spacious (40px) modes.
 #
 # Usage: waybar-density {dense|spacious}

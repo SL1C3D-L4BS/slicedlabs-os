@@ -31,12 +31,13 @@ font-size=24
 #   bs-hl-*    = backspace pulse
 # State variants: -clear (post-type), -ver (verifying), -wrong (denied).
 
-# Idle / typing state — primary accent ring, near-bg interior.
+# Idle / typing state — primary accent ring, near-bg interior. The keypress
+# pulse rides the lavender family (Liquid Retina v3 purple presence).
 inside-color={{color_raw.bg}}cc
 ring-color={{color_raw.primary}}
 line-color={{color_raw.bg}}
 text-color={{color_raw.fg}}
-key-hl-color={{color_raw.secondary}}
+key-hl-color={{family.lavender}}
 bs-hl-color={{color_raw.error}}
 
 # After-typing pulse — selection purple inside, primary ring stays.

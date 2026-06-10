@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-cockpits-live — the LIVE cockpit gate (P2). Proves the world-class bar: each
+# project-scoped workspace, summoned BOUND to a project, realizes with every declared pane
+# live, placed, and ATTACHED to that project (the deck's cwd == the bound project).
+#
+# NON-DESTRUCTIVE by construction — it never disturbs your real work:
+#   • the FOCUSED workspace is never touched (your current window is sacred);
+#   • a workspace already IN USE (any window present) is skipped, not disturbed;
+#   • it only validates EMPTY, non-focused project-scoped workspaces — binding a throwaway
+#     project, summoning WITHOUT focus-steal, asserting, then closing only what it spawned
+#     and restoring the prior binding. Backend services are NOT started (SCENE_NO_SERVICES).
+#
+#   verify-cockpits-live [ws...]   validate the given project-scoped ws (default: all)
+# Run via `verify-all --live` (it launches windows; the default static verify-all does not).
+set -uo pipefail
+
+REG="${SCENE_REG:-$HOME/.config/sliced-engine/workspaces.toml}"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/sliced/ws-project"
+TP="__live__"; TP_DIR="$HOME/SlicedLabs/lab/$TP"
+export SCENE_NO_SERVICES=1            # validation never spins up ai-stack/ollama/dev-stack
+rc=0; tested=0; skipped=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+inf(){ printf '  \033[33m•\033[0m %s\n' "$1"; }
+
+command -v niri >/dev/null 2>&1 || { no "niri not running"; exit 1; }
+command -v jq   >/dev/null 2>&1 || { no "jq required"; exit 1; }
+
+_focused_wsid(){ niri msg --json workspaces | jq -r 'first(.[]|select(.is_focused==true))|.id // empty'; }
+_wsid(){ niri msg --json workspaces | jq -r --arg n "$1" 'first(.[]|select(.name==$n))|.id // empty'; }
+_apps_on(){ niri msg --json windows | jq -r --argjson w "$1" '.[]|select(.workspace_id==$w)|.app_id'; }
+_win(){ niri msg --json windows | jq -r --arg a "$1" --argjson w "$2" 'first(.[]|select(.app_id==$a and .workspace_id==$w))|"\(.id) \(.pid)"'; }
+_ids_on(){ niri msg --json windows | jq -r --argjson w "$1" '.[]|select(.workspace_id==$w)|.id'; }
+_declared(){ python3 - "$REG" "$1" <<'PY'
+import sys, tomllib
+d = tomllib.load(open(sys.argv[1], "rb"))
+for a in sorted(d["workspaces"].get(sys.argv[2], {}).get("apps", []), key=lambda x: x.get("column", 99)):
+    print(a["app_id"])
+PY
+}
+_project_scoped(){ python3 - "$REG" <<'PY'
+import sys, tomllib
+d = tomllib.load(open(sys.argv[1], "rb"))
+for n, w in d["workspaces"].items():
+    if w.get("project_scoped"): print(n)
+PY
+}
+
+cleanup(){
+    # Delete every deck zellij session this run spawned (zj names them <layout>-__live__), so they
+    # never persist + get re-attached in the since-deleted __live__ cwd (the `current_dir() os
+    # error 2` bug). Then remove the throwaway project.
+    zellij list-sessions -s 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -- '-__live__$' \
+        | while read -r s; do zellij delete-session --force "$s" >/dev/null 2>&1 || true; done
+    rm -rf "$TP_DIR" 2>/dev/null
+}
+trap cleanup EXIT
+[ -d "$TP_DIR" ] || sl-project new "$TP" --type rust >/dev/null 2>&1
+TP_REAL="$(cd "$TP_DIR" && pwd)"
+
+targets="$*"; [ -n "$targets" ] || targets="$(_project_scoped)"
+FWS="$(_focused_wsid)"
+echo "── live cockpit validation (focused ws=$FWS protected; services off) ──"
+
+for ws in $targets; do
+    wsid="$(_wsid "$ws")"
+    [ -z "$wsid" ]       && { inf "$ws: no niri workspace — skip"; continue; }
+    [ "$wsid" = "$FWS" ] && { inf "$ws: focused — skip (never disturb the current window)"; skipped=$((skipped + 1)); continue; }
+    if [ -n "$(_apps_on "$wsid")" ]; then
+        inf "$ws: in use — skip (don't disturb real work)"; skipped=$((skipped + 1)); continue
+    fi
+
+    tested=$((tested + 1))
+    prev="$(cat "$STATE/$ws" 2>/dev/null || true)"        # save the user's binding
+    cockpit "$ws" "$TP" >/dev/null 2>&1 || true           # bind throwaway + realize (no focus-steal)
+
+    first="$(_declared "$ws" | head -1)"
+    t=0; while [ $t -lt 80 ]; do [ -n "$(_win "$first" "$wsid")" ] && break; sleep 0.25; t=$((t + 1)); done
+
+    while IFS= read -r app; do
+        [ -z "$app" ] && continue
+        info="$(_win "$app" "$wsid")"
+        if [ -z "$info" ]; then no "$ws/$app — not placed (pane missing)"; continue; fi
+        ok "$ws/$app — live + placed"
+        case "$app" in com.slicedlabs.*)
+            # Authoritative attachment proof: the deck was SPAWNED bound to the project
+            # (ghostty --working-directory=$SL_PROJECT). Read it from the live cmdline — robust
+            # vs the ghostty→zellij→pane tree (ghostty's own cwd is its launch dir; each deck
+            # pane inherits --working-directory, which is the project).
+            wd="$(tr '\0' '\n' < "/proc/${info##* }/cmdline" 2>/dev/null | sed -n 's/^--working-directory=//p')"
+            [ "$wd" = "$TP_REAL" ] && ok "$ws/$app — bound to project ($TP via --working-directory)" \
+                || no "$ws/$app — working-directory '$wd' != bound project '$TP_REAL'" ;;
+        esac
+    done < <(_declared "$ws")
+
+    # close only what we spawned (this ws was empty + unfocused → safe); restore binding
+    while read -r id; do [ -n "$id" ] && niri msg action close-window --id "$id" >/dev/null 2>&1 || true; done < <(_ids_on "$wsid")
+    t=0; while [ -n "$(_apps_on "$wsid")" ] && [ $t -lt 40 ]; do sleep 0.25; t=$((t + 1)); done  # let deck procs die + release the test project cwd
+    if [ -n "$prev" ]; then printf '%s\n' "$prev" > "$STATE/$ws"; else rm -f "$STATE/$ws" 2>/dev/null; fi
+done
+
+echo
+[ "$tested" -eq 0 ] && inf "no empty, non-focused project-scoped ws to validate (run from a clean session for full coverage)"
+printf 'cockpits-live: %d validated · %d skipped · %s\n' "$tested" "$skipped" \
+    "$([ $rc -eq 0 ] && echo 'every pane live + project-attached ✓' || echo 'FAILURES above')"
+exit $rc

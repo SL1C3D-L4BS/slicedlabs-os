@@ -10,8 +10,8 @@
 
 window {
     background-color: {{color_css.backdrop}};
-    border: {{geom.border}}px solid {{color.primary}};
-    border-radius: {{geom.radius_lg}}px;
+    border: {{geom.border}}px solid {{ramp.primary_400}};
+    border-radius: {{modal.radius}}px;
     padding: 16px;
     /* Soft purple glow behind the chip — niri's layer-rule contributes the
      * actual drop shadow; this gives an extra inner-bleed at the seam. */
@@ -27,7 +27,7 @@ window {
     padding: 10px 14px;
     margin-bottom: 10px;
     outline: none;
-    caret-color: {{color.tertiary}};
+    caret-color: {{family.tangerine}};
 }
 
 #input image {
@@ -57,7 +57,7 @@ window {
 
 #entry:hover {
     background-color: {{color_css.chip}};
-    border-left-color: {{color.tertiary}};
+    border-left-color: {{family.tangerine}};
 }
 
 #entry:selected {
@@ -79,6 +79,6 @@ window {
  * renders matches in `#text-match`. The primary accent makes the typed
  * substring jump out without changing the row's chrome. */
 #text-match {
-    color: {{color.primary}};
+    color: {{ramp.primary_300}};
     font-weight: bold;
 }

@@ -1,0 +1,63 @@
+// ci — the "CI / GitHub" column of the coding/engine command center
+// (com.slicedlabs.coding-ci, ~50%). The GitHub/CI stack: gh-dash (the GitHub TUI:
+// PRs · issues · Actions runs) beside a stack shell for `gh run watch` / `gh pr` /
+// git status. Launched as `zj ci`. gh-dash loads start_suspended (it hits the
+// GitHub API → 0 calls until you press Enter). NEUTRAL bar (rides coding + engine).
+//
+// git-lfs (3.7.1) is installed + globally linked (filter.lfs in ~/.gitconfig); the `lfs`
+// tab is a live git-lfs console (git lfs status · ls-files · track · env).
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {mode} {tabs}"
+                format_center ""
+                format_right  "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{icon.clock}} {datetime} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{powerline.dot}} {name} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal   "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked   "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="ci" focus=true {
+        pane split_direction="vertical" {
+            pane size="{{layout.phi_major}}%" name="github" command="gh-dash" {
+                start_suspended true   // GitHub API → 0 calls until Enter
+            }
+            pane size="{{layout.phi_minor}}%" name="ci · stack" command="sl-ci" {
+                start_suspended true   // gh API → 0 calls until Enter
+            }
+        }
+    }
+    tab name="runs" {
+        pane name="runs" command="sl-ci" {
+            args "runs"
+            start_suspended true
+        }
+    }
+    tab name="prs" {
+        pane name="prs" command="sl-ci" {
+            args "prs"
+            start_suspended true
+        }
+    }
+    tab name="lfs" {
+        pane name="git-lfs" command="fish" {
+            args "-C" "git lfs env 2>/dev/null | head -5; echo '— git lfs status · git lfs ls-files · git lfs track \"*.bin\"'"
+        }
+    }
+}

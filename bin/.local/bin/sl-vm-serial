@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-vm-serial — capture a qemu:///session guest's serial console to a tailable file so
+# `sl-log --vm` / the VM `logger` tab show always-on boot logs (not just QEMU stdout).
+#
+#   sl-vm-serial <domain>           advisory: show whether serial-file logging is configured
+#   sl-vm-serial <domain> --apply   attach a <serial type='file'> device (domain must be OFF)
+#
+# Safe by default — prints the exact device XML and only mutates with --apply, and only when
+# the domain is shut off (libvirt rejects live serial edits). Adds the device on port 1 so the
+# existing console (port 0) is untouched; point the guest at ttyS1 (console=ttyS1) to capture
+# its boot log there. File: ~/.local/share/libvirt/serial/<domain>.log
+set -uo pipefail
+URI="qemu:///session"
+dom="${1:-}"; [ -n "$dom" ] || { grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 1; }
+logdir="$HOME/.local/share/libvirt/serial"; logf="$logdir/$dom.log"
+
+virsh -c "$URI" dominfo "$dom" >/dev/null 2>&1 || { echo "sl-vm-serial: no such domain '$dom' on $URI"; exit 1; }
+if virsh -c "$URI" dumpxml "$dom" | grep -qE "<serial type='file'"; then
+  echo "✓ $dom already logs serial to a file. Tail it:  sl-log --vm $dom"; exit 0
+fi
+
+dev="$(mktemp --suffix=.xml)"
+cat > "$dev" <<XML
+<serial type='file'>
+  <source path='$logf'/>
+  <target type='isa-serial' port='1'/>
+</serial>
+XML
+echo "Proposed serial-file device for '$dom' (→ $logf, port 1; leaves the existing console intact):"
+cat "$dev"
+if [ "${2:-}" = "--apply" ]; then
+  state="$(virsh -c "$URI" domstate "$dom" 2>/dev/null || true)"
+  [ "$state" = "shut off" ] || { echo "✗ domain is '$state' — shut it off first, then re-run with --apply"; rm -f "$dev"; exit 1; }
+  mkdir -p "$logdir"
+  virsh -c "$URI" attach-device "$dom" "$dev" --config \
+    && echo "✓ attached (takes effect next boot). Then: sl-log --vm $dom  (add console=ttyS1 to the guest cmdline for boot logs)"
+else
+  echo "(advisory) re-run with --apply to attach it — the domain must be shut off."
+fi
+rm -f "$dev"

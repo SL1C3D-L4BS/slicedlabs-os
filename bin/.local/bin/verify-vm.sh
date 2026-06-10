@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-vm — the coding command center's virtualization invariants (rootless
 # qemu:///session). Non-destructive: NEVER boots a guest. Wire into verify-all (opt).
 # Exits 0 (clean opt-out) if libvirt isn't installed yet, so partial builds still pass.

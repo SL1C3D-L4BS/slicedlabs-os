@@ -1,0 +1,45 @@
+// vim — the standalone scratch/diff editor column of the coding command center
+// (com.slicedlabs.coding-edit, ~50%). A SECOND, lightweight editor next to the
+// cockpit's dominant Neovim: a throwaway buffer for quick edits, paste-scratch,
+// `:vert diffsplit`, or a file you want side-by-side with the deck. Launched as
+// `zj vim`. NEUTRAL bar (this layout also rides the engine workspace) — the niri
+// focus ring + workspace carry the identity hue. Rounded titled frame from config.kdl.
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {mode} {tabs}"
+                format_center ""
+                format_right  "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{icon.clock}} {datetime} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{powerline.dot}} {name} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal   "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked   "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="vim" focus=true {
+        pane command="vim" { name "Vim"; }
+    }
+    tab name="scratch" {
+        pane command="vim" { name "scratch"; }
+    }
+    tab name="diff" {
+        pane name="git diff · delta" command="fish" {
+            args "-C" "git diff 2>/dev/null | delta; echo '› git add -p · git diff --staged | delta'"
+        }
+    }
+}

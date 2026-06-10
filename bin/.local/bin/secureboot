@@ -34,7 +34,7 @@ case "${1:-status}" in
   sign)
     sudo sbctl sign-all ;;
   enroll)
-    if sudo sbctl status 2>/dev/null | grep -qiE 'Setup Mode:[[:space:]]*(Enabled|✓)'; then
+    if sbctl status --json 2>/dev/null | jq -e '.setup_mode == true' >/dev/null 2>&1; then
       sudo sbctl enroll-keys --microsoft
       echo "secureboot: keys enrolled. Now ENABLE Secure Boot in firmware + reboot. (Microsoft"
       echo "            keys included so signed option-ROMs/Windows still boot.)"

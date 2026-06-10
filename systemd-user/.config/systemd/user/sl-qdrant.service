@@ -1,0 +1,18 @@
+# SlicedLabs · body · © 2026 SlicedLabs
+# sl-qdrant — the local vector store behind Hermes memory + doc-RAG
+# (collections: sl_memories, docindex; volume: sl_qdrant_data).
+# ON-DEMAND by design (lean boot): `systemctl --user start sl-qdrant`,
+# or it rides `systemctl --user start sl-mem` via Wants= below.
+[Unit]
+Description=SlicedLabs Qdrant (Hermes memory + RAG vector store)
+Wants=podman.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/podman start --attach sl-qdrant
+ExecStop=/usr/bin/podman stop -t 10 sl-qdrant
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

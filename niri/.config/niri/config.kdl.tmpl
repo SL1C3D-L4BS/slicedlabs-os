@@ -1,5 +1,13 @@
+// SlicedLabs · body · © 2026 SlicedLabs
 // [ENGINE] platform — Niri compositor config
 // Spec Part XVIII.6 · design tokens from system/tokens.toml
+
+// DOCKER_HOST → the rootless podman socket, inherited by every GUI child niri spawns
+// (lazydocker in the monitoring ops deck, ctop, any docker-API tool). This host is
+// rootless: there is no /var/run/docker.sock — podman's per-user socket is the daemon.
+environment {
+    DOCKER_HOST "unix:///run/user/1000/podman/podman.sock"
+}
 
 input {
     keyboard {
@@ -362,7 +370,7 @@ window-rule {
     match app-id="firefox"
     match app-id="mpv"
     match app-id="zoom"
-    match app-id="obs"
+    match app-id="^com.obsproject.Studio$"
     match app-id="com.slicedlabs.netflix"
     match app-id="com.slicedlabs.youtube"
     match app-id="com.slicedlabs.cinema"
@@ -381,7 +389,7 @@ window-rule {
 
 // OBS: no shadow (cleaner in screen captures and overlay scenes).
 window-rule {
-    match app-id="obs"
+    match app-id="^com.obsproject.Studio$"
     shadow {
         off
     }
@@ -540,40 +548,56 @@ window-rule {
     open-on-workspace "research"
     default-column-width { proportion 0.5; }
 }
-// coding command center: CODE cockpit (full) + AI agent window (coding-side, full) +
-// reference-docs Firefox (coding-web, half). niri scrolls between the full cockpits;
-// Firefox is the half-width sidecar. The cockpit id is ANCHORED (^…$) so it never also
-// matches the coding-side window (whose id contains "com.slicedlabs.coding"). The VM
-// console (com.slicedlabs.coding-vm) is ruled below, opaque + summoned on demand.
+// coding command center (the mockup): the dense CODE deck (full, AI pair folded IN)
+// that niri scrolls from into the supporting columns — Vim (scratch editor), VM Stack,
+// reference-docs Firefox, and the CI/GitHub stack (all half-width). Each id is ANCHORED
+// (^…$) so the deck's `^…coding$` never also matches the -edit/-vm/-ci siblings (which
+// share the prefix). The LIVE VM framebuffer (virt-viewer) is ruled separately below, opaque.
 window-rule {
     match app-id="^com.slicedlabs.coding$"
     open-on-workspace "coding"
     default-column-width { proportion 1.0; }
 }
 window-rule {
-    match app-id="com.slicedlabs.coding-side"
+    match app-id="^com.slicedlabs.coding-edit$"
     open-on-workspace "coding"
-    default-column-width { proportion 1.0; }
+    default-column-width { proportion 0.5; }
+}
+window-rule {
+    match app-id="^com.slicedlabs.coding-vm$"
+    open-on-workspace "coding"
+    default-column-width { proportion 0.5; }
 }
 window-rule {
     match app-id="coding-web"
     open-on-workspace "coding"
     default-column-width { proportion 0.5; }
 }
-// engine command center mirrors coding: CODE engine-dev (full) + AI engine-side (full) +
-// half-width docs engine-web. Explicit anchored ids (not the old broad "engine-" match).
+window-rule {
+    match app-id="^com.slicedlabs.coding-ci$"
+    open-on-workspace "coding"
+    default-column-width { proportion 0.5; }
+}
+// engine command center mirrors coding: the dense CODE deck (engine-dev, full, AI folded
+// in) + VM Stack + docs Firefox + CI/GitHub (all half-width). Anchored ids keep the deck's
+// `^…engine-dev$` from also matching the -vm/-ci siblings.
 window-rule {
     match app-id="^com.slicedlabs.engine-dev$"
     open-on-workspace "engine"
     default-column-width { proportion 1.0; }
 }
 window-rule {
-    match app-id="com.slicedlabs.engine-side"
+    match app-id="^com.slicedlabs.engine-vm$"
     open-on-workspace "engine"
-    default-column-width { proportion 1.0; }
+    default-column-width { proportion 0.5; }
 }
 window-rule {
     match app-id="engine-web"
+    open-on-workspace "engine"
+    default-column-width { proportion 0.5; }
+}
+window-rule {
+    match app-id="^com.slicedlabs.engine-ci$"
     open-on-workspace "engine"
     default-column-width { proportion 0.5; }
 }
@@ -612,7 +636,7 @@ window-rule {
     default-column-width { proportion 1.0; }
 }
 window-rule {
-    match app-id="obs"
+    match app-id="^com.obsproject.Studio$"
     open-on-workspace "streaming"
 }
 window-rule {
@@ -626,7 +650,7 @@ binds {
     Mod+Space { spawn "wofi" "--show" "drun"; }
     Mod+Alt+Space { spawn "sh" "-c" "$HOME/.local/bin/sliced-menu"; }
     Mod+Alt+S { spawn "ghostty" "--class=com.slicedlabs.tui" "-e" "slicedlabs"; }
-    Mod+Alt+E { spawn "sh" "-c" "ghostty --working-directory=$HOME/Projects/engine"; }
+    Mod+Alt+E { spawn "sh" "-c" "ghostty --working-directory=$HOME/SlicedLabs/tools/slicedengine"; }
     Mod+Alt+P { spawn "ghostty" "--class=com.slicedlabs.music" "-e" "music"; }
     Mod+H { focus-column-left; }
     Mod+L { focus-column-right; }
@@ -686,14 +710,16 @@ binds {
     Mod+Ctrl+Shift+G { spawn "sh" "-c" "niri msg action focus-workspace gaming;     cockpit gaming"; }
     Mod+Ctrl+Shift+V { spawn "sh" "-c" "$HOME/.local/bin/coding-vm"; }
     Mod+Slash { spawn "sh" "-c" "qs -c cockpit ipc call cockpit menu"; }
-    Mod+Alt+K { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal keys"; }
-    Mod+Alt+C { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl control"; }
-    Mod+Alt+I { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal context"; }
-    Mod+Alt+M { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal media"; }
-    Mod+Alt+N { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal net"; }
-    Mod+Alt+A { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal ai"; }
-    Mod+Alt+T { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal agenda"; }
-    Mod+Alt+Y { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal system"; }
+    Mod+Alt+K { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system keys"; }
+    Mod+Alt+C { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system"; }
+    Mod+Grave { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl hermes"; }
+    Mod+Alt+I { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect context"; }
+    Mod+Alt+M { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl market"; }
+    Mod+Alt+N { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect net"; }
+    Mod+Alt+B { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system bluetooth"; }
+    Mod+Alt+A { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect ai"; }
+    Mod+Alt+T { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect agenda"; }
+    Mod+Alt+Y { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system governance"; }
     Mod+Alt+L { spawn "sh" "-c" "$HOME/.local/bin/cockpitctl theme toggle"; }
     Mod+Shift+W { spawn "engine-wallpaper" "--random"; }
     Print { screenshot; }

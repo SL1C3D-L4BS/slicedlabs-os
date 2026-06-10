@@ -1,0 +1,10 @@
+# SlicedLabs · body · © 2026 SlicedLabs
+# sl-wallpaper-cycle — advance the SlicedLabs mark wallpaper to its next
+# wheel-gradient frame (awww transition morphs the change; engine-backdrop
+# re-feeds the glass shader). Driven by sl-wallpaper-cycle.timer.
+[Unit]
+Description=SlicedLabs mark wallpaper — next gradient frame
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/sl-wallpaper mark --tick

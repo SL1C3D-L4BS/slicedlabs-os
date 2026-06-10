@@ -2,6 +2,8 @@
 
 Arch + Niri workstation configuration. Stow-deployed, token-rendered, secret-aware.
 
+**New here?** → **[docs/START-HERE.md](docs/START-HERE.md)** (the 10-minute tour) · **[docs/INDEX.md](docs/INDEX.md)** (every doc, beginner → architect).
+
 ## Repository layout
 
 - `<package>/` — GNU Stow package. `cd ~/.dotfiles && stow <package>` symlinks its contents into `$HOME`.
@@ -21,19 +23,35 @@ Arch + Niri workstation configuration. Stow-deployed, token-rendered, secret-awa
 8. `bin/install-hooks` to wire gitleaks into every relevant repo's pre-commit.
 9. `./bootstrap.sh` — installs every package layer; idempotent.
 
-## Design tokens & templates
+## Design tokens & templates — Liquid Retina v3
 
-`system/tokens.toml` is the *only* place colors, fonts, motion, and spacing values live. Every `.tmpl` file references `{{section.key}}` placeholders. `bin/render-templates` substitutes them and writes the output next to the template (e.g., `config.tmpl` → `config`). Rendered outputs are gitignored — the `.tmpl` is the tracked truth.
+`system/tokens.toml` is the *only* place colors, fonts, motion, spacing, and
+the glass material live. **Anchors are the only stored colour truth**: the 8
+workspace identities + 6 `[family]` accents are OKLCH anchors at matched
+perceptual lightness (`bin/.local/bin/lib/color.py --selftest` pins the exact
+sRGB bake); 10-step tonal ramps derive at render time (`{{ramp.coding_300}}`),
+plus `{{vec3.*}}` (GLSL) and `{{rgb.*}}` (ANSI truecolor) namespaces.
 
-Tracked templates today:
+Every `.tmpl` file references `{{section.key}}` placeholders.
+`bin/render-templates` (with `--variant=dark|light` and `--look=clear`)
+substitutes them next to the template; rendered outputs are gitignored — the
+`.tmpl` is the tracked truth. Dedicated generators keep the non-template
+surfaces in lockstep: `render-quickshell` (cockpit `Theme.qml` — glass tiers
+base/focal/ultra, ramps API), `render-textual` (TUI palette + tcss),
+`render-engine-palette` (the engine's `palette.rs`), `render-brand`
+(wallpapers — `sl-wallpaper` for the liquid-retina art + per-hue moods).
 
-- `ghostty/.config/ghostty/config.tmpl`
-- `starship/.config/starship.toml.tmpl`
-- `waybar/.config/waybar/style.css.tmpl`
-- `niri/.config/niri/config.kdl.tmpl`
-- `zellij/.config/zellij/config.kdl.tmpl`
+The cascade today: niri · cockpit (Quickshell) · mako/wofi/swaylock/wlogout ·
+ghostty/zellij/fish (the `[ansi]` content SSOT) · fastfetch (the SLICEDLABS
+wordmark greeting) · nvim/vim schemes · qt6ct · OBS theme · GTK 3/4 · cava ·
+spotify-player/lazygit/gh-dash/delta/btop · the Hermes web face
+(`liquid-tokens.css`) · the engine. `sl-theme dark|light|clear` re-renders
+and live-reloads the whole machine.
 
-Adding a new templated file: write `<path>.tmpl` next to where the rendered file should land, add the rendered path to `.gitignore`, and rerun `bin/render-templates`.
+Adding a new templated file: write `<path>.tmpl` next to where the rendered
+file should land, add the rendered path to `.gitignore`, and rerun
+`bin/render-templates`. The law: `library/codex/20-architect/design-language.md`.
+Gates: `verify-design-language` · `verify-tokens-drift` · `verify-terminal`.
 
 ## Secrets
 
@@ -50,8 +68,8 @@ Today: a single host, `engine-workstation`. Future MacBook Air integration docum
 
 ## Adjacent repositories
 
-- `~/Projects/engine/` — the [ENGINE] product (separate repo, `SL1C3D-L4BS/engine`).
-- `~/discord-mcp/` — the Discord MCP bot (separate repo, `SL1C3D-L4BS/discord-mcp`). Token in `pass discord/bot-token`.
+- `~/SlicedLabs/tools/engine/` — the [ENGINE] product (separate repo, `SL1C3D-L4BS/engine`).
+- `~/SlicedLabs/tools/discord/` — the Discord MCP bot (separate repo, `SL1C3D-L4BS/discord-mcp`). Token in `pass discord/bot-token`.
 - `~/.claude/projects/-home-doodlebob/memory/` — Claude auto-memory. Eventually symlinked into a `claude-memory/` stow package for versioning.
 
 ## Related design docs

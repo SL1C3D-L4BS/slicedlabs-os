@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # cockpit — realize principled per-workspace scenes on demand (idempotent).
 #
-#   cockpit                 realize every [meta].auto workspace
-#   cockpit <workspace>     realize one (e.g. `cockpit engine`, `cockpit coding`)
+#   cockpit                 realize every [meta].auto workspace (now empty — project-scoped)
+#   cockpit <ws>            realize one; a project-scoped ws (coding/engine/research/studio)
+#                           binds to a project first — reuse the saved binding, else pick
+#   cockpit <ws> <project>  bind to a specific project (name under ~/SlicedLabs, or a path)
+#   cockpit <ws> --pick     force the picker (switch project), then realize
+#   cockpit resume          re-realize every project-scoped ws that has a saved binding
 #   cockpit --list          show the scene registry
 #   cockpit --dry-run [ws]  print what would happen; spawn nothing
 #
@@ -21,10 +25,36 @@ case "${1:-}" in
     -h|--help)    grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
 esac
 
-if [[ -n "${1:-}" ]]; then
-    realize_scene "$1"
+# `resume` — re-realize every project-scoped workspace with a saved binding (the
+# lean-login alternative to auto-staging: bring back what you were working on, on demand).
+if [[ "${1:-}" == "resume" ]]; then
+    for ws in coding engine research streaming; do
+        [[ -n "$(sl-project bound "$ws" 2>/dev/null)" ]] && realize_scene "$ws"
+    done
+    exit 0
+fi
+
+ws="${1:-}"
+if [[ -n "$ws" ]]; then
+    shift || true
+    # Project-scoped workspaces bind to a project BEFORE realizing, so the whole deck
+    # attaches to it. Explicit name/path wins; `--pick` forces the picker (switch);
+    # otherwise reuse the saved binding, and only pick when there is none.
+    if _scene_is_project_scoped "$ws"; then
+        case "${1:-}" in
+            --pick) chosen="$(sl-project pick "$ws")" || { echo "cockpit: no project chosen" >&2; exit 1; }
+                    sl-project bind "$ws" "$chosen" >/dev/null ;;
+            "")     if [[ -z "$(sl-project bound "$ws" 2>/dev/null)" ]]; then
+                        chosen="$(sl-project pick "$ws")" || { echo "cockpit: no project chosen" >&2; exit 1; }
+                        sl-project bind "$ws" "$chosen" >/dev/null
+                    fi ;;
+            *)      sl-project bind "$ws" "$1" >/dev/null || exit 1 ;;
+        esac
+        scene_log "cockpit[$ws]: project → $(sl-project bound "$ws")"
+    fi
+    realize_scene "$ws"
 else
-    while IFS= read -r ws; do
-        [[ -n "$ws" ]] && realize_scene "$ws"
+    while IFS= read -r w; do
+        [[ -n "$w" ]] && realize_scene "$w"
     done < <(scene_meta_auto)
 fi

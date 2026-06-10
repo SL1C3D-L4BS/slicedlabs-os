@@ -1,8 +1,8 @@
+// SlicedLabs · body · © 2026 SlicedLabs
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import "bars"
-import "modals"
 import "services"
 
 // The Cockpit — GPU instrument cluster for the [ENGINE] workstation.
@@ -45,9 +45,8 @@ ShellRoot {
     LeftPill { screen: root.primary }
     CenterPill { screen: root.primary }
     RightPill { screen: root.primary }
-    ModalLayer { screen: root.primary }
-    MenuDropdown { screen: root.primary }
-    ControlCenter { screen: root.primary }
+    ModalStack { screen: root.primary }    // the modeless stack: hermes · System · Inspector (right-anchored)
+    Marketplace { screen: root.primary }   // the SlicedLabs layer — independent, left-anchored
 
     // Secondary (DP-3, monitoring panel): focal clock + status pill ONLY — no
     // workspaces/left module (that stays unique to the main screen). When DP-3 is
@@ -57,11 +56,14 @@ ShellRoot {
 
     IpcHandler {
         target: "cockpit"
-        function toggle(name: string): void { Modals.toggle(name) }
-        function open(name: string): void { Modals.openModal(name) }
-        function close(): void { Modals.close() }
-        function status(): string { return Modals.current }
-        function menu(): void { Menu.toggle() }
-        function control(): void { CC.toggle() }
+        function close(): void { Stack.closeAll() }
+        function status(): string { return Stack.ids.join(",") }
+        function menu(): void { Stack.toggleSystem(0) }      // legacy ☰ verb → the System card
+        function control(): void { Stack.toggleSystem(0) }   // Mod+Alt+C → the System card (Controls)
+        function hermes(): void { Stack.toggle("hermes") }
+        function system(): void { Stack.toggle("system") }
+        function systemTab(name: string): void { Stack.openSystemNamed(name) }
+        function market(): void { Market.toggle() }
+        function inspect(name: string): void { Stack.openInspectorNamed(name) }
     }
 }

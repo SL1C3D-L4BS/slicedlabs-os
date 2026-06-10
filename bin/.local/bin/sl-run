@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-run — project-aware build / test / run / REPL launcher for the cockpit Run pane.
+#
+#   sl-run            detect the project; print a ready banner + drop to a shell
+#   sl-run build      build the project
+#   sl-run test       run the test suite
+#   sl-run run        run the project / dev server
+#   sl-run repl       open the language REPL
+#   sl-run watch      run the right file-watch loop (bacon / cargo watch / dev server / entr)
+#
+# Mapping: Rust→cargo(+bacon) · Node→bun/npm · Python→uv/pytest/ruff · Make→make · CMake→cmake.
+# Grounding: "The Pragmatic Programmer" — fast, repeatable build/test loops. Never dies on a
+# missing tool — falls back to an interactive shell.
+set -uo pipefail
+shell="${SHELL:-/usr/bin/fish}"
+have() { command -v "$1" >/dev/null 2>&1; }
+
+detect() {  # → project kind
+  if   [ -f Cargo.toml ]; then echo rust
+  elif [ -f package.json ]; then echo node
+  elif [ -f pyproject.toml ] || [ -f setup.py ] || compgen -G '*.py' >/dev/null 2>&1; then echo python
+  elif [ -f CMakeLists.txt ]; then echo cmake
+  elif [ -f Makefile ] || [ -f makefile ]; then echo make
+  else echo generic; fi
+}
+PROJ="$(detect)"
+
+node_pm() {  # prefer bun when its lockfile is present (or no npm lock + bun installed)
+  if [ -f bun.lockb ] || { have bun && [ ! -f package-lock.json ]; }; then echo bun; else echo npm; fi
+}
+
+cmd_for() {  # $1 = action → the concrete shell command (empty if N/A)
+  local a="$1" pm
+  case "$PROJ" in
+    rust)   case "$a" in
+              build) echo "cargo build";; test) echo "cargo test";; run) echo "cargo run";;
+              repl)  have evcxr && echo "evcxr" || echo "cargo run";;
+              watch) have bacon && echo "bacon" || echo "cargo watch -x run";; esac;;
+    node)   pm="$(node_pm)"; case "$a" in
+              build) echo "$pm run build";; test) echo "$pm test";; run) echo "$pm run dev";;
+              repl)  [ "$pm" = bun ] && echo "bun repl" || echo "node";;
+              watch) echo "$pm run dev";; esac;;
+    python) case "$a" in
+              build) echo "uv build";; test) echo "pytest";; run) echo "uv run .";;
+              repl)  echo "python";; watch) echo "ls *.py | entr -cr python -m .";; esac;;
+    cmake)  case "$a" in
+              build) echo "cmake -B build && cmake --build build";; test) echo "ctest --test-dir build";;
+              run) echo "./build/*";; esac;;
+    make)   case "$a" in build) echo "make";; test) echo "make test";; run) echo "make run";; esac;;
+  esac
+}
+
+run_action() {  # run a detected command, then return to the shell
+  local a="$1" c; c="$(cmd_for "$a")"
+  [ -n "$c" ] || { echo "sl-run: no '$a' command for a $PROJ project"; return; }
+  printf '▸ %s\n' "$c"; eval "$c"
+}
+
+case "${1:-}" in
+  build|test|run|repl|watch) run_action "$1"; exec "$shell" ;;
+  -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+  "") : ;;
+  *) echo "sl-run: unknown action '$1' (build|test|run|repl|watch)" ;;
+esac
+
+# no args → ready banner + a build-ready shell
+printf '⏿ sl-run — %s project\n' "$PROJ"
+for a in build test run repl; do c="$(cmd_for "$a")"; [ -n "$c" ] && printf '   %-5s → %s\n' "$a" "$c"; done
+w="$(cmd_for watch)"; [ -n "$w" ] && printf '   %-5s → %s\n' watch "$w"
+[ "$PROJ" = generic ] && echo '   (no build system detected — plain shell)'
+echo '   shortcut:  sl-run <build|test|run|repl|watch>'
+exec "$shell"

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # render-brand — rasterize SVGs across the brand surfaces. Substitutes
 # tokens first (render-templates handles .tmpl) then Inkscape exports PNG.
 #

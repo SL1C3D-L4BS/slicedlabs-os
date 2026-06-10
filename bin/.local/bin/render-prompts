@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """render-prompts — generate .claude/agents/<name>.md from prompts/roles/<name>.md
 and the team manifest.
 

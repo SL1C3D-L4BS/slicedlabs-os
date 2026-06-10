@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # sliced-menu — the workstation command palette (Mod+Alt+Space).
 #
 # Omarchy's Super+Alt+Space menu / ML4W's Settings app, but terminal/wofi-native
@@ -10,13 +11,13 @@
 # niri already frosts the `wofi` namespace, so it inherits the glass chrome.
 set -euo pipefail
 
-WOFI=(wofi --dmenu --insensitive --width 520 --height 420)
-menu() { local p="$1"; shift; printf '%s\n' "$@" | "${WOFI[@]}" --prompt "$p"; }
+WOFI=(wofi --dmenu --insensitive --width 760 --height 560)
+menu() { local p="$1"; shift; printf '%s\n' "$@" | "${WOFI[@]}" --prompt "$p" 2>/dev/null; }
 run()  { setsid -f sh -c "$*" >/dev/null 2>&1 || true; }
 
 # Overlay HUD list straight from the waybar registry (fallback to the known four).
 OVERLAY_TABS=(media net ai agenda)
-TABS_ENV="$HOME/.config/waybar/scripts/lib/tabs.env"
+TABS_ENV="$HOME/.config/quickshell/cockpit/scripts/lib/tabs.env"
 # shellcheck source=/dev/null
 [[ -f "$TABS_ENV" ]] && source "$TABS_ENV" 2>/dev/null || true
 
@@ -79,7 +80,7 @@ case "$top" in
       Agents)          run 'ghostty -e slicedlabs agents' ;;
       Standup)         run standup-post ;;
       'Ask…')
-        q="$(printf '' | wofi --dmenu --prompt 'ask architect › ')" || true
+        q="$(printf '' | wofi --dmenu --prompt 'ask architect › ' 2>/dev/null)" || true
         [[ -n "$q" ]] && run "ghostty --class=com.slicedlabs.tui -e slicedlabs ask slicedlabs_architect \"$q\"" ;;
     esac ;;
 esac

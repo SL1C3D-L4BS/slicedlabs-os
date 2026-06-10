@@ -14,8 +14,8 @@ layout {
                 format_precedence "lrc"
                 border_enabled "false"
 
-                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
-                tab_active    "#[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.monitoring}},bold] {{powerline.dot}} {index} {name} #[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.monitoring}},bold] {{powerline.dot}} {name} #[fg=#{{color_raw.monitoring}},bg={{color.bg}}]{{powerline.round_right}}"
                 tab_separator "#[bg={{color.bg}}] "
 
                 mode_normal   "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
@@ -34,7 +34,18 @@ layout {
         pane split_direction="horizontal" {
             pane size="50%" command="lazydocker"   // dev-stack-obs containers
             pane size="25%" command="btop"          // host
-            pane size="25%"                          // `dev-stack logs -f` / journalctl --user
+            pane size="25%" command="fish" {   // dev-stack logs -f / journalctl --user
+                args "-C" "podman ps 2>/dev/null | head; echo '— sl-log --stack · dev-stack logs -f · journalctl --user -f'"
+            }
         }
+    }
+    // logs — LIVE user journal streamed through lnav (the world-class log TUI).
+    tab name="logs" {
+        pane name="logs" command="sl-log" {
+            args "--journal"   // live user journal → lnav
+        }
+    }
+    tab name="host" {
+        pane command="btop" { name "btop"; }
     }
 }

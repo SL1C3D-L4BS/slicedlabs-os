@@ -1,0 +1,67 @@
+/* SlicedLabs · body · © 2026 SlicedLabs
+ * liquid-tokens.css — the Surface/Hermes face's design tokens, RENDERED from
+ * ~/.dotfiles/system/tokens.toml (Liquid Retina v3). The single source of
+ * truth crosses the repo boundary here: `just sync-tokens` in tools/surface
+ * copies the rendered file into frontend/. Loaded BEFORE style.css; the
+ * frontend's :root placeholders are the no-dotfiles fallback. */
+:root {
+  /* base chrome (the names style.css already binds) */
+  --bg: {{color.bg}};
+  --panel: {{color_css.chip}};
+  --stroke: rgba(255, 255, 255, {{modal.hairline}});
+  --text: {{color.fg}};
+  --muted: {{color.fg_muted}};
+  --accent: {{ramp.primary_400}};
+  --owned: {{family.jade}};
+  --stub: {{family.gold}};
+  --radius: {{modal.radius}}px;
+  --blur: {{blur.backdrop_lg}}px;
+
+  /* status triad (status ≠ identity) */
+  --ok: {{color.success}};
+  --warn: {{color.tertiary}};
+  --danger: {{color.error}};
+  --info: {{color.secondary}};
+
+  /* workspace identities (v3 wheel) — chrome accents only */
+  --hue-coding: {{color.coding}};
+  --hue-research: {{color.research}};
+  --hue-engine: {{color.engine}};
+  --hue-browser: {{color.browser}};
+  --hue-monitoring: {{color.monitoring}};
+  --hue-streaming: {{color.streaming}};
+  --hue-gaming: {{color.gaming}};
+  --hue-media: {{color.media}};
+  --hue-ai: {{color.ai}};
+
+  /* family accents (v3 half-spokes) */
+  --fam-lavender: {{family.lavender}};
+  --fam-orchid: {{family.orchid}};
+  --fam-jade: {{family.jade}};
+  --fam-lime: {{family.lime}};
+  --fam-tangerine: {{family.tangerine}};
+  --fam-gold: {{family.gold}};
+
+  /* primary tonal ramp (depth tiers: 300 text-accent · 600 hover · 700 border · 800 surface) */
+  --ramp-primary-300: {{ramp.primary_300}};
+  --ramp-primary-600: {{ramp.primary_600}};
+  --ramp-primary-700: {{ramp.primary_700}};
+  --ramp-primary-800: {{ramp.primary_800}};
+
+  /* glass material (the web approximation of [glass]) */
+  --glass-tint-opacity: {{glass.tint_opacity}};
+  --glass-rim-opacity: {{glass.rim_opacity}};
+
+  /* modal language ([modal]) */
+  --modal-radius: {{modal.radius}}px;
+  --modal-pad: {{modal.pad}}px;
+  --modal-gap: {{modal.gap}}px;
+  --modal-enter-scale: {{modal.enter_scale}};
+  --modal-backdrop-dim: {{modal.backdrop_dim}};
+
+  /* motion ([motion]) */
+  --motion-quick: {{motion.quick_ms}}ms;
+  --motion-normal: {{motion.normal_ms}}ms;
+  --motion-slow: {{motion.slow_ms}}ms;
+  --ease: {{motion.ease}};
+}

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# backup-borg-drill — prove the borg backup chain end-to-end WITHOUT the
+# production drive: init a throwaway repo, archive a representative sample
+# (a design SSOT + an owned body doc + the backup script itself), extract it,
+# byte-verify every file, and `borg check` the repo. Records a drill marker
+# that verify-backup reads. Self-contained, idempotent, leaves no repo behind.
+#
+# This proves the *mechanism* any time; the real quarterly drill (recovery.md)
+# restores from an actual rotated disk. Both matter — this one can't lapse.
+set -euo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/backup-borg"
+# Work on btrfs (under $HOME) so borg can restore the btrfs.compression xattr —
+# a tmpfs /tmp can't, which borg (correctly) flags as a warning.
+mkdir -p "${XDG_CACHE_HOME:-${HOME}/.cache}"
+WORK="$(mktemp -d "${XDG_CACHE_HOME:-${HOME}/.cache}/backup-borg-drill.XXXXXX")"
+REPO="${WORK}/repo"; OUT="${WORK}/out"
+export BORG_PASSPHRASE="drill-throwaway"   # throwaway repo — never the real key
+trap 'rm -rf "${WORK}"' EXIT
+
+log() { printf '\n\033[1;35m==> %s\033[0m\n' "$*"; }
+die() { echo "backup-borg-drill: $*" >&2; exit 1; }
+# borg uses rc=1 for benign warnings, rc>=2 for real errors — tolerate warnings.
+bg()  { local rc=0; borg "$@" || rc=$?; [ "$rc" -le 1 ] || die "borg $1 failed (rc=$rc)"; }
+
+command -v borg >/dev/null 2>&1 || die "borg not installed"
+
+# A representative sample — files that MUST survive a real restore.
+SAMPLE=(
+  "${HOME}/.dotfiles/system/tokens.toml"
+  "${HOME}/SlicedLabs/library/codex/20-architect/naming-canon.md"
+  "${HOME}/.dotfiles/bin/.local/bin/backup-borg"
+)
+for f in "${SAMPLE[@]}"; do [ -r "$f" ] || die "sample missing: $f"; done
+
+log "init throwaway repo"
+borg init --encryption=repokey-blake2 "${REPO}"
+
+log "create archive"
+bg create --compression=zstd,9 "${REPO}::drill-$(date +%s)" "${SAMPLE[@]}"
+
+log "extract + byte-verify"
+ARCH="$(borg list --short "${REPO}" | head -1)"
+mkdir -p "${OUT}"; ( cd "${OUT}" && bg extract "${REPO}::${ARCH}" )
+for f in "${SAMPLE[@]}"; do
+  cmp -s "$f" "${OUT}/${f#/}" || die "MISMATCH after restore: $f"
+done
+
+log "repo integrity (borg check)"
+bg check "${REPO}"
+
+mkdir -p "${STATE_DIR}"
+date -Is > "${STATE_DIR}/last-drill"
+log "drill PASSED — ${#SAMPLE[@]} samples round-tripped byte-identical · marker → ${STATE_DIR}/last-drill"

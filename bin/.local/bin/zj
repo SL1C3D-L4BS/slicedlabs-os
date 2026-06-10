@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # zj — launch a fresh zellij session per terminal window. An optional first arg is
 # a LAYOUT name (coding / research / engine-dev) for the workspace dev-cockpits, e.g.
 # `ghostty -e zj coding`. No arg = the `default` layout: your shell + Claude Code
@@ -6,8 +7,8 @@
 # Opt out of the Claude pane per-window with `zj bare` or `SL_NO_CLAUDE=1` (→ `bare`
 # layout: shell only, same pill bar).
 #
-# Each window gets a uniquely-named session (epoch+PID) so sessions never collide
-# or auto-resume. Cockpits pass a LAYOUT and are started with -n
+# Cockpit LAYOUTs reuse ONE stable session each (re-summoning attaches → no
+# pileup); plain shells get a unique session per window. Cockpits start with -n
 # (--new-session-with-layout) — NOT `-s NAME --layout X`, which zellij 0.44
 # interprets as "attach to session NAME and add X as tabs" and so fails with
 # "There is no active session!" when NAME doesn't exist yet. Guards:
@@ -32,11 +33,30 @@ layout="${1:-}"
 if [ -z "$layout" ] && [ -n "${SL_NO_CLAUDE:-}" ]; then
     layout="bare"
 fi
-sess="win-$(date +%s)-$$"
+# Cockpit dev-layouts reuse ONE stable session per layout, so re-summoning a
+# workspace ATTACHES to the live cockpit instead of minting a duplicate session.
+# The old unique-per-launch scheme piled up detached sessions that exhausted RAM
+# and made duplicate `vim NOTES.md` / `nvim` instances collide on swap files.
+# (config.kdl `session_serialization false` ⇒ list-sessions shows only LIVE
+# sessions, so this attach-or-create is exact.) Plain shells stay per-window.
+# Sessions reuse ONE per (layout × PROJECT): re-summoning the SAME project's deck attaches
+# (no pileup), while different projects — and the verify harness's throwaway __live__ — never
+# share a session rooted in the wrong/deleted cwd (that was the `current_dir() os error 2` bug:
+# a stale `vm` session in a since-deleted project got re-attached). Project = $SL_PROJECT_NAME
+# (exported by scene.sh); a bare `zj <layout>` with no project keeps the plain name.
+sess="$layout"; [ -n "${SL_PROJECT_NAME:-}" ] && sess="${layout}-${SL_PROJECT_NAME}"
+# shellcheck disable=SC2194  # constant case-word is an intentional membership test on "$layout"
+case " coding engine-dev research vim vm ci monitor-side agent studio " in
+    *" $layout "*)
+        if zellij list-sessions -s 2>/dev/null | grep -qx -- "$sess"; then
+            exec zellij attach "$sess"
+        fi
+        exec zellij -s "$sess" -n "$layout"
+        ;;
+esac
 
-# Fresh, uniquely-named session per window. `-s` names a new session; with a
-# cockpit layout, `-n` forces a NEW session staged from that layout (combining
-# both keeps the unique name AND renders the layout — verified on zellij 0.44.3).
+# Default / bare / one-off layout → a fresh uniquely-named session per window.
+sess="win-$(date +%s)-$$"
 if [ -n "$layout" ]; then
     exec zellij -s "$sess" -n "$layout"
 fi

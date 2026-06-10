@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-usbguard — the peripheral-trust invariant: USBGuard is installed,
+# enforcing (block unknown by default), persists across reboot, and has NOT
+# locked out the operator (a present USB keyboard is still authorized). The
+# device policy (rules.conf) is host-private (generated per host); this gate
+# checks posture, not the device list.
+# SSOT: system/etc/usbguard/usbguard-daemon.conf · bootstrap layer_S ·
+#       /etc/usbguard/rules.conf (host-generated, never tracked).
+set -uo pipefail
+fail=0
+ok()   { echo "  ✓ $1"; }
+no()   { echo "  ✗ $1" >&2; fail=1; }
+info() { echo "  ⓘ $1"; }
+
+# 1) installed
+command -v usbguard >/dev/null 2>&1 && ok "usbguard installed" || no "usbguard not installed"
+
+# 2) active (enforcing now) + 3) enabled (enforces at boot too)
+[ "$(systemctl is-active usbguard.service 2>/dev/null)" = active ] \
+  && ok "usbguard.service active (enforcing)" || no "usbguard.service not active"
+[ "$(systemctl is-enabled usbguard.service 2>/dev/null)" = enabled ] \
+  && ok "usbguard.service enabled (persists across reboot)" || no "usbguard.service not enabled"
+
+# 4) block-by-default + a non-empty policy (root-only files → via passwordless sudo; else info)
+if sudo -n true 2>/dev/null; then
+  t="$(sudo -n grep -m1 '^ImplicitPolicyTarget=' /etc/usbguard/usbguard-daemon.conf 2>/dev/null | cut -d= -f2)"
+  [ "$t" = block ] && ok "ImplicitPolicyTarget=block (unknown devices denied)" || no "ImplicitPolicyTarget=${t:-unset} (want block)"
+  rc="$(sudo -n grep -c '^allow' /etc/usbguard/rules.conf 2>/dev/null || echo 0)"
+  [ "${rc:-0}" -ge 1 ] && ok "rules.conf has ${rc} allow rule(s)" || no "rules.conf empty or missing"
+else
+  info "skipped daemon.conf/rules checks (no passwordless sudo here)"
+fi
+
+# 5) anti-lockout — every present USB keyboard belongs to an authorized device (sysfs, non-root)
+kbd_seen=0; kbd_blocked=0
+for ifc in /sys/bus/usb/devices/*:*/bInterfaceProtocol; do
+  [ -r "$ifc" ] || continue
+  [ "$(cat "$ifc" 2>/dev/null)" = "01" ] || continue                     # HID boot keyboard protocol
+  d="${ifc%/bInterfaceProtocol}"
+  [ "$(cat "${d}/bInterfaceClass" 2>/dev/null)" = "03" ] || continue     # HID class
+  kbd_seen=1
+  dev="${d%:*}"
+  [ "$(cat "${dev}/authorized" 2>/dev/null)" = "1" ] || kbd_blocked=1
+done
+if [ "$kbd_seen" = 1 ]; then
+  [ "$kbd_blocked" = 0 ] && ok "present USB keyboard is authorized (operator not locked out)" \
+    || no "a present USB keyboard is DEAUTHORIZED — lockout!"
+else
+  info "no USB keyboard interface present to check"
+fi
+
+[ $fail -eq 0 ] && echo "usbguard: installed · enforcing · boot-persistent · operator not locked out ✓"
+exit $fail

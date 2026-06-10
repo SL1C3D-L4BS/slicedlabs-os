@@ -1,19 +1,19 @@
-// [ENGINE] CODE cockpit (zj engine-dev) — the editor column of the engine command center,
-// pointed at ~/Projects/engine by the `engine` scene. Mirrors `coding` (the AI team is its
-// own full `zj agent` window; docs Firefox is a half-width column) — so this is pure Rust
-// dev: an elite, editor-dominant, logically-organized surface. zjstatus pill bar from
-// tokens.toml (engine-coral accent).
+// [ENGINE] COMMAND CENTER (zj engine-dev) — the dense cockpit deck, Rust‑flavored.
+// Mirrors `coding` (~/Downloads/0.png) but pointed at ~/SlicedLabs/tools/engine by the
+// `engine` scene, in the engine‑coral hue:
 //
-// Design (spec §14): ONE dominant editor; an anchored utility row that loads start_suspended
-// (0 CPU/tokens until Enter); a tight LOGICAL tab set. Alt+]/Alt+[ cycle pane arrangements;
-// Alt+f floats a scratch shell.
+//   ┌ Neovim (dominant) ─────────┬ rail ┬ Sli labs ┬ Claude ┐
+//   │                            │ Tree │ (susp)   │ (susp) │
+//   │                            │ Git  │          │        │
+//   │                            │ Bacon│ (susp)   │        │
+//   ├ Debugger console ┬ Logger ─┴──────┴──────────┴────────┤
+//   │                  │ console                            │
+//   └──────────────────┴────────────────────────────────────┘
 //
-// Tabs:
-//   code  — nvim, full pane. The editor IS the workspace.
-//   build — bacon (continuous cargo check/test) │ run/REPL   (bacon suspended — CPU-heavy)
-//   git   — lazygit │ gh-dash            (suspended)
-//   debug — runtime/debugger console │ logs tail
-//   data  — dbshell (dev-postgres) │ sqlite3 (suspended)
+// Tile 3 is `bacon` (continuous cargo check/test = live Rust diagnostics) — CPU‑heavy,
+// so start_suspended like the AI pair (0 cost until Enter). The wgpu/Rust docs Firefox,
+// the VM Stack, and the CI/GitHub columns are SEPARATE niri columns (engine‑web /
+// engine‑vm / engine‑ci) that niri scrolls to. Zen: Ctrl+p f. Scratch float: Alt+f.
 layout {
     default_tab_template {
         pane size=1 borderless=true {
@@ -25,8 +25,8 @@ layout {
                 format_precedence "lrc"
                 border_enabled "false"
 
-                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {index} {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
-                tab_active    "#[fg=#{{color_raw.engine}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.engine}},bold] {{powerline.dot}} {index} {name} #[fg=#{{color_raw.engine}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg=#{{color_raw.engine}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg=#{{color_raw.engine}},bold] {{powerline.dot}} {name} #[fg=#{{color_raw.engine}},bg={{color.bg}}]{{powerline.round_right}}"
                 tab_separator "#[bg={{color.bg}}] "
 
                 mode_normal       "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
@@ -52,62 +52,104 @@ layout {
         children
     }
 
-    // code — the dominant editor. nvim fills the column.
-    tab name="code" focus=true {
-        pane command="nvim"
-    }
-    // build — bacon (continuous cargo check/test, CPU-heavy → suspended) │ run/REPL.
-    tab name="build" {
-        pane split_direction="vertical" {
-            pane command="bacon" { start_suspended true; }
-            pane                                   // run / REPL
-        }
-    }
-    // git — lazygit + the gh PR/issue dashboard. Both suspended.
-    tab name="git" {
-        pane split_direction="vertical" {
-            pane command="lazygit" { start_suspended true; }
-            pane command="gh-dash" { start_suspended true; }
-        }
-    }
-    // debug — runtime/debugger console │ logs tail.
-    tab name="debug" {
-        pane split_direction="vertical" {
-            pane                                   // runtime / debugger console
-            pane                                   // logs tail
-        }
-    }
-    // data — dev-postgres shell │ a scratch sqlite. Both suspended.
-    tab name="data" {
-        pane split_direction="vertical" {
-            pane command="dbshell" { start_suspended true; }
-            pane command="sqlite3" { start_suspended true; }
+    // deck — the command center. Outer = 3 columns (left block · Sli labs · Claude);
+    // the left block stacks editor+rail over the two consoles. bacon + AI suspended.
+    tab name="deck" focus=true {
+        // EDITOR ROW (top) over a calm full-width CONSOLE strip. Proportions from tokens [layout]
+        // — Neovim dominant + slim rail/AI. bacon + AI suspended (0 cost until Enter).
+        pane split_direction="horizontal" {
+            pane size="{{layout.deck_top}}%" split_direction="vertical" {
+                pane size="{{layout.editor_major}}%" command="nvim" { name "Neovim"; }
+                pane size="{{layout.rail}}%" split_direction="horizontal" {
+                    pane name="Tree" command="fish" {
+                        args "-C" "eza --tree --level=2 --icons --git 2>/dev/null"
+                    }
+                    pane name="Git" command="fish" {
+                        args "-C" "git -c color.ui=always status -sb 2>/dev/null; and git -c color.ui=always log --oneline -8 2>/dev/null"
+                    }
+                    pane name="Bacon" command="bacon" {
+                        start_suspended true   // continuous cargo check/test — CPU-heavy → 0 until Enter
+                    }
+                }
+                pane size="{{layout.aux_slim}}%" command="slicedlabs" {
+                    start_suspended true
+                    name "AI · Sli labs"
+                }
+                pane command="slc-claude" {
+                    start_suspended true
+                    name "AI · Claude"
+                }
+            }
+            pane size="{{layout.console_h}}%" split_direction="vertical" {
+                pane name="Debugger console" command="sl-debug"   // detects Cargo.toml → rust-lldb / lldb-dap
+                pane name="Logger console" command="sl-log"       // live engine logs → lnav (engine_log format)
+            }
         }
     }
 
-    // Alt+] / Alt+[ swap layouts (spec §14): dominant (big left + rest) ↔ even ↔ stacked.
-    swap_tiled_layout name="dominant" {
-        tab {
-            pane split_direction="vertical" {
-                pane size="62%"
-                pane { children; }
-            }
+    // Classic tabs RESTORED (their original functionality) — selectable pills beside `deck`.
+    tab name="code" {
+        pane command="nvim" { name "Neovim"; }
+    }
+    tab name="build" {
+        pane split_direction="vertical" {
+            pane command="bacon" { start_suspended true; name "bacon"; }
+            pane name="cargo run · test" command="sl-run"
         }
     }
-    swap_tiled_layout name="even" {
-        tab {
-            pane split_direction="vertical" {
-                pane
-                pane { children; }
-            }
+    tab name="git" {
+        pane split_direction="vertical" {
+            pane command="lazygit" { start_suspended true; name "lazygit"; }
+            pane command="gh-dash" { start_suspended true; name "gh-dash"; }
         }
     }
-    swap_tiled_layout name="stacked" {
-        tab {
-            pane split_direction="vertical" {
-                pane
-                pane stacked=true { children; }
-            }
+    tab name="debug" {
+        pane split_direction="vertical" {
+            pane name="rust-gdb · lldb" command="sl-debug" { start_suspended true; }
+            pane name="RUST_LOG · journalctl" command="sl-log" { start_suspended true; }
         }
+    }
+    // ── IDE pillars (engine is a Rust project — inherits the coding ring) ──
+    tab name="problems" {
+        pane name="diagnostics" command="sl-diag" { args "--clippy"; start_suspended true; }
+    }
+    tab name="test" {
+        pane name="tests" command="sl-test" { args "list"; start_suspended true; }
+    }
+    tab name="search" {
+        pane name="find" command="sl-find" { args "-i"; start_suspended true; }
+    }
+    // ── engine render-dev (the specialized surfaces) ──
+    tab name="run" {
+        pane name="live engine" command="sl-engine" { args "run"; start_suspended true; }
+    }
+    tab name="shaders" {
+        pane split_direction="vertical" {
+            pane size="{{layout.phi_major}}%" command="nvim" { name "slang"; }
+            pane size="{{layout.phi_minor}}%" name="slangc → spirv-dis" command="sl-shader" { start_suspended true; }
+        }
+    }
+    tab name="gpu" {
+        pane name="RenderDoc" command="qrenderdoc" { start_suspended true; }
+    }
+    tab name="oracles" {
+        pane name="determinism · golden suite" command="sl-engine" { args "oracles"; start_suspended true; }
+    }
+    tab name="profile" {
+        pane name="profiler" command="sl-profile" { start_suspended true; }
+    }
+    tab name="data" {
+        pane split_direction="vertical" {
+            pane command="dbshell" { start_suspended true; name "dbshell"; }
+            pane command="sqlite3" { start_suspended true; name "sqlite3"; }
+        }
+    }
+    // ssh — the MacBook Air LAN build/test/sign node (Host `mac`). RESTORED.
+    tab name="ssh" {
+        pane command="ssh" { args "mac"; name "mac · MacBook Air"; }
+    }
+    // term — a plain working terminal on the main-screen cockpit.
+    tab name="term" {
+        pane name="terminal"
     }
 }

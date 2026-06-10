@@ -1,0 +1,7 @@
+[Unit]
+Description=SlicedLabs health watchdog — failed units · disk → sl-alert
+After=ntfy.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/sl-alert-health

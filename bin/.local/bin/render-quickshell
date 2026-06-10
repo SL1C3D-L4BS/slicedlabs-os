@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """render-quickshell — generate the Cockpit's QML Theme singleton from tokens.toml.
 
 Mirrors render-engine-palette / render-templates: system/tokens.toml is the single
@@ -20,6 +21,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 import color  # noqa: E402 — local OKLCH→sRGB lib alongside this script
+
+colorlib = color  # main() shadows `color` with the [color] table; keep the module
+
+# [color] hue anchors that derive tonal ramps (every [family] key does too) —
+# mirrors render-templates RAMP_HUES (the one v3 ramp law).
+RAMP_HUES = (
+    "coding", "research", "engine", "browser",
+    "monitoring", "streaming", "gaming", "media",
+    "primary", "secondary", "tertiary", "error", "success",
+)
+RAMP_STEPS = ("50", "100", "200", "300", "400", "500", "600", "700", "800", "900")
 
 DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
 TOKENS = DOTFILES / "system/tokens.toml"
@@ -70,11 +82,18 @@ def merged(t: dict, base: str, light: str, variant: str) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--variant", choices=("dark", "light"), default="dark")
+    ap.add_argument(
+        "--look",
+        choices=("standard", "clear"),
+        default="standard",
+        help="Material look (clear = see-through Liquid Retina overlay)",
+    )
     args = ap.parse_args()
     variant = args.variant
 
     t = tomllib.loads(TOKENS.read_text())
     color = merged(t, "color", "color_light", variant)
+    fam = merged(t, "family", "family_light", variant)
     css = merged(t, "color_css", "color_css_light", variant)
     icon = t["icon"]
     geom = t["geom"]
@@ -83,8 +102,23 @@ def main() -> int:
     blur = t["blur"]
     glass = merged(t, "glass", "glass_light", variant)
     glass_per_ws = glass.pop("per_workspace", {})  # per-cockpit quality → glassQualityFor()
+    if args.look == "clear":  # the see-through Liquid Retina overlay (v3)
+        glass = {**glass, **t.get("glass_clear", {}), "look": "clear"}
+        opacity = {**opacity, **t.get("opacity_clear", {})}
+    # sl-theme --glass override (render-time env; tokens.toml stays the SSOT)
+    if os.environ.get("GLASS_QUALITY") in ("off", "low", "medium", "high"):
+        glass["quality"] = os.environ["GLASS_QUALITY"]
     semantic = merged(t, "semantic", "semantic_light", variant)
     cockpit = t.get("cockpit", {})
+
+    # Derived tonal ramps (v3) — anchors are the only stored truth.
+    ramps: dict[str, dict[str, str]] = {}
+    ramp_anchors: dict[str, object] = {k: color[k] for k in RAMP_HUES if k in color}
+    ramp_anchors.update(fam)
+    for name, value in ramp_anchors.items():
+        hexed = colorlib.to_hex(value)
+        if hexed:
+            ramps[name] = colorlib.ramp_for_hex(hexed)
 
     # cubic-bezier(a,b,c,d) → QML easing.bezierCurve [a,b,c,d,1,1]
     bez = re.findall(r"[\d.]+", str(motion.get("ease", "")))
@@ -106,6 +140,9 @@ def main() -> int:
         "    // ---- semantic colours ([color]) ----",
     ]
     for k, v in color.items():
+        L.append(f"    readonly property color {camel(k)}: {qml_color(v)}")
+    L += ["", "    // ---- family accents ([family]) — Liquid Retina v3 half-spokes ----"]
+    for k, v in fam.items():
         L.append(f"    readonly property color {camel(k)}: {qml_color(v)}")
     L += ["", "    // ---- GTK/rgba surfaces + glows ([color_css]) ----"]
     for k, v in css.items():
@@ -168,6 +205,18 @@ def main() -> int:
         else:
             esc = str(v).replace("\\", "\\\\").replace('"', '\\"')
             L.append(f'    readonly property string {camel(k)}: "{esc}"')
+    L += ["", "    // ---- modal design language ([modal]) ----"]
+    for k, v in t.get("modal", {}).items():
+        name = "modal" + camel(k)[0].upper() + camel(k)[1:]
+        if isinstance(v, bool):
+            L.append(f"    readonly property bool {name}: {'true' if v else 'false'}")
+        elif isinstance(v, int):
+            L.append(f"    readonly property int {name}: {v}")
+        elif isinstance(v, float):
+            L.append(f"    readonly property real {name}: {v}")
+        else:
+            L.append(f"    readonly property color {name}: {qml_color(v)}")
+
     L += ["", "    // ---- typography ([font]) ----"]
     for k, v in t.get("font", {}).items():
         if isinstance(v, (int, float)):
@@ -175,6 +224,26 @@ def main() -> int:
         else:
             esc = str(v).replace("\\", "\\\\").replace('"', '\\"')
             L.append(f'    readonly property string {camel(k)}: "{esc}"')
+
+    # Derived tonal ramps (v3): {{ramp.coding_300}} ⇄ Theme.rampFor("coding", 300)
+    steps_js = ", ".join(f'"{s}"' for s in RAMP_STEPS)
+    L += ["", "    // ---- derived tonal ramps (v3) — lib/color.ramp() at render time ----",
+          f"    readonly property var rampSteps: [{steps_js}]",
+          "    readonly property var ramps: ({"]
+    obj_lines = []
+    for name in ramps:
+        pairs = ", ".join(f'"{s}": "{ramps[name][s]}"' for s in RAMP_STEPS)
+        obj_lines.append(f'        "{name}": {{ {pairs} }}')
+    L.append(",\n".join(obj_lines))
+    L += ["    })",
+          "    function rampFor(name, step) {",
+          "        var r = ramps[name];",
+          "        return r ? r[String(step)] : fgMuted;",
+          "    }",
+          "    function rampOf(name) {",
+          "        var r = ramps[name];",
+          "        return r ? rampSteps.map(function(s) { return r[s]; }) : [];",
+          "    }"]
 
     # brand(name) → workspace/HUD identity colour
     L += ["", "    // ---- brand identity map (workspace/HUD name → colour) ----",
@@ -206,9 +275,9 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "Theme.qml").write_text("\n".join(L) + "\n")
     (OUT_DIR / "qmldir").write_text("singleton Theme 1.0 Theme.qml\n")
-    print(f"render-quickshell: {OUT_DIR}/Theme.qml ({variant}) "
-          f"— {len(color)} colours, {len(css)} surfaces, {len(icon)} glyphs, "
-          f"{len(geom)} geom, {len(motion)} motion")
+    print(f"render-quickshell: {OUT_DIR}/Theme.qml ({variant}, look={args.look}) "
+          f"— {len(color)} colours, {len(fam)} families, {len(ramps)} ramps, "
+          f"{len(css)} surfaces, {len(icon)} glyphs, {len(geom)} geom, {len(motion)} motion")
     return 0
 
 

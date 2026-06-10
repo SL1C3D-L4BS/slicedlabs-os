@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """render-engine-palette — generate the [ENGINE] UI palette from tokens.toml.
 
 Mirrors render-templates / render-prompts: system/tokens.toml is the single
@@ -11,15 +12,27 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import color as colorlib  # noqa: E402 — local OKLCH→sRGB lib alongside this script
+
 DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
-ENGINE = Path(os.environ.get("ENGINE_ROOT") or (Path.home() / "Projects/engine"))
+ENGINE = Path(os.environ.get("ENGINE_ROOT") or (Path.home() / "SlicedLabs/tools/slicedengine"))
 TOKENS = DOTFILES / "system/tokens.toml"
 OUT = ENGINE / "crates/engine-ui/src/theme/palette.rs"
 
 HEX = re.compile(r"^#([0-9a-fA-F]{6})$")
+
+# [color] hue anchors that derive tonal ramps (every [family] key does too) —
+# mirrors render-templates / render-quickshell / render-textual (one ramp law).
+RAMP_HUES = (
+    "coding", "research", "engine", "browser",
+    "monitoring", "streaming", "gaming", "media",
+    "primary", "secondary", "tertiary", "error", "success",
+)
 
 
 def rust_str(v: str) -> str:
@@ -58,11 +71,38 @@ def main() -> int:
         "pub mod color {",
         "    use super::Rgba;",
     ]
+    n_col = 0
     for k, v in t["color"].items():
-        m = HEX.match(str(v))
-        if m:
-            L.append(f"    /// `{v}`")
-            L.append(f"    pub const {k.upper()}: Rgba = Rgba::rgb(0x{m.group(1).upper()});")
+        hexed = colorlib.to_hex(v)  # oklch() anchors bake to sRGB hex (v3)
+        if hexed:
+            n_col += 1
+            L.append(f"    /// `{hexed}`")
+            L.append(f"    pub const {k.upper()}: Rgba = Rgba::rgb(0x{hexed.lstrip('#').upper()});")
+    L += ["}", "",
+          "/// Family accents — Liquid Retina v3 half-spokes (tokens.toml `[family]`).",
+          "pub mod family {",
+          "    use super::Rgba;"]
+    fam = t.get("family", {})
+    for k, v in fam.items():
+        hexed = colorlib.to_hex(v)
+        if hexed:
+            L.append(f"    /// `{hexed}`")
+            L.append(f"    pub const {k.upper()}: Rgba = Rgba::rgb(0x{hexed.lstrip('#').upper()});")
+    L += ["}", "",
+          "/// Derived tonal ramps (v3) — 10 steps per hue, lib/color.ramp() law.",
+          "pub mod ramp {",
+          "    use super::Rgba;"]
+    anchors: dict[str, object] = {k: t["color"][k] for k in RAMP_HUES if k in t["color"]}
+    anchors.update(fam)
+    n_ramp = 0
+    for name, value in anchors.items():
+        hexed = colorlib.to_hex(value)
+        if not hexed:
+            continue
+        n_ramp += 1
+        for step, hx in colorlib.ramp_for_hex(hexed).items():
+            L.append(f"    /// `{hx}`")
+            L.append(f"    pub const {name.upper()}_{step}: Rgba = Rgba::rgb(0x{hx.lstrip('#').upper()});")
     L += ["}", "", "/// Nerd-Font glyphs (tokens.toml `[icon]`).", "pub mod icon {"]
     for k, v in t["icon"].items():
         L.append(f"    /// `{rust_str(v)}`")
@@ -84,9 +124,9 @@ def main() -> int:
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text("\n".join(L) + "\n")
-    n_col = sum(1 for v in t["color"].values() if HEX.match(str(v)))
     print(f"render-engine-palette: {OUT.relative_to(ENGINE)} "
-          f"({n_col} colours, {len(t['icon'])} icons, {len(t['geom'])} geom, {len(t['motion'])} motion)")
+          f"({n_col} colours, {len(fam)} families, {n_ramp} ramps, "
+          f"{len(t['icon'])} icons, {len(t['geom'])} geom, {len(t['motion'])} motion)")
     return 0
 
 

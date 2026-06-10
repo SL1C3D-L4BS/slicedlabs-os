@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-debug — project-aware debugger launcher for the cockpit Debugger console.
+#
+#   sl-debug                   detect the project; print a ready banner + drop to a shell
+#                              with the right debugger toolchain on PATH
+#   sl-debug <program> [args]  launch the language's debugger on <program>
+#   sl-debug -p <pid>          attach the language's debugger to <pid>
+#   sl-debug -a | attach       fzf-pick one of your running processes and attach
+#
+# Mapping: Rust→rust-lldb · Go→dlv · Python→pdb · C/C++→gdb · (in nvim, F5 = DAP via lldb-dap).
+# Never dies on a missing tool — falls back to an interactive shell.
+set -uo pipefail
+shell="${SHELL:-/usr/bin/fish}"
+have() { command -v "$1" >/dev/null 2>&1; }
+
+detect() {  # → "<lang> <debugger>"
+  if   [ -f Cargo.toml ]; then echo "rust rust-lldb"
+  elif [ -f go.mod ]; then echo "go dlv"
+  elif [ -f pyproject.toml ] || compgen -G '*.py' >/dev/null 2>&1; then echo "python pdb"
+  elif [ -f CMakeLists.txt ] || [ -f Makefile ] || compgen -G '*.c' >/dev/null 2>&1 || compgen -G '*.cpp' >/dev/null 2>&1; then echo "c/c++ gdb"
+  else echo "generic gdb"; fi
+}
+read -r PROJ DBG < <(detect)
+
+attach() {  # $1 = pid
+  local pid="$1"
+  case "$PROJ" in
+    rust) have rust-lldb && exec rust-lldb -p "$pid"; have lldb && exec lldb -p "$pid";;
+    go)   have dlv && exec dlv attach "$pid";;
+  esac
+  have gdb && exec gdb -p "$pid"; have lldb && exec lldb -p "$pid"
+  echo "sl-debug: no debugger found to attach"; exec "$shell"
+}
+launch() {  # $1 = program; rest = args
+  local p="$1"; shift
+  case "$PROJ" in
+    rust)   have rust-lldb && exec rust-lldb -- "$p" "$@";;
+    go)     have dlv && exec dlv exec "$p" -- "$@";;
+    python) have python && exec python -m pdb "$p" "$@";;
+  esac
+  have gdb && exec gdb --args "$p" "$@"; have lldb && exec lldb -- "$p" "$@"
+  echo "sl-debug: no debugger found"; exec "$shell"
+}
+pick_attach() {
+  have fzf || { echo "sl-debug: fzf not installed — use: sl-debug -p <pid>"; exec "$shell"; }
+  local pid
+  pid=$(ps -u "$USER" -o pid=,comm=,args= --sort=-pid 2>/dev/null \
+        | grep -vE 'sl-debug|[f]zf' \
+        | fzf --prompt='attach pid (Esc = shell) › ' --height=45% --reverse --no-sort | awk '{print $1}')
+  [ -n "${pid:-}" ] && attach "$pid"
+  exec "$shell"
+}
+
+case "${1:-}" in
+  -p) [ -n "${2:-}" ] && attach "$2" || { echo "usage: sl-debug -p <pid>"; exec "$shell"; } ;;
+  -a|attach) pick_attach ;;
+  -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+  "") : ;;
+  *) launch "$@" ;;
+esac
+
+# no args → ready banner + a debugger-ready shell
+printf '⏿ sl-debug — %s · %s ready\n' "$PROJ" "$DBG"
+case "$PROJ" in
+  rust)   echo '   cargo build  →  sl-debug target/debug/<bin> [args]   ·   attach: sl-debug -a';;
+  go)     echo '   sl-debug ./<pkg-or-bin>  (dlv)                       ·   attach: sl-debug -a';;
+  python) echo '   sl-debug <script>.py  (pdb)';;
+  *)      echo '   sl-debug ./<binary> [args]  (gdb)                    ·   attach: sl-debug -a';;
+esac
+echo '   in nvim: F5 = DAP (lldb-dap)  ·  also: gdb -tui · lldb · sl-debug -p <pid>'
+exec "$shell"

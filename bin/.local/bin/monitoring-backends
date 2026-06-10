@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # monitoring-backends — start/stop the HOST observability units on demand.
 #
 # Daily monitoring is the native `slicedlabs monitor` cockpit (Mod+5 / monitoring-stack),

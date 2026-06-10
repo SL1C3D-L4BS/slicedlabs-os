@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-capture — on-camera legibility mode for recording/streaming. Toggles a capture profile
+# that bumps the font of NEWLY-summoned scene terminals (so the cockpits read clearly on a
+# 1080p/4K video) WITHOUT touching tokens or the live session. Summon a cockpit while capture
+# is ON → big-font deck; turn it off + re-summon → normal. Pairs with the studio (Mod+Ctrl+S).
+#
+#   sl-capture on [size]   enable (default font SL_CAPTURE_FONT or 17)
+#   sl-capture off         disable
+#   sl-capture toggle      flip
+#   sl-capture status      ON (font N) | OFF
+set -euo pipefail
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/sliced/capture"
+mkdir -p "$(dirname "$STATE")"
+note() { command -v notify-send >/dev/null 2>&1 && notify-send "$@" 2>/dev/null || true; }
+
+case "${1:-status}" in
+    on)     printf '%s\n' "${2:-${SL_CAPTURE_FONT:-17}}" > "$STATE"
+            echo "capture ON (font $(cat "$STATE")) — re-summon cockpits (cockpit <ws>) for big-font"
+            note "● Capture mode ON" "Cockpits summon at font $(cat "$STATE")" ;;
+    off)    rm -f "$STATE"; echo "capture OFF — re-summon cockpits for normal font"; note "Capture mode OFF" ;;
+    toggle) if [ -f "$STATE" ]; then exec "$0" off; else exec "$0" on; fi ;;
+    status) if [ -f "$STATE" ]; then echo "ON (font $(cat "$STATE"))"; else echo "OFF"; fi ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *) echo "usage: sl-capture on|off|toggle|status" >&2; exit 1 ;;
+esac

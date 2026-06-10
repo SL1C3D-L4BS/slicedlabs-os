@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-models — the local model registry/manager (sovereign, local-only). Thin honest wrapper
+# over Ollama (the local server) + the owned .slw weights (mind/ai). `sl cookbook` recommends
+# what fits THIS box; this lists/pulls/removes. No cloud — local only.
+set -uo pipefail
+OWNED_WEIGHTS="${SLICED_WEIGHTS:-$HOME/SlicedLabs/mind/ai/research/checkpoints}"
+
+_need_ollama(){ command -v ollama >/dev/null 2>&1 || { echo "sl-models: 'ollama' (the local model server) not found — install it, then 'ai-stack-up'." >&2; exit 127; }; }
+
+case "${1:-list}" in
+  list|ls|"")
+    printf '\033[1mLocal models (Ollama)\033[0m\n'
+    if command -v ollama >/dev/null 2>&1; then
+      ollama list 2>/dev/null | sed 's/^/  /' || echo "  (ollama not running — 'ai-stack-up')"
+    else echo "  (ollama not installed)"; fi
+    printf '\n\033[1mOwned weights (mind/ai)\033[0m\n'
+    if compgen -G "$OWNED_WEIGHTS/*.slw" >/dev/null 2>&1 || compgen -G "$OWNED_WEIGHTS/*.pt" >/dev/null 2>&1; then
+      ls -lh "$OWNED_WEIGHTS"/*.slw "$OWNED_WEIGHTS"/*.pt 2>/dev/null | awk '{print "  " $9 "  (" $5 ")"}'
+    else echo "  (none yet — the owned model trains on public data in P6)"; fi
+    ;;
+  pull)      _need_ollama; shift; [ $# -ge 1 ] || { echo "usage: sl models pull <tag>" >&2; exit 2; }; exec ollama pull "$@" ;;
+  rm|remove) _need_ollama; shift; [ $# -ge 1 ] || { echo "usage: sl models rm <tag>"   >&2; exit 2; }; exec ollama rm "$@" ;;
+  ps|running) _need_ollama; exec ollama ps ;;
+  fit|cookbook) exec sl-cookbook ;;
+  -h|--help|help) printf 'sl models — the local model registry (Ollama + owned .slw)\n  list | pull <tag> | rm <tag> | ps | fit\n' ;;
+  *) echo "sl-models: unknown '$1' (try: list | pull | rm | ps | fit)" >&2; exit 2 ;;
+esac

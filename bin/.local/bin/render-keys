@@ -34,7 +34,7 @@ DOTFILES = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
 KEYS = DOTFILES / "system/keys.toml"
 TOKENS = DOTFILES / "system/tokens.toml"
 JSON_OUT = DOTFILES / "quickshell/.config/quickshell/cockpit/generated/keys.json"
-DOCS_DIR = DOTFILES / "docs/keys"
+DOCS_DIR = Path.home() / "SlicedLabs/library/codex/00-start/keys"
 NIRI_TMPL = DOTFILES / "niri/.config/niri/config.kdl.tmpl"
 
 BEGIN = "    // >>> generated: keys (render-keys) — do not edit by hand"
@@ -118,6 +118,19 @@ def build_json(binds: list[dict], colors: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # 2. Markdown cheatsheets                                                      #
 # --------------------------------------------------------------------------- #
+def md_code(s: str) -> str:
+    """Inline-code a key for a GFM table, safe for literal backticks (CommonMark:
+    fence with one more backtick than the longest inner run; pad when the content
+    touches an edge). So `{mark} and Ctrl-` keys render correctly."""
+    longest = cur = 0
+    for ch in s:
+        cur = cur + 1 if ch == "`" else 0
+        longest = max(longest, cur)
+    fence = "`" * (longest + 1)
+    pad = " " if s[:1] == "`" or s[-1:] == "`" else ""
+    return f"{fence}{pad}{s}{pad}{fence}"
+
+
 def _tool_md(tool: str, binds: list[dict]) -> str:
     cats: dict[str, list] = {}
     for b in binds:
@@ -128,7 +141,7 @@ def _tool_md(tool: str, binds: list[dict]) -> str:
         for b in rows:
             key = b["key"].replace("|", "\\|")
             desc = b["desc"].replace("|", "\\|")
-            lines.append(f"| `{key}` | {desc} |")
+            lines.append(f"| {md_code(key)} | {desc} |")
         lines.append("")
     return "\n".join(lines)
 
@@ -299,9 +312,9 @@ def main() -> int:
     (DOCS_DIR / "keyboard-poster.typ").write_text(build_poster(binds, colors))
 
     print(f"✓ {len(binds)} binds across {len(by_tool)} tools")
-    print(f"  → {JSON_OUT.relative_to(DOTFILES)}")
-    print(f"  → {(DOCS_DIR / 'SYSTEM-KEYS.md').relative_to(DOTFILES)} (+ {len(by_tool)} per-tool)")
-    print(f"  → {(DOCS_DIR / 'keyboard-poster.typ').relative_to(DOTFILES)}  (typst compile to SVG/PDF)")
+    print(f"  → {JSON_OUT.relative_to(Path.home())}")
+    print(f"  → {(DOCS_DIR / 'SYSTEM-KEYS.md').relative_to(Path.home())} (+ {len(by_tool)} per-tool)")
+    print(f"  → {(DOCS_DIR / 'keyboard-poster.typ').relative_to(Path.home())}  (typst compile to SVG/PDF)")
     return 0
 
 

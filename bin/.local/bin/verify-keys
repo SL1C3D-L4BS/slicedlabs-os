@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-keys — keys.toml is the SSOT for the niri binds (phase-1b guarantee).
 # Fails if: (1) any niri key is bound twice (a duplicate breaks niri — §18.5),
 # (2) the managed binds region in config.kdl.tmpl has drifted from `render-keys

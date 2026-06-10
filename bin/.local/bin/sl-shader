@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-shader — the engine shader dev loop: compile via the PINNED slangc (v2026.9, ADR-038) →
+# inspect the SPIR-V (spirv-dis). slangd gives in-editor LSP. Runs in $SL_PROJECT (the engine).
+#   sl-shader <file.slang> [stage] [entry]   compile → SPIR-V + disassembly (stage default: compute)
+#   sl-shader list                           list the project's .slang shaders + the pinned version
+#   sl-shader watch <file.slang> [stage]     recompile on save (entr)
+set -uo pipefail
+B=$'\033[1m'; N=$'\033[0m'; D=$'\033[2m'
+have() { command -v "$1" >/dev/null 2>&1; }
+have slangc || { echo "sl-shader: slangc not on PATH — provision the pinned build: sl-slangc-build"; exit 1; }
+
+compile() {
+    local f="$1" stage="${2:-compute}" entry="${3:-main}" out
+    [ -f "$f" ] || { echo "sl-shader: no such file: $f"; return 1; }
+    out="/tmp/$(basename "${f%.slang}").spv"
+    printf '%s▸ slangc %s  (stage=%s entry=%s)%s\n' "$B" "$f" "$stage" "$entry" "$N"
+    if slangc "$f" -target spirv -stage "$stage" -entry "$entry" -o "$out" 2>&1; then
+        printf '  → %s (%s bytes)\n' "$out" "$(stat -c%s "$out" 2>/dev/null)"
+        have spirv-dis && { printf '%s--- SPIR-V (spirv-dis, head) ---%s\n' "$D" "$N"; spirv-dis "$out" 2>/dev/null | head -40; }
+    else echo "  compile failed"; return 1; fi
+}
+
+case "${1:-list}" in
+    list)  printf '%s⏿ shaders — slangc %s%s\n' "$B" "$(slangc -v 2>&1 | head -1)" "$N"
+           { have fd && fd -e slang; } 2>/dev/null || find . -name '*.slang' 2>/dev/null | head -40 ;;
+    watch) shift; have entr || { echo "sl-shader: watch needs entr"; exit 1; }
+           [ -n "${1:-}" ] || { echo "usage: sl-shader watch <file.slang> [stage]"; exit 1; }
+           printf '%s\n' "$1" | entr -c "$0" "$@" ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *)     compile "$@" ;;
+esac

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-canon — the META-gate (CANON-2026.md §VI). Assert every principle the
+# Canon claims to enforce still points at a LIVE, WIRED gate. A missing gate, or a
+# gate quietly dropped from verify-all, is an enforcement gap — caught here, so the
+# doctrine can never silently rot. Non-destructive. Standalone or via verify-all.
+set -uo pipefail
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+# (1) Each gate the Canon's `Enforced by` column names must resolve on PATH.
+#     "<principle §>  <gate>"
+GATES=(
+  "III.7 verify-design-language"
+  "III.8 verify-tokens-drift"
+  "III.7 verify-cockpit.sh"
+  "III.8 verify-tooling"
+  "V.12  verify-scenes"
+  "IV.10 verify-governance"
+  "IV.10 verify-platform"
+  "V.12  verify-boot-contract"
+  "IV.10 warden"
+  "IV.11 verify-supply-chain"
+  "II.5  verify-gateway"
+  "II.5  verify-slicedlabs"
+  "IV.9  verify-odysseus-wrap"
+  "I.2   verify-reproducible"
+  "II.4  verify-tooling-cohesion"
+  "V.12  verify-cockpits-live"
+  "V.12  verify-studio"
+  "V.12  verify-ide"
+  "II.4  verify-journal-clean"
+  "VIII.17 verify-hermes"
+)
+for e in "${GATES[@]}"; do
+  sec=${e%% *}; g=${e##* }
+  if command -v "$g" >/dev/null 2>&1; then ok "§$sec enforced by present gate: $g"
+  else no "§$sec ENFORCEMENT GAP — missing gate: $g"; fi
+done
+
+# (2) The verify-* gates must be WIRED INTO verify-all (else they never run).
+VA="$(command -v verify-all 2>/dev/null)"
+for g in verify-design-language verify-tokens-drift verify-cockpit.sh verify-tooling \
+         verify-scenes verify-governance verify-platform verify-boot-contract verify-supply-chain verify-gateway verify-slicedlabs verify-odysseus-wrap verify-reproducible verify-tooling-cohesion verify-cockpits-live verify-studio verify-ide verify-journal-clean verify-hermes; do
+  if grep -q -- "$g" "$VA" 2>/dev/null; then ok "wired into verify-all: $g"
+  else no "gate NOT wired into verify-all (never runs): $g"; fi
+done
+
+# (3) Engine owned-gates (Canon §I.1 own-the-machine-model, §I.3 determinism,
+#     §II.4 every-subsystem-an-oracle) — the repo's CI entrypoints exist.
+ENG="$HOME/SlicedLabs/tools/slicedengine/justfile"
+grep -qE "^ci:"          "$ENG" 2>/dev/null && ok "§I.1/§II.4 engine 'just ci' gate present"        || no "engine 'just ci' gate missing"
+grep -qE "^determinism:" "$ENG" 2>/dev/null && ok "§I.3 engine 'just determinism' oracle present"    || no "engine determinism oracle missing"
+
+# (4) The doctrine of record itself.
+[ -f "$HOME/SlicedLabs/library/codex/20-architect/canon.md" ] && ok "Canon doctrine of record present" || no "CANON-2026.md missing"
+
+# (5) Naming reservation (Canon §VIII.17 + naming-canon): only the OS assistant may be
+#     named `hermes`; everything else is slicedlabs/sl. Any owned executable matching
+#     *hermes* must be allowlisted (hermes, hermesd). Empty now → enforces later.
+shopt -s nullglob 2>/dev/null || true
+bc_bad=0
+for f in "$HOME/.local/bin/"*hermes*; do
+  b="$(basename "$f")"
+  case "$b" in
+    hermes|hermesd) : ;;          # the assistant itself
+    verify-*|render-*|sl-*) : ;;        # owned tooling ABOUT hermes (verify-hermes etc.) — not claiming the name
+    *) no "naming: '$b' reuses the reserved name 'hermes' (only the assistant may)"; bc_bad=1 ;;
+  esac
+done
+[ "$bc_bad" -eq 0 ] && ok "§VIII.17 'hermes' reserved for the assistant (no misuse on PATH)"
+
+echo
+if [ $rc -eq 0 ]; then echo "canon: every named principle points at a live, wired gate ✓"
+else echo "canon: ENFORCEMENT GAP (see above)" >&2; fi
+exit $rc

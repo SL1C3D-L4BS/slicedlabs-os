@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # tunes — keyboard-driven Spotify via spotify_player (Premium, librespot, MPRIS).
 # The `media` workspace cockpit (Violet). Mirrors `music` (the FOSS mpd cockpit)
 # but for Spotify; spotify_player exposes MPRIS so the Cockpit media HUD + playerctl

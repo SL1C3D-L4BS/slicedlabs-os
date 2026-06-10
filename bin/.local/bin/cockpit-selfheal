@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # cockpit-selfheal — login backstop. Fire the `cockpit` gap-fill reconcile as soon
 # as the eager-staged [meta].auto scenes have SETTLED (their windows are mapped), or
 # a cap elapses — instead of a blind `sleep 30`. On a warm boot this closes gaps

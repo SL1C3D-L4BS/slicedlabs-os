@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # ff-scene — serialized, collision-proof Firefox launcher for niri scenes.
 #
 # WHY: the boot contract stages up to THREE Firefoxes near-simultaneously — the

@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# sl-teach — the lesson pipeline for SlicedLabs' YouTube education (science · engineering ·
+# art · technology · physics · AI). A lesson is an sl-project of type=lesson under
+# ~/Documents/lessons; the `studio` deck (zj studio) binds to it. Scaffolds the authoring
+# set (script · manim scene · typst slides · vhs demo), renders assets, and emits chapters.
+#
+#   sl-teach new <name> [--discipline physics|math|ai|eng|art|tech|cs]
+#                            scaffold a lesson + bind the studio to it; print the path
+#   sl-teach list            lessons (name · discipline · path)
+#   sl-teach render [--manim|--slides|--demo|--all]   render the asset(s) (default: --all)
+#   sl-teach chapters        derive YouTube chapters from SCRIPT.md `## mm:ss Title` headings
+#   sl-teach thumbnail       compile a brand-styled 1280×720 thumbnail (typst → PNG)
+#
+# Grounding: The Art of Game Design (the lesson is an experience — hook, arc, payoff);
+# The Pragmatic Programmer (reproducible asset builds). Books are reference, not ingested.
+set -euo pipefail
+
+LESSONS="${SL_LESSONS_DIR:-$HOME/Documents/lessons}"
+TOKENS="${SL_TOKENS:-$HOME/.dotfiles/system/tokens.toml}"
+die() { printf 'sl-teach: %s\n' "$*" >&2; exit 1; }
+log() { printf '\033[1m▶ %s\033[0m\n' "$*"; }
+
+# Pull a brand hex from the tokens SSOT (consume, never fork the design language).
+_brand_hex() { # <identity-key, e.g. engine> -> #RRGGBB (fallback coral)
+    python3 - "$TOKENS" "$1" <<'PY' 2>/dev/null || printf '#D95C5C\n'
+import sys, tomllib
+try: d = tomllib.load(open(sys.argv[1], "rb"))
+except Exception: print("#D95C5C"); sys.exit()
+raw = d.get("color_raw", {}) or d.get("color", {})
+v = raw.get(sys.argv[2]) or raw.get("engine") or "D95C5C"
+print("#" + v.lstrip("#"))
+PY
+}
+
+_hue_for() { case "$1" in
+    physics | math) echo engine ;; ai) echo ai 2>/dev/null || echo engine ;;
+    art) echo browser ;; eng | cs) echo coding ;; tech) echo research ;; *) echo engine ;;
+esac; }
+
+cmd_list() {
+    [ -d "$LESSONS" ] || { echo "(no lessons yet — sl-teach new <name>)"; return; }
+    local d
+    for d in "$LESSONS"/*/; do
+        [ -d "$d" ] || continue; d="${d%/}"
+        local disc; disc="$(python3 -c "import tomllib;print(tomllib.load(open('$d/.slproject','rb')).get('discipline','?'))" 2>/dev/null || echo '?')"
+        printf '%s\t%s\t%s\n' "$(basename "$d")" "$disc" "$d"
+    done
+}
+
+cmd_new() {
+    local name="" disc="cs"
+    while [ $# -gt 0 ]; do case "$1" in
+        --discipline) disc="${2:-cs}"; shift 2 ;;
+        -*) die "unknown flag: $1" ;; *) name="$1"; shift ;;
+    esac; done
+    [ -n "$name" ] || die "usage: sl-teach new <name> [--discipline physics|math|ai|eng|art|tech|cs]"
+    case "$disc" in physics | math | ai | eng | art | tech | cs) ;; *) die "unknown discipline: $disc" ;; esac
+    local dir="$LESSONS/$name"
+    [ -e "$dir" ] && die "refusing to clobber existing $dir"
+    local accent; accent="$(_brand_hex "$(_hue_for "$disc")")"
+    mkdir -p "$dir/media" "$dir/assets"
+    (cd "$dir" && git init -q)
+
+    cat > "$dir/SCRIPT.md" <<EOF
+# $name  ·  ($disc)
+
+> The lesson script — what you SAY. Teleprompter source (DP-3). Each \`## mm:ss Title\`
+> heading becomes a YouTube chapter (\`sl-teach chapters\`).
+
+## 00:00 Hook
+Why this matters in 15 seconds.
+
+## 00:30 The idea
+The one core concept, stated plainly. Ground it in first principles.
+
+## 02:00 Show it
+Live: the manim animation (animate tab) / the terminal demo (demo tab) / the code.
+
+## 06:00 The deeper why
+Connect to the broader $disc principle. One honest caveat.
+
+## 08:00 Recap + what's next
+Three sentences. The call to action.
+EOF
+
+    cat > "$dir/SLIDES.typ" <<EOF
+// $name — slides. \`typst watch SLIDES.typ\` (slides tab) → live PDF.
+#set page(width: 1920pt, height: 1080pt, margin: 80pt, fill: rgb("#101012"))
+#set text(fill: rgb("#E8E6E1"), size: 40pt)
+#let accent = rgb("$accent")
+#let slide(title, body) = page[
+  #text(fill: accent, weight: "bold", size: 64pt)[#title]
+  #v(40pt); #body
+]
+#slide("$name")[A SlicedLabs lesson · #text(fill: accent)[$disc]]
+#slide("The idea")[- point one\n- point two\n- point three]
+#slide("Recap")[What we built · why it matters · what's next]
+EOF
+
+    cat > "$dir/scene.py" <<EOF
+"""$name — manim scene (animate tab). Render: manim -pql scene.py Lesson"""
+from manim import *
+
+ACCENT = "$accent"
+
+class Lesson(Scene):
+    def construct(self):
+        title = Text("$name", color=ACCENT).scale(1.2)
+        self.play(Write(title))
+        self.wait()
+        self.play(title.animate.to_edge(UP))
+        # build the core idea here ($disc)
+        self.wait(2)
+EOF
+
+    cat > "$dir/demo.tape" <<EOF
+# $name — terminal demo (demo tab). Render: vhs demo.tape → demo.gif
+Output demo.gif
+Set FontSize 22
+Set Width 1200
+Set Height 700
+Type "# $name — live demo"
+Enter
+Sleep 2s
+EOF
+
+    {
+        echo "# sl-teach lesson — bound by the studio deck (zj studio)."
+        printf 'name = "%s"\ntype = "lesson"\ndiscipline = "%s"\nhue = "%s"\naccent = "%s"\n' \
+            "$name" "$disc" "$(_hue_for "$disc")" "$accent"
+    } > "$dir/.slproject"
+
+    (cd "$dir" && git add -A && git commit -q -m "lesson($disc): scaffold $name via sl-teach")
+    command -v sl-project >/dev/null 2>&1 && sl-project bind streaming "$dir" >/dev/null 2>&1 || true
+    log "lesson ready → $dir  (studio bound; summon: Mod+Ctrl+S)"
+    printf '%s\n' "$dir"
+}
+
+_lesson_here() { [ -f "./.slproject" ] && grep -q 'type = "lesson"' ./.slproject 2>/dev/null; }
+
+cmd_render() {
+    _lesson_here || die "not in a lesson dir (cd into one, or run from the studio deck)"
+    local what="${1:---all}"
+    case "$what" in --manim | --slides | --demo | --all) ;; *) die "usage: sl-teach render [--manim|--slides|--demo|--all]" ;; esac
+    if { [ "$what" = --manim ] || [ "$what" = --all ]; } && [ -f scene.py ]; then
+        log "manim scene.py"; command -v manim >/dev/null 2>&1 && manim -ql scene.py Lesson || echo "  (manim unavailable / render skipped)"
+    fi
+    if { [ "$what" = --slides ] || [ "$what" = --all ]; } && [ -f SLIDES.typ ]; then
+        log "typst SLIDES.typ → SLIDES.pdf"; typst compile SLIDES.typ 2>&1 | head || true
+    fi
+    if { [ "$what" = --demo ] || [ "$what" = --all ]; } && [ -f demo.tape ]; then
+        log "vhs demo.tape"; command -v vhs >/dev/null 2>&1 && vhs demo.tape || echo "  (vhs unavailable / render skipped)"
+    fi
+}
+
+cmd_chapters() {
+    _lesson_here || die "not in a lesson dir"
+    [ -f SCRIPT.md ] || die "no SCRIPT.md"
+    log "YouTube chapters (from SCRIPT.md):"
+    sed -n 's/^## \([0-9][0-9]:[0-9][0-9]\) \(.*\)/\1 \2/p' SCRIPT.md | tee chapters.txt
+}
+
+cmd_thumbnail() {
+    _lesson_here || die "not in a lesson dir"
+    local name accent
+    name="$(python3 -c "import tomllib;print(tomllib.load(open('.slproject','rb'))['name'])" 2>/dev/null || basename "$PWD")"
+    accent="$(python3 -c "import tomllib;print(tomllib.load(open('.slproject','rb')).get('accent','#D95C5C'))" 2>/dev/null || echo '#D95C5C')"
+    cat > .thumb.typ <<EOF
+#set page(width: 1280pt, height: 720pt, margin: 0pt, fill: rgb("#0E0E10"))
+#place(center + horizon)[
+  #text(fill: rgb("$accent"), weight: "bold", size: 130pt)[$name]
+  #v(30pt)
+  #align(center)[#text(fill: rgb("#E8E6E1"), size: 44pt)[SlicedLabs]]
+]
+EOF
+    log "thumbnail → thumbnail.png"
+    typst compile --format png .thumb.typ thumbnail.png 2>&1 | head && rm -f .thumb.typ
+}
+
+mkdir -p "$LESSONS"
+case "${1:-}" in
+    new)             shift; cmd_new "$@" ;;
+    list)            shift; cmd_list ;;
+    render)          shift; cmd_render "$@" ;;
+    chapters)        shift; cmd_chapters ;;
+    thumbnail)       shift; cmd_thumbnail ;;
+    -h | --help | "") grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *)               die "unknown subcommand: $1 (try --help)" ;;
+esac

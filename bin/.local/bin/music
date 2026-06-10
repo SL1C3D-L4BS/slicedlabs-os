@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # music — minimal, FOSS, no-distraction music (mpd + rmpc). Local library +
 # internet radio, output through PipeWire; mpd-mpris lights the Waybar media HUD.
 #
 #   music                 ensure mpd is up, open the rmpc cockpit (inline TUI)
-#   music radio [name]    queue + play a stream  (lofi | drone | jazz; default lofi)
+#   music radio [name]    queue + play a stream  (lofi | soul | drone | jazz; default soul)
 #   music toggle|stop|next|prev|play|pause     transport
 #   music vol <0-100>     set volume
 #   music <anything>      passed straight to mpc
@@ -11,6 +12,7 @@ set -euo pipefail
 
 declare -A STREAMS=(
     [lofi]="http://ice1.somafm.com/groovesalad-128-mp3"    # SomaFM Groove Salad — downtempo
+    [soul]="http://ice1.somafm.com/fluid-128-mp3"          # SomaFM Fluid — instrumental hip-hop · future soul · liquid trap (soulful rapper vibes)
     [drone]="http://ice1.somafm.com/dronezone-128-mp3"     # SomaFM Drone Zone — ambient, zero-distraction
     [jazz]="http://ice1.somafm.com/sonicuniverse-128-mp3"  # SomaFM Sonic Universe — jazz
 )
@@ -24,7 +26,7 @@ case "${1:-tui}" in
         ;;
     radio)
         ensure_mpd
-        name="${2:-lofi}"; url="${STREAMS[$name]:-}"
+        name="${2:-soul}"; url="${STREAMS[$name]:-}"
         [[ -z "$url" ]] && { echo "streams: ${!STREAMS[*]}" >&2; exit 1; }
         mpc -q clear && mpc -q add "$url" && mpc -q play
         echo "▶ radio: $name"

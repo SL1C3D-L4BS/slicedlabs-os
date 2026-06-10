@@ -50,47 +50,67 @@ layout {
 
     tab name="study" focus=true {
         pane split_direction="vertical" {
-            pane size="58%" command="vim" {
+            pane size="{{layout.phi_major}}%" command="vim" {
                 args "NOTES.md"
             }
-            pane size="42%" split_direction="horizontal" {
+            pane size="{{layout.phi_minor}}%" split_direction="horizontal" {
                 pane command="books"
-                pane
+                pane command="fish" {
+                    args "-C" "eza --tree --level=2 --icons --git 2>/dev/null; or ls; echo '— scratch: rg <q> · glow NOTES.md'"
+                }
             }
         }
     }
     tab name="architect" {
         pane split_direction="vertical" {
-            pane size="60%" command="slc-claude" { start_suspended true; }
-            pane size="40%" command="slicedlabs" { start_suspended true; }
+            pane size="{{layout.phi_major}}%" command="slc-claude" { start_suspended true; }
+            pane size="{{layout.phi_minor}}%" command="slicedlabs" { start_suspended true; }
+        }
+    }
+    // synthesize — the deep-reasoning surface (the Gemini Deep-Research pattern, manually driven:
+    // reason → build the structured argument → cite). Write SYNTHESIS.md while the agent reasons
+    // (extended thinking) and the corpus reader supplies book+chapter+page citations.
+    tab name="synthesize" {
+        pane split_direction="vertical" {
+            pane size="{{layout.phi_major}}%" command="nvim" { args "SYNTHESIS.md"; name "synthesis"; }
+            pane size="{{layout.phi_minor}}%" split_direction="horizontal" {
+                pane command="slc-claude" { start_suspended true; name "reason"; }
+                pane command="books" { start_suspended true; name "cite"; }
+            }
         }
     }
     tab name="design" {
         pane split_direction="vertical" {
-            pane size="60%" command="nvim" {
+            pane size="{{layout.phi_major}}%" command="nvim" {
                 args "/home/doodlebob/.dotfiles/system/tokens.toml"
             }
-            pane size="40%" cwd="/home/doodlebob/.dotfiles"   // render-templates · chafa previews
+            pane size="{{layout.phi_minor}}%" cwd="/home/doodlebob/.dotfiles" command="fish" {
+                args "-C" "verify-tokens-drift 2>&1 | tail -8; echo '— render-templates · chafa <img> · verify-design-language'"
+            }
         }
     }
     tab name="audit" {
         pane split_direction="vertical" {
             pane command="lazygit" { start_suspended true; }
-            pane                                              // git log · delta · rg · semgrep · ruff
+            pane command="sl-audit"   // git log · delta · rg · semgrep · ruff
         }
     }
     tab name="read" {
         pane split_direction="vertical" {
-            pane size="55%" command="books"                   // TUI corpus reader
-            pane size="45%"                                   // pandoc · pdftotext · fetch
+            pane size="{{layout.phi_major}}%" command="books"                   // TUI corpus reader
+            pane size="{{layout.phi_minor}}%" command="fish" {
+                args "-C" "eza --icons ~/SlicedLabs/vendor/corpus 2>/dev/null | head -30; or ls ~/SlicedLabs/vendor/corpus; echo '— pandoc <f> -t plain · pdftotext <f> | less'"
+            }
         }
     }
     tab name="write" {
         pane split_direction="vertical" {
-            pane size="60%" command="nvim" {
+            pane size="{{layout.phi_major}}%" command="nvim" {
                 args "DRAFT.md"
             }
-            pane size="40%"                                   // typst watch · glow preview
+            pane size="{{layout.phi_minor}}%" command="fish" {
+                args "-C" "eza -la --icons *.typ *.md DRAFT* 2>/dev/null; or ls; echo '— typst watch DRAFT.typ · glow -p DRAFT.md'"
+            }
         }
     }
 }

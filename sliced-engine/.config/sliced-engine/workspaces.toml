@@ -21,7 +21,7 @@
 #     delegate (layout=delegate) a script to run instead (e.g. monitoring-stack)
 #     services systemd --user units started (idempotent, --no-block) when the scene
 #              realizes — the workspace's backing infra (e.g. dev-stack-obs for monitoring)
-#     ambient  optional mpd radio station (lofi|drone|jazz); auto-played when the scene
+#     ambient  optional mpd radio station (lofi|soul|drone|jazz); auto-played when the scene
 #              realizes, but ONLY if nothing is already playing — low-key focus music
 #   [[workspaces.<name>.apps]]
 #     id       short label (for `cockpit --list`)
@@ -35,19 +35,16 @@
 # =============================================================================
 
 [meta]
-auto = ["coding", "research", "browser"]
-# Track B P3 (2026-06-02): the working stacks autostart again — STAGGERED. The
-# 2026-06-01 login-storm OOM (load ~23, cockpits culled) had two root causes, BOTH
-# now fixed: (1) the cockpits' heavy panes spawned EAGERLY — they now load
-# `start_suspended` (0 cost until Enter), so coding stages just nvim + shells, not
-# 7 TUIs; (2) staging thundered the CPU — niri-workspace-launcher now stages each
-# scene SEQUENTIALLY behind a load-settle guard (wait until the 1-min load drops
-# before the next), atop A4's systemd-oomd + 15.6G zram. Monitoring stays OFF this
-# list on purpose: autostarting it would boot dev-stack-obs at login (against Track
-# A's lean boot) — summon it with Mod+5. Everything else stays opt-in. Each ws is
-# also summonable / repairable on demand via `cockpit <ws>` or its bind:
-#   coding Mod+Ctrl+D · research Mod+Ctrl+C · browser Mod+Ctrl+B · engine Mod+Ctrl+E ·
-#   monitoring Mod+Ctrl+M · media Mod+Ctrl+V · streaming Mod+Ctrl+S · gaming Mod+Ctrl+Shift+G
+# Project-scoped cockpits (2026-06-03): NOTHING auto-stages. A context-free cockpit is a
+# "generalized station" — meaningless on camera and in practice. Each project-scoped
+# workspace (coding/engine/research/studio) launches BOUND to a project via the picker
+# (`cockpit <ws>` → sl-project pick: existing | ✦ new-from-scratch), and the whole deck
+# attaches to it (SL_PROJECT → every pane's cwd → the sl-* tools scope to it). This also
+# keeps login lean (the durable fix for the 2026-06-01 login-storm OOM). Summon on demand:
+#   coding Mod+Ctrl+D · research Mod+Ctrl+C · engine Mod+Ctrl+E · studio Mod+Ctrl+S ·
+#   browser Mod+Ctrl+B · monitoring Mod+Ctrl+M · media Mod+Ctrl+V · gaming Mod+Ctrl+Shift+G
+# (Re-summon reuses the binding; `cockpit <ws> --pick` switches; `cockpit <ws> <name>` is explicit.)
+auto = []
 
 # --- coding: the 2026 command center for ANY project idea. Three full-height cockpits
 # --- niri scrolls between — CODE (zj coding: nvim-dominant dev) · AI (zj agent: claude │
@@ -56,65 +53,99 @@ auto = ["coding", "research", "browser"]
 # --- domains are established; one key brings the console in. Ambient lofi when you arrive. -
 [workspaces.coding]
 output = "DP-2"
+tier = "resident"
+project_scoped = true            # launched bound to a project (sl-project); whole deck attaches via $SL_PROJECT
+default_project = "Projects"     # fallback when unbound (relative to $HOME, or absolute)
 layout = "columns"
 tiling = "manual"   # CODE + AI full (100%) · Firefox half (50%) — niri scrolls between them
 services = ["dev-stack-data", "uair"]
-ambient = "lofi"
+ambient = "soul"
   [[workspaces.coding.apps]]
   id = "cockpit"
   app_id = "com.slicedlabs.coding"
-  cmd = "ghostty --class=com.slicedlabs.coding --working-directory=$HOME/Projects -e zj coding"
+  cmd = "ghostty --class=com.slicedlabs.coding --working-directory=$SL_PROJECT -e zj coding"
   column = 1
   width = "100%"
+  # The AI pair (Sli labs │ Claude) is now FOLDED INTO the cockpit deck (zj coding) —
+  # no separate `agent` column. The remaining columns are the mockup's scroll set.
   [[workspaces.coding.apps]]
-  id = "agent"
-  app_id = "com.slicedlabs.coding-side"
-  cmd = "ghostty --class=com.slicedlabs.coding-side --working-directory=$HOME/Projects -e zj agent"
+  id = "vim"
+  app_id = "com.slicedlabs.coding-edit"
+  # standalone scratch/diff editor — a second, lightweight vim beside the deck's Neovim.
+  cmd = "ghostty --class=com.slicedlabs.coding-edit --working-directory=$SL_PROJECT -e zj vim"
   column = 2
-  width = "100%"
+  width = "50%"
+  [[workspaces.coding.apps]]
+  id = "vm"
+  app_id = "com.slicedlabs.coding-vm"
+  # VM Stack management cockpit (status + console/boot shell). The LIVE guest framebuffer
+  # is the separate opaque virt-viewer window summoned by `coding-vm` / Mod+Ctrl+Shift+V —
+  # this terminal never boots a guest at login.
+  cmd = "ghostty --class=com.slicedlabs.coding-vm --working-directory=$SL_PROJECT -e zj vm"
+  column = 3
+  width = "50%"
   [[workspaces.coding.apps]]
   id = "docs"
   app_id = "coding-web"
   # reference/docs browser — dedicated throwaway profile, serialized via ff-scene (the
   # fixed launcher: stale-lock cleanup so a cold profile reliably opens a window).
   cmd = "ff-scene --app-id coding-web --profile $HOME/.cache/ff-coding"
-  column = 3
+  column = 4
   width = "50%"
-  # VM console (com.slicedlabs.coding-vm) is summoned on demand by `coding-vm` — NOT listed
-  # here, so the scene never auto-boots a guest at login. See bin/coding-vm + the niri rule.
+  [[workspaces.coding.apps]]
+  id = "ci"
+  app_id = "com.slicedlabs.coding-ci"
+  # CI / GitHub stack — gh-dash (PRs·issues·runs) │ stack shell (gh run watch · git status).
+  cmd = "ghostty --class=com.slicedlabs.coding-ci --working-directory=$SL_PROJECT -e zj ci"
+  column = 5
+  width = "50%"
 
 # --- engine: the [ENGINE]'s OWN command center — mirrors `coding` but pointed at
-# --- ~/Projects/engine: CODE (zj engine-dev: nvim + bacon) · AI (zj agent: claude │
+# --- ~/SlicedLabs/tools/engine: CODE (zj engine-dev: nvim + bacon) · AI (zj agent: claude │
 # --- slicedlabs) · half-width Rust/wgpu docs Firefox, with the VM console summonable
 # --- (Mod+Ctrl+Shift+V). Full ai-stack/ollama service set. On-demand (Mod+Ctrl+E).
 [workspaces.engine]
 output = "DP-2"
+tier = "on-demand"
+project_scoped = true               # canonical preset — proves coding generalizes to any project
+default_project = "SlicedLabs/tools/engine"
 layout = "columns"
 tiling = "manual"   # CODE + AI full (100%) · Firefox half (50%) — niri scrolls between them
 services = ["dev-stack-data", "ai-stack", "ollama", "uair"]
-ambient = "lofi"
+ambient = "soul"
   [[workspaces.engine.apps]]
   id = "cockpit"
   app_id = "com.slicedlabs.engine-dev"
-  cmd = "ghostty --class=com.slicedlabs.engine-dev --working-directory=$HOME/Projects/engine -e zj engine-dev"
+  cmd = "ghostty --class=com.slicedlabs.engine-dev --working-directory=$SL_PROJECT -e zj engine-dev"
   column = 1
   width = "100%"
+  # AI pair (Sli labs │ Claude) folded into the cockpit deck (zj engine-dev) — no
+  # separate `agent` column. Supporting columns mirror the coding command center.
   [[workspaces.engine.apps]]
-  id = "agent"
-  app_id = "com.slicedlabs.engine-side"
-  cmd = "ghostty --class=com.slicedlabs.engine-side --working-directory=$HOME/Projects/engine -e zj agent"
+  id = "vm"
+  app_id = "com.slicedlabs.engine-vm"
+  # VM Stack management cockpit (shared `zj vm` layout, engine-routed app-id).
+  cmd = "ghostty --class=com.slicedlabs.engine-vm --working-directory=$SL_PROJECT -e zj vm"
   column = 2
-  width = "100%"
+  width = "50%"
   [[workspaces.engine.apps]]
   id = "docs"
   app_id = "engine-web"
   cmd = "ff-scene --app-id engine-web --profile $HOME/.cache/ff-engine"
   column = 3
   width = "50%"
+  [[workspaces.engine.apps]]
+  id = "ci"
+  app_id = "com.slicedlabs.engine-ci"
+  # CI / GitHub stack (shared `zj ci` layout, engine-routed app-id).
+  cmd = "ghostty --class=com.slicedlabs.engine-ci --working-directory=$SL_PROJECT -e zj ci"
+  column = 4
+  width = "50%"
 
 # --- browser: the web — Zen (primary) + Firefox, side by side -----------------
 [workspaces.browser]
 output = "DP-2"
+tier = "resident"
 layout = "columns"
   [[workspaces.browser.apps]]
   id = "zen"
@@ -138,6 +169,7 @@ layout = "columns"
 # --- no longer boot-enabled, so login stays lean and nothing monitoring runs until you look.
 [workspaces.monitoring]
 output = "DP-2"
+tier = "on-demand"
 layout = "columns"
 tiling = "manual"   # declared 65/35
 services = ["dev-stack-obs"]
@@ -163,13 +195,16 @@ services = ["dev-stack-obs"]
 # --- Excalidraw is summon-on-demand (`excalidraw-desktop`) from the design tab.
 [workspaces.research]
 output = "DP-2"
+tier = "resident"
+project_scoped = true                  # topic-scoped: notes/vault/audit/web bound to the study
+default_project = "Documents/research"
 layout = "columns"
 tiling = "manual"   # keep the declared 58/42 (+ Obsidian) — exempt from auto full↔halves
-ambient = "lofi"
+ambient = "soul"
   [[workspaces.research.apps]]
   id = "study"
   app_id = "com.slicedlabs.research"
-  cmd = "ghostty --class=com.slicedlabs.research --working-directory=$HOME/Documents/research -e zj research"
+  cmd = "ghostty --class=com.slicedlabs.research --working-directory=$SL_PROJECT -e zj research"
   column = 1
   width = "58%"
   [[workspaces.research.apps]]
@@ -187,19 +222,34 @@ ambient = "lofi"
   column = 3
   width = "50%"   # scrolls in as a 3rd column (Mod+L / overview); manual tiling keeps it
 
-# --- streaming: OBS Studio ----------------------------------------------------
+# --- streaming → the TEACHING STUDIO: produce a lesson. Project/lesson-scoped (bind the deck
+# --- to the topic via sl-teach / sl-project). The `zj studio` authoring deck (script · animate
+# --- (manim) · slides (typst) · demo (vhs) · broadcast (OBS via obs-websocket) · assets) beside
+# --- the OBS GUI. Reuses the WS6 identity (magenta · 󰕧). On-demand (Mod+Ctrl+S); DP-3 = teleprompter.
 [workspaces.streaming]
 output = "DP-2"
-layout = "single"
+tier = "on-demand"
+project_scoped = true                  # lesson-scoped — the deck binds to the lesson you're producing
+default_project = "Documents/lessons"
+layout = "columns"
+tiling = "manual"                      # studio deck full (100%) · OBS half (50%) — niri scrolls
+  [[workspaces.streaming.apps]]
+  id = "studio"
+  app_id = "com.slicedlabs.studio"
+  cmd = "ghostty --class=com.slicedlabs.studio --working-directory=$SL_PROJECT -e zj studio"
+  column = 1
+  width = "100%"
   [[workspaces.streaming.apps]]
   id = "obs"
-  app_id = "obs"
+  app_id = "com.obsproject.Studio"   # OBS 32's real Wayland app_id (NOT "obs" — the zen-bug class)
   cmd = "obs"
-  column = 1
+  column = 2
+  width = "50%"
 
 # --- gaming: Steam ------------------------------------------------------------
 [workspaces.gaming]
 output = "DP-2"
+tier = "on-demand"
 layout = "single"
   [[workspaces.gaming.apps]]
   id = "steam"
@@ -207,18 +257,19 @@ layout = "single"
   cmd = "steam"
   column = 1
 
-# --- media (Violet): the active-listening cockpit — keyboard-driven Spotify
-# --- (spotify_player) beside a live cava visualizer. On-demand: Mod+8 / Mod+V focus,
+# --- media (Violet): the active-listening cockpit — keyboard-driven mpd (rmpc)
+# --- beside a live cava visualizer. On-demand: Mod+8 / Mod+V focus,
 # --- Mod+Ctrl+V stages it. No ambient auto-play here — this is where YOU pick the
 # --- music. `cinema` routes Netflix/YouTube here too (opaque video, separate app-ids).
 [workspaces.media]
 output = "DP-2"
+tier = "on-demand"
 layout = "columns"
 tiling = "manual"   # declared 60/40
   [[workspaces.media.apps]]
-  id = "tunes"
+  id = "music"
   app_id = "com.slicedlabs.tunes"
-  cmd = "ghostty --class=com.slicedlabs.tunes --title=tunes -e tunes"
+  cmd = "ghostty --class=com.slicedlabs.tunes --title=music -e music"
   column = 1
   width = "60%"
   [[workspaces.media.apps]]

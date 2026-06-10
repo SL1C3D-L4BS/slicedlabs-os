@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-slangc-build — provision the pinned Slang shader compiler FROM SOURCE.
+#
+# The engine pins ONE slangc version (ADR-037/038, `SLANGC_PIN`) for byte-reproducible
+# shader output. The Arch package tracks HEAD (currently 2026.10), which both drifts off
+# the pin AND SIGSEGVs in libslang-compiler on compile. This builds the pinned tag from
+# upstream, installs it to an isolated prefix, and shims it ahead of /usr/bin on PATH —
+# so the engine always sees the pinned, reproducible compiler no matter what pacman does
+# to the system package. The pin is read FROM the engine source (single source of truth),
+# so this tool and the engine can never disagree. Idempotent; re-run to rebuild.
+#
+#   sl-slangc-build            build + install the pinned slangc (reuse source if present)
+#   sl-slangc-build --check    report installed-vs-pinned version only (no build)
+#   sl-slangc-build --clean    wipe source tree + prefix, then full rebuild
+set -euo pipefail
+
+SRC_ROOT="$HOME/SlicedLabs/vendor/slang-build"
+SRC="$SRC_ROOT/slang"
+BIN_SHIM="$HOME/.local/bin/slangc"
+JOBS="${SL_BUILD_JOBS:-6}"
+
+die() { printf 'sl-slangc-build: %s\n' "$*" >&2; exit 1; }
+log() { printf '\033[1m▶ %s\033[0m\n' "$*"; }
+
+# The pin is the engine's — parsed from source so the two never drift.
+resolve_pin_src() {
+    local d
+    for d in "${ENGINE_DIR:-}" "$HOME/SlicedLabs/tools/slicedengine" "$HOME/Code/engine"; do
+        [ -n "$d" ] && [ -f "$d/tools/engine-shader/src/slangc.rs" ] && {
+            printf '%s\n' "$d/tools/engine-shader/src/slangc.rs"; return 0; }
+    done
+    return 1
+}
+PIN_SRC="$(resolve_pin_src)" || die "engine slangc.rs not found (set ENGINE_DIR)"
+PIN="$(sed -n 's/.*SLANGC_PIN: &str = "\([^"]*\)".*/\1/p' "$PIN_SRC")"
+[ -n "$PIN" ] || die "could not parse SLANGC_PIN from $PIN_SRC"
+
+NUMERIC="${PIN#v}"                          # 2026.9 — project() VERSION must be numeric
+FULL="$PIN"; case "$PIN" in v*) ;; *) FULL="v$PIN" ;; esac   # tag/report form carries 'v'
+PREFIX="$HOME/.local/opt/slang-$NUMERIC"
+R="$SRC/build/Release"
+
+check() {
+    [ -x "$BIN_SHIM" ] || { echo "slangc shim not installed ($BIN_SHIM)"; return 1; }
+    local got; got="$("$BIN_SHIM" -v 2>&1 | head -1)"
+    printf 'pinned: %s    installed: %s → %s\n' "$FULL" "$BIN_SHIM" "$got"
+    [ "$got" = "$FULL" ] && { echo "✓ slangc matches the engine pin"; return 0; }
+    echo "✗ slangc does NOT match the pin"; return 1
+}
+
+case "${1:-build}" in
+    --check)   if check; then exit 0; else exit 1; fi ;;
+    --clean)   log "wipe $SRC + $PREFIX"; rm -rf -- "${SRC:?}" "${PREFIX:?}" ;;
+    build|"")  ;;
+    -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *)         die "unknown arg: $1 (try --help)" ;;
+esac
+
+for t in git cmake ninja; do command -v "$t" >/dev/null || die "missing build tool: $t"; done
+
+# 1. Source at the pinned tag (shallow, recursive). Reuse if already present.
+if [ ! -d "$SRC/.git" ]; then
+    log "clone $FULL (shallow, recursive)"
+    mkdir -p "$SRC_ROOT"
+    git clone --depth 1 --branch "$FULL" --recurse-submodules --shallow-submodules \
+        https://github.com/shader-slang/slang "$SRC"
+else
+    log "reuse source at $SRC (--clean to refetch)"
+fi
+
+# 2. Configure. Force the v-prefixed version: a clone resolves the version via
+#    `git describe`, whose leading 'v' the parser strips → bare "2026.9", which
+#    mismatches the pin. -DSLANG_VERSION_FULL is slang's own documented override.
+#    DISABLE slang-llvm — slangc emits SPIR-V/etc. with no host LLVM, so the build stays lean.
+log "configure (Release; version forced $FULL; slang-llvm DISABLE)"
+cmake -S "$SRC" -B "$SRC/build" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+    -DSLANG_VERSION_FULL="$FULL" -DSLANG_VERSION_NUMERIC="$NUMERIC" >/dev/null
+
+# 3. Build slangc + its runtime downstream (slang-glslang = glslang + spirv-opt, which
+#    slangc dlopens for the default SPIR-V optimisation pass).
+log "build slangc + slang-glslang (-j$JOBS)"
+cmake --build "$SRC/build" --config Release --target slangc slang-glslang -j"$JOBS" >/dev/null
+
+# 4. Install: the binary + its runtime .so set (real lib + compat symlinks + downstreams).
+#    The slangc rpath is $ORIGIN/../lib, so bin/ + lib/ siblings make it relocatable; the
+#    shim's $ORIGIN resolves through the symlink to the real binary's dir. Skip .dwarf/.a.
+log "install → $PREFIX"
+[ -x "$R/bin/slangc" ] || die "build produced no slangc"
+mkdir -p "$PREFIX/bin" "$PREFIX/lib"
+cp -a "$R/bin/slangc" "$PREFIX/bin/"
+for so in "$R"/lib/libslang*.so*; do
+    case "$so" in *.dwarf | *.a) continue ;; esac
+    cp -a "$so" "$PREFIX/lib/"
+done
+mkdir -p "$(dirname "$BIN_SHIM")"
+ln -sf "$PREFIX/bin/slangc" "$BIN_SHIM"
+
+# 5. Verify against the pin (also confirms the downstream .so set resolves).
+log "verify"
+check || die "installed slangc does not match the engine pin $FULL"

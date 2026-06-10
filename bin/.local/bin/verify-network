@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# SlicedLabs · governance · © 2026 SlicedLabs
+# verify-network — the Tier-2 network-hardening gate (spec XVIII.13):
+#   1. nftables: default-drop input structured as the named subchains,
+#      the pyroscope-mesh guard, and the rate-limited log_drop tail
+#   2. pyroscope pinned to loopback (config) + never listening off-box (live)
+#   3. SSH client crypto allowlist present (PQ-hybrid KEX floor)
+#   4. auditd: enabled + the curated SlicedLabs keys loaded
+# Tier 1 (default-drop · tailnet trust · DNSoverTLS) is asserted implicitly by
+# the chain checks. Read-only; standalone or via verify-all.
+set -u
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+RULES="$(sudo -n nft list table inet filter 2>/dev/null)" || RULES=""
+if [ -z "$RULES" ]; then
+    no "cannot read the live ruleset (nft list — sudo?)"
+else
+    grep -q 'policy drop' <<<"$RULES" && ok "input policy: default-drop" || no "input policy is not drop"
+    for c in trusted_ifaces svc_inbound icmp_ok log_drop; do
+        grep -q "chain $c" <<<"$RULES" && ok "subchain: $c" || no "subchain missing: $c (Tier-2 refactor)"
+    done
+    grep -q 'pyroscope mesh' <<<"$RULES" && ok "pyroscope-mesh port guard present" || no "pyroscope guard missing"
+    grep -q 'log prefix "nft-drop' <<<"$RULES" && ok "rate-limited drop log (nft-drop)" || no "log_drop has no log rule"
+fi
+
+# pyroscope: pinned in config; if running, no non-loopback listener on its ports
+grep -q 'http_listen_address: 127.0.0.1' /etc/pyroscope/config.yml 2>/dev/null \
+    && ok "pyroscope pinned to loopback (config)" || no "pyroscope config not loopback-pinned"
+if pgrep -x pyroscope >/dev/null 2>&1; then
+    stray="$(ss -tlnH 2>/dev/null | awk '$4 !~ /^(127\.0\.0\.1|\[::1\])/ && $4 ~ /:(4040|9095|7946)$/')"
+    [ -z "$stray" ] && ok "pyroscope live listeners loopback-only" || no "pyroscope listening off-box: $stray"
+else
+    ok "pyroscope not running (on-demand monitoring) — config pin stands"
+fi
+
+# SSH client crypto floor
+grep -q 'KexAlgorithms mlkem768x25519-sha256' "$HOME/.ssh/config" 2>/dev/null \
+    && ok "ssh client crypto allowlist (PQ-hybrid KEX floor)" || no "ssh crypto allowlist missing"
+
+# auditd: enabled + curated keys live
+systemctl is-enabled auditd >/dev/null 2>&1 && ok "auditd enabled" || no "auditd not enabled"
+AUDIT="$(sudo -n auditctl -l 2>/dev/null)" || AUDIT=""
+for k in identity privilege bootchain firewall modules; do
+    # auditctl prints watches as `-k key` but syscall rules as `-F key=key`
+    grep -qE -- "(-k $k|-F key=$k)\b" <<<"$AUDIT" && ok "audit key: $k" || no "audit key missing: $k"
+done
+
+echo
+if [ "$rc" -eq 0 ]; then
+    echo "verify-network: ✓ Tier-2 — subchains · pyroscope loopback · ssh crypto floor · curated audit"
+else
+    echo "verify-network: ✗ failures above"
+fi
+exit $rc

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # niri-workspace-launcher — on first focus of an "auto" workspace (declared in
 # ~/.config/sliced-engine/workspaces.toml [meta].auto), realize its scene:
 # spawn the canonical apps and place them in their columns. Registry-driven via

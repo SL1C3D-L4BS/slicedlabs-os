@@ -1,0 +1,22 @@
+# SlicedLabs · body · © 2026 SlicedLabs
+# sl-mem — the OWNED Hermes persistent-memory server on 127.0.0.1:8089
+# (tools/surface/tools/mem_local.py: L1 memory REST contract over local
+# Ollama embeddings + local Qdrant; no vendor lib, no egress).
+# ON-DEMAND by design (lean boot): `systemctl --user start sl-mem`.
+[Unit]
+Description=SlicedLabs Hermes memory (owned mem_local, :8089)
+Wants=sl-qdrant.service
+After=sl-qdrant.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/SlicedLabs/tools/surface
+Environment=PYTHONPATH=%h/SlicedLabs/tools/surface/tools
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+Environment=QDRANT_URL=http://127.0.0.1:6333
+ExecStart=%h/SlicedLabs/tools/surface/surface/.venv/bin/python -m uvicorn mem_local:app --host 127.0.0.1 --port 8089
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

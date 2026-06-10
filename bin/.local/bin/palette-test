@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # palette-test — render every [color] hex value in tokens.toml as a labeled
 # swatch in the terminal. Quick eyeball check after editing the palette.
+#
+# Liquid Retina v3: identities/families (oklch anchors) bake + render too;
+#   --ramps     also print the derived 10-step tonal ramp rows per hue
+#   --families  only the [family] swatches
 set -eu
+
+SHOW_RAMPS=0
+ONLY_FAMILIES=0
+for a in "$@"; do
+    case "$a" in
+        --ramps) SHOW_RAMPS=1 ;;
+        --families) ONLY_FAMILIES=1 ;;
+    esac
+done
 
 TOKENS="$HOME/.dotfiles/system/tokens.toml"
 
@@ -26,8 +40,25 @@ swatch() {
 
 echo
 echo "════════════════════════════════════════════════════════════════"
-echo "  [ENGINE] palette swatch — variant=$(cat ${XDG_CACHE_HOME:-$HOME/.cache}/ricing-variant 2>/dev/null || echo dark)"
+echo "  [ENGINE] palette swatch — variant=$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/ricing-variant" 2>/dev/null || echo dark)"
 echo "════════════════════════════════════════════════════════════════"
+
+if [[ "$ONLY_FAMILIES" -eq 1 ]]; then
+    SHOW_RAMPS=$SHOW_RAMPS python3 - <<'EOF'
+import os, sys, tomllib
+from pathlib import Path
+sys.path.insert(0, str(Path.home() / ".dotfiles/bin/.local/bin/lib"))
+import color
+t = tomllib.load(open(Path.home() / ".dotfiles/system/tokens.toml", "rb"))
+def sw(label, hx):
+    r, g, b = (int(hx[i:i+2], 16) for i in (1, 3, 5))
+    print(f"\033[48;2;{r};{g};{b}m          \033[0m  {label:<18}  {hx}")
+print("\n  ── [family] accents (v3) ───────────────────")
+for k, v in t.get("family", {}).items():
+    sw(k, color.to_hex(v))
+EOF
+    exit 0
+fi
 
 # Walk every line of [color] block: "key = "#RRGGBB"" and emit a swatch.
 in_block=0
@@ -62,5 +93,46 @@ while IFS= read -r line; do
         swatch "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
     fi
 done < "$TOKENS"
+
+# Liquid Retina v3 — identities (oklch anchors baked), families, and the
+# derived tonal ramps (--ramps). Python because oklch needs lib/color.
+SHOW_RAMPS=$SHOW_RAMPS python3 - <<'EOF'
+import os, sys, tomllib
+from pathlib import Path
+sys.path.insert(0, str(Path.home() / ".dotfiles/bin/.local/bin/lib"))
+import color
+t = tomllib.load(open(Path.home() / ".dotfiles/system/tokens.toml", "rb"))
+show_ramps = os.environ.get("SHOW_RAMPS") == "1"
+
+def sw(label, hx):
+    r, g, b = (int(hx[i:i+2], 16) for i in (1, 3, 5))
+    print(f"\033[48;2;{r};{g};{b}m          \033[0m  {label:<18}  {hx}")
+
+def cell(hx):
+    r, g, b = (int(hx[i:i+2], 16) for i in (1, 3, 5))
+    return f"\033[48;2;{r};{g};{b}m    \033[0m"
+
+idents = ["coding", "research", "engine", "browser",
+          "monitoring", "streaming", "gaming", "media"]
+print("\n  ── identities (v3 wheel, baked from oklch) ─")
+for k in idents:
+    sw(k, color.to_hex(t["color"][k]))
+print("\n  ── [family] accents (v3) ───────────────────")
+fams = {k: color.to_hex(v) for k, v in t.get("family", {}).items()}
+for k, hx in fams.items():
+    sw(k, hx)
+
+if show_ramps:
+    steps = [s for s, _, _ in color.RAMP_STEPS]
+    print("\n  ── derived tonal ramps (50…900) ────────────")
+    print("  " + " " * 12 + "".join(f"{s:^4}" for s in steps))
+    anchors = {k: color.to_hex(t["color"][k]) for k in idents}
+    for extra in ("primary", "secondary", "tertiary", "error", "success"):
+        anchors[extra] = color.to_hex(t["color"][extra])
+    anchors.update(fams)
+    for name, hx in anchors.items():
+        r = color.ramp_for_hex(hx)
+        print(f"  {name:<12}" + "".join(cell(r[s]) for s in steps))
+EOF
 
 echo

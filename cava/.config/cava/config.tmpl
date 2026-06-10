@@ -1,0 +1,24 @@
+## SlicedLabs — cava visualizer (media workspace). GENERATED from system/tokens.toml
+## by render-templates. The spectrum is the OKLCH identity ramp swept cool→warm, so the
+## bars breathe the same eight workspace hues as the Cockpit pager.
+[general]
+framerate = 60
+autosens = 1
+overshoot = 0
+[input]
+method = pulse
+source = auto
+[output]
+method = ncurses
+channels = stereo
+[color]
+gradient = 1
+gradient_count = 8
+gradient_color_1 = '#{{color_raw.monitoring}}'
+gradient_color_2 = '#{{color_raw.browser}}'
+gradient_color_3 = '#{{color_raw.coding}}'
+gradient_color_4 = '#{{color_raw.research}}'
+gradient_color_5 = '#{{color_raw.streaming}}'
+gradient_color_6 = '#{{color_raw.gaming}}'
+gradient_color_7 = '#{{color_raw.engine}}'
+gradient_color_8 = '#{{color_raw.media}}'

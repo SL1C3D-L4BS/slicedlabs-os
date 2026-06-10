@@ -39,6 +39,26 @@ BRAND = {
     "net": "net", "ai": "ai", "agenda": "agenda",
 }
 
+# [color] hue anchors that derive tonal ramps (every [family] key does too) —
+# mirrors render-templates / render-quickshell (the one v3 ramp law).
+RAMP_HUES = (
+    "coding", "research", "engine", "browser",
+    "monitoring", "streaming", "gaming", "media",
+    "primary", "secondary", "tertiary", "error", "success",
+)
+
+
+def _ramps(color_map: dict, fam_map: dict) -> dict[str, dict[str, str]]:
+    """Derive the 10-step tonal ramps from baked anchors via lib/color.ramp()."""
+    out: dict[str, dict[str, str]] = {}
+    anchors: dict[str, object] = {k: color_map[k] for k in RAMP_HUES if k in color_map}
+    anchors.update(fam_map)
+    for name, v in anchors.items():
+        h = color.to_hex(v)
+        if h:
+            out[name] = color.ramp_for_hex(h)
+    return out
+
 
 def _hex(v: object) -> object:
     """Normalise an oklch()/hex colour to '#RRGGBB'; pass anything else through."""
@@ -65,6 +85,10 @@ def py_dict(d: dict[str, object], indent: str = "    ") -> str:
 def build_palette(t: dict) -> str:
     color_dark = _hexify(merged(t, "color", "color_light", "dark"))
     color_light = _hexify(merged(t, "color", "color_light", "light"))
+    family_dark = _hexify(merged(t, "family", "family_light", "dark"))
+    family_light = _hexify(merged(t, "family", "family_light", "light"))
+    ramps_dark = _ramps(color_dark, family_dark)
+    ramps_light = _ramps(color_light, family_light)
     semantic_dark = _hexify(merged(t, "semantic", "semantic_light", "dark"))
     semantic_light = _hexify(merged(t, "semantic", "semantic_light", "light"))
     glass_dark = merged(t, "glass", "glass_light", "dark")
@@ -84,6 +108,14 @@ def build_palette(t: dict) -> str:
     L.append(f"COLOR_DARK: dict[str, str] = {py_dict(color_dark)}")
     L.append("")
     L.append(f"COLOR_LIGHT: dict[str, str] = {py_dict(color_light)}")
+    L.append("")
+    L.append(f"FAMILY_DARK: dict[str, str] = {py_dict(family_dark)}")
+    L.append("")
+    L.append(f"FAMILY_LIGHT: dict[str, str] = {py_dict(family_light)}")
+    L.append("")
+    L.append(f"RAMPS_DARK: dict[str, dict[str, str]] = {py_dict(ramps_dark)}")
+    L.append("")
+    L.append(f"RAMPS_LIGHT: dict[str, dict[str, str]] = {py_dict(ramps_light)}")
     L.append("")
     L.append(f"SEMANTIC_DARK: dict[str, str] = {py_dict(semantic_dark)}")
     L.append("")
@@ -125,6 +157,18 @@ def build_palette(t: dict) -> str:
     L.append("def icon(name: str) -> str:")
     L.append("    return ICON.get(name, '')")
     L.append("")
+    L.append("")
+    L.append("def family(variant: str = 'dark') -> dict[str, str]:")
+    L.append('    """Family accent hues (Liquid Retina v3 half-spokes)."""')
+    L.append("    return FAMILY_LIGHT if variant == 'light' else FAMILY_DARK")
+    L.append("")
+    L.append("")
+    L.append("def ramp_for(name: str, step: int | str, variant: str = 'dark') -> str:")
+    L.append('    """Tonal ramp step, e.g. ramp_for(\'coding\', 300)."""')
+    L.append("    ramps = RAMPS_LIGHT if variant == 'light' else RAMPS_DARK")
+    L.append("    r = ramps.get(name, {})")
+    L.append("    return r.get(str(step), palette(variant)['primary'])")
+    L.append("")
     return "\n".join(L)
 
 
@@ -143,6 +187,11 @@ def build_tcss(t: dict) -> str:
     L.append("/* Brand identity hues, baked from tokens (used by the .brand-* classes). */")
     for name, key in BRAND.items():
         L.append(f"$hue-{name}: {c.get(key, c['primary'])};")
+    L.append("")
+    L.append("/* Family accents (Liquid Retina v3 half-spokes) — emphasis vocabulary. */")
+    fam = _hexify(merged(t, "family", "family_light", "dark"))
+    for name, v in fam.items():
+        L.append(f"$fam-{name}: {v};")
     L.append("")
     L.append("/* Semantic role tier ($sl-*), baked — bind to ROLES, not raw hues. */")
     for k, v in s.items():

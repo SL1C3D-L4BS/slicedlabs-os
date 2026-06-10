@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-cockpit.sh — invariants for the Quickshell Cockpit (supersedes the
 # Waybar checks in verify-gaming.sh). Static + live (needs the cockpit running).
 set -u
@@ -12,7 +13,9 @@ chk() { if eval "$2" >/dev/null 2>&1; then ok "$1"; else no "$1"; fi; }
 # primary's full 3-pill cluster rather than a global count (which is 5 with DP-3 up).
 primary_pills() { niri msg --json layers 2>/dev/null | grep -oF '"namespace":"cockpit","output":"DP-2"' | wc -l; }
 
+# shellcheck disable=SC2034  # QS/NIRI are referenced inside the eval'd chk '…' command strings below
 QS=~/.config/quickshell/cockpit
+# shellcheck disable=SC2034
 NIRI=~/.config/niri/config.kdl
 
 echo "── Cockpit · install + service ──"
@@ -38,13 +41,22 @@ echo "── Cockpit · niri integration ──"
 chk "niri config valid"                         'niri validate -c "$NIRI"'
 chk "layer-rule namespace=^cockpit\$"           'grep -q "namespace=\"\\^cockpit\\$\"" "$NIRI"'
 chk "layer-rule cockpit-modal (screencast block)" 'grep -q "namespace=\"cockpit-modal\"" "$NIRI"'
-chk "cockpitctl modal binds (>=6)"              '[ "$(grep -c "cockpitctl modal" "$NIRI")" -ge 6 ]'
+chk "cockpit IPC binds (>=6)"                   '[ "$(grep -cE "cockpitctl (system|market|hermes|inspect)" "$NIRI")" -ge 6 ]'
 chk "theme toggle bind"                         'grep -q "cockpitctl theme" "$NIRI"'
 
 echo "── Cockpit · data reuse ──"
-chk "waybar scripts/ preserved (reused)"        '[ -d ~/.config/waybar/scripts ]'
-chk "glyphs.sh present (script glyphs)"         '[ -f ~/.config/waybar/scripts/lib/glyphs.sh ]'
-chk "active-tab state file writable"            'touch "${XDG_CACHE_HOME:-$HOME/.cache}/waybar-active-tab"'
+chk "waybar scripts/ preserved (reused)"        '[ -d ~/.config/quickshell/cockpit/scripts ]'
+chk "glyphs.sh present (script glyphs)"         '[ -f ~/.config/quickshell/cockpit/scripts/lib/glyphs.sh ]'
+chk "active-tab state file writable"            'touch "${XDG_CACHE_HOME:-$HOME/.cache}/cockpit-active-tab"'
+
+echo "── Cockpit · Bluetooth (native picker) ──"
+chk "Bt service registered (qmldir)"            'grep -q "singleton Bt 1.0 Bt.qml" "$QS/services/qmldir"'
+chk "Bt.qml present"                            '[ -f "$QS/services/Bt.qml" ]'
+chk "Bt wraps Quickshell.Bluetooth"             'grep -q "import Quickshell.Bluetooth" "$QS/services/Bt.qml"'
+chk "Theme gBluetooth glyphs baked"             'grep -q "gBluetoothConnected" "$QS/generated/Theme.qml"'
+chk "RightPill BT status glyph wired"           'grep -q "Bt\." "$QS/bars/RightPill.qml"'
+chk "bt device-picker (System card Bluetooth tab)" 'grep -q "Bt.sorted" "$QS/components/SystemCard.qml"'
+chk "Mod+Alt+B → System Bluetooth bound"        'grep -q "cockpitctl system bluetooth" "$NIRI"'
 
 echo "── Cockpit · live runtime ──"
 chk "3 cockpit pills on primary (DP-2)"         '[ "$(primary_pills)" -eq 3 ]'
@@ -56,9 +68,12 @@ chk "glass.frag.qsb compiled"                   '[ -f "$QS/core/shaders/glass.fr
 chk "contrast_floor token baked"                'grep -q "glassContrastFloor" "$QS/generated/Theme.qml"'
 chk "focal Liquid Glass tokens baked"           'grep -q "glassFocalSpecularSpeed" "$QS/generated/Theme.qml"'
 chk "semantic role tier baked"                  'grep -q "semBgPrimary" "$QS/generated/Theme.qml"'
-chk "identity anchor exact (engine=#D85A30)"    'grep -qE "engine: .#D85A30" "$QS/generated/Theme.qml"'
+# identity anchor exact — read the canonical hex from color.py ANCHORS (the
+# SSOT) so a deliberate re-hue (e.g. Liquid Retina v3) never stales this gate.
+ENGINE_HEX="$(python3 -c "import sys; sys.path.insert(0, \"$HOME/.dotfiles/bin/.local/bin/lib\"); import color; print(color.ANCHORS[\"engine\"])")"
+chk "identity anchor exact (engine=$ENGINE_HEX)" 'grep -qE "engine: .$ENGINE_HEX" "$QS/generated/Theme.qml"'
 chk "OKLCH round-trip (color.py --selftest)"    'python3 ~/.dotfiles/bin/.local/bin/lib/color.py --selftest'
-chk "pager: capitalized identity tabs"          'grep -q "Theme.workspaceLabel" "$QS/bars/LeftPill.qml" && grep -q "wsOrder" "$QS/bars/LeftPill.qml"'
+chk "pager: official identity glyphs"           'grep -q "Theme.glyph" "$QS/bars/LeftPill.qml" && grep -q "wsOrder" "$QS/bars/LeftPill.qml"'
 chk "pager: active accent border"               'grep -q "pagerActiveBorder" "$QS/bars/LeftPill.qml"'
 chk "workspace remap clean (guarantee #1)"      'verify-workspace-remap'
 chk "design language: no raw hex (guarantee #6)" 'verify-design-language'

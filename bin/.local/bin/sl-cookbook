@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-cookbook — the sovereign Cookbook: hardware-aware local-model recommender. Honest
+# about THIS box (i7-6700 + RX 580: generation is CPU-bound — RADV/ROCm don't engage for
+# gen here), so fit is RAM-budgeted. Read-only. `sl models pull <tag>` to fetch a pick.
+set -uo pipefail
+
+# --- detect hardware ---
+ram_kb=$(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null || echo 0)
+ram_gb=$(awk -v k="$ram_kb" 'BEGIN{printf "%.1f", k/1048576}')
+threads=$(nproc 2>/dev/null || echo "?")
+cpu=$(awk -F: '/model name/{print $2; exit}' /proc/cpuinfo 2>/dev/null | sed 's/^ *//; s/(R)//g; s/(TM)//g; s/ CPU.*//')
+avx2=$(grep -qm1 avx2 /proc/cpuinfo 2>/dev/null && echo AVX2 || echo no-AVX2)
+gpu=$(lspci 2>/dev/null | grep -iE 'VGA|3D|Display' | sed 's/.*: //' | head -1 | cut -c1-38)
+budget=$(awk -v g="$ram_gb" 'BEGIN{printf "%.1f", g*0.6}')   # headroom for the desktop (CPU-bound)
+
+# --- installed (Ollama, best-effort) ---
+installed=""
+command -v ollama >/dev/null 2>&1 && installed="$(ollama list 2>/dev/null | tail -n +2 | awk '{print $1}')"
+_inst(){ printf '%s\n' "$installed" | grep -qiF "$1" && echo "✓" || echo "-"; }
+
+# --- the curated shelf: name | params | ~RAM(GB, Q4_K_M) | ollama tag | note ---
+shelf='
+Llama-3.2-3B-Instruct|3B|2.6|llama3.2:3b|hermes pick — fast, local-only
+Qwen2.5-7B-Instruct|7B|5.0|qwen2.5:7b|workspace pick — strong generalist
+Qwen2.5-Coder-7B|7B|5.0|qwen2.5-coder:7b|coding
+DeepSeek-R1-Distill-Qwen-7B|7B|5.0|deepseek-r1:7b|reasoning (distilled)
+Mistral-7B-Instruct|7B|5.0|mistral:7b|generalist
+Qwen2.5-14B-Instruct|14B|9.0|qwen2.5:14b|stronger — tight + slower on CPU
+Phi-4|14B|9.0|phi4|stronger — tight + slower on CPU
+nomic-embed-text|0.1B|0.3|nomic-embed-text|RAG embeddings (interim)
+'
+printf '\033[1mSlicedLabs Cookbook\033[0m — local models for THIS machine\n'
+printf '  CPU %s · %s threads · %s   RAM %s GB (fit budget ~%s GB)   GPU %s\n' \
+  "${cpu:-?}" "$threads" "$avx2" "$ram_gb" "$budget" "${gpu:-?}"
+printf '  \033[2mgeneration is CPU-bound here — RX 580 RADV/ROCm do not engage for gen; fit is RAM-budgeted\033[0m\n\n'
+printf '  \033[1m%-28s %-6s %-6s %-4s %-4s %s\033[0m\n' MODEL PARAMS ~RAM FIT INST NOTE
+printf '%s\n' "$shelf" | while IFS='|' read -r name params ram tag note; do
+  [ -z "${name:-}" ] && continue
+  fit=$(awk -v r="$ram" -v b="$budget" 'BEGIN{print (r+0<=b+0)?"✓":"✗"}')
+  printf '  %-28s %-6s %-5sG %-4s %-4s %s\n' "$name" "$params" "$ram" "$fit" "$(_inst "$tag")" "$note"
+done
+printf '\n  pull:  \033[36msl models pull <tag>\033[0m  (e.g. qwen2.5:7b)    list:  \033[36msl models\033[0m\n'

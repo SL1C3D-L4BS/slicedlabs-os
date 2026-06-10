@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-ide — the forever-IDE gate (Forever Environments program). Assert the coding command
+# center is a complete IDE: every VS Code pillar exists as an OWNED tool, each language has
+# IntelliSense (LSP) + step-debug (DAP) declared, and the deck surfaces the pillars. The editor
+# itself is LazyVim — asserted as present + reused, never rebuilt here.
+set -uo pipefail
+DOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+NV="$DOT/nvim/.config/nvim"
+DECK="$DOT/zellij/.config/zellij/layouts/coding.kdl.tmpl"
+rc=0
+ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no() { rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+echo "── editor (reused, not forked) ──"
+command -v nvim >/dev/null 2>&1 && ok "nvim present" || no "nvim missing"
+[ -f "$NV/lazyvim.json" ] && ok "LazyVim distro (the editor ring: LSP·DAP·treesitter·pickers)" || no "LazyVim not detected"
+
+echo "── owned pillars (the VS Code ring → owned tools) ──"
+for t in sl-run sl-debug sl-diag sl-test sl-find sl-task sl-profile sl-cmd sl-ci sl-audit; do
+    command -v "$t" >/dev/null 2>&1 && ok "pillar: $t" || no "pillar tool missing: $t"
+done
+
+echo "── IntelliSense (LSP) coverage — declared per language ──"
+lsp_cfg="$(cat "$NV"/lua/plugins/polyglot.lua "$NV"/lua/plugins/systems.lua 2>/dev/null)"
+for pair in "rust:rust-analyzer|rustup" "c/c++:clangd" "python:pyright" "go:gopls" "zig:zls" \
+            "typescript:typescript-language-server|ts_ls" "lua:lua-language-server" \
+            "bash:bash-language-server" "toml:taplo"; do
+    lang="${pair%%:*}"; pat="${pair#*:}"
+    if grep -qE "$pat" <<<"$lsp_cfg" || { [ "$lang" = rust ] && command -v rust-analyzer >/dev/null 2>&1; }; then
+        ok "LSP: $lang"
+    else no "LSP missing for $lang"; fi
+done
+
+echo "── Debugging (DAP) coverage ──"
+for pair in "rust/c/zig:codelldb|lldb-dap" "go:delve|dlv" "python:debugpy"; do
+    lang="${pair%%:*}"; pat="${pair#*:}"
+    grep -qE "$pat" <<<"$lsp_cfg" && ok "DAP: $lang" || no "DAP missing for $lang"
+done
+
+echo "── the deck surfaces the pillars ──"
+for tab in problems test search tasks profile run git debug; do
+    grep -q "tab name=\"$tab\"" "$DECK" 2>/dev/null && ok "deck tab: $tab" || no "deck tab missing: $tab"
+done
+
+echo "── engine render-dev environment ──"
+ENGDECK="$DOT/zellij/.config/zellij/layouts/engine-dev.kdl.tmpl"
+for t in sl-engine sl-shader; do command -v "$t" >/dev/null 2>&1 && ok "engine tool: $t" || no "engine tool missing: $t"; done
+command -v slangc >/dev/null 2>&1 && ok "shader compiler: slangc ($(slangc -v 2>&1 | head -1))" || no "slangc missing (sl-slangc-build)"
+command -v qrenderdoc >/dev/null 2>&1 && ok "GPU frame debugger: RenderDoc" || no "RenderDoc missing (pacman -S renderdoc)"
+command -v vulkaninfo >/dev/null 2>&1 && ok "Vulkan toolchain (vulkaninfo)" || no "vulkaninfo missing"
+for tab in run shaders gpu oracles profile; do
+    grep -q "tab name=\"$tab\"" "$ENGDECK" 2>/dev/null && ok "engine deck tab: $tab" || no "engine deck tab missing: $tab"
+done
+
+echo
+if [ $rc -eq 0 ]; then echo "ide: complete — editor + LSP + DAP + pillars + deck + engine render-dev ✓"
+else echo "ide: gaps above" >&2; fi
+exit $rc

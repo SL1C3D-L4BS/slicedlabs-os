@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# corpus-ingest — own the book corpus (Sovereign Stack seam S1).
+#
+# Frees RAM by bringing the dev-stack DATA tier down (postgres/valkey/meili/
+# clickhouse — not needed for ingest), keeping qdrant (the ingest target) and the
+# host ollama (embeddings) up, then runs the books ingest and logs it.
+#
+# IDEMPOTENT + RESUMABLE: skips books already in ~/.cache/marker/<hash>.done, so a
+# Ctrl-C or an OOM kill just means "rerun to continue". Status summary lands in
+# ~/.cache/slicedlabs-corpus.json. marker on the i7-6700 is multi-hour + RAM-bound
+# — designed to run when AFK.
+#
+# Usage:
+#   corpus-ingest                 # tier down, ingest books, leave tier down
+#   RESTORE_TIER=1 corpus-ingest  # ...then bring the data tier back up afterward
+set -uo pipefail
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/slicedlabs"
+mkdir -p "$CACHE_DIR"
+LOG="$CACHE_DIR/ingest-$(date +%F-%H%M%S).log"
+
+DATA_TIER=(dev-postgres dev-valkey dev-meili dev-clickhouse)   # heavy; idle during ingest
+NEED=(dev-qdrant)                                              # ingest target (ollama = host svc)
+
+log(){ printf '%s  %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$LOG"; }
+
+log "corpus-ingest start — log → $LOG"
+log "RAM before: $(free -h | awk '/^Mem:/{print $7}') avail"
+
+log "data tier DOWN (keep ${NEED[*]} + ollama): ${DATA_TIER[*]}"
+podman stop "${DATA_TIER[@]}" >>"$LOG" 2>&1 || true
+
+podman start "${NEED[@]}" >>"$LOG" 2>&1 || true               # ensure qdrant is up
+for i in $(seq 1 10); do
+    curl -sf --max-time 3 http://localhost:6333/collections >/dev/null && break
+    log "waiting for qdrant… ($i)"; sleep 2
+done
+
+log "RAM after tier-down: $(free -h | awk '/^Mem:/{print $7}') avail"
+log "ingesting books (idempotent; resumes from marker .done cache)…"
+ingest-books >>"$LOG" 2>&1
+rc=$?
+log "ingest exit=$rc"
+
+if [[ "${RESTORE_TIER:-0}" == "1" ]]; then
+    log "restoring data tier: ${DATA_TIER[*]}"
+    podman start "${DATA_TIER[@]}" >>"$LOG" 2>&1 || true
+fi
+
+log "done. corpus status → ~/.cache/slicedlabs-corpus.json"
+exit "$rc"

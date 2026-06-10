@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-hermes — the local-only OS assistant (Canon §VIII.17). Assert hermes exists,
+# routes through the owned Gateway's LOCAL route (sovereign · offline — never the cloud or
+# the books), that its overlay is the composed modal language (pills · bubbles · permission)
+# rather than a monolith, and that it is summonable (IPC verb + keybind wired). Does NOT
+# require a model to be pulled — it certifies the WIRING. Non-destructive. Standalone or via verify-all.
+set -uo pipefail
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+BC="$HOME/.dotfiles/bin/.local/bin/hermes"
+C="$HOME/.dotfiles/quickshell/.config/quickshell/cockpit"
+NIRI="$HOME/.dotfiles/niri/.config/niri/config.kdl.tmpl"
+
+command -v hermes >/dev/null 2>&1 && ok "hermes on PATH" || no "hermes CLI missing"
+grep -q 'local/' "$BC" 2>/dev/null && ok "routes the owned Gateway LOCAL route (sovereign · offline · free)" || no "hermes not routed through the local Gateway route"
+grep -qiE 'never .*(cloud|book|web)' "$BC" 2>/dev/null && ok "declares the sovereignty contract (no cloud · no books)" || no "hermes missing the no-cloud/no-books contract"
+
+[ -f "$C/services/Stack.qml" ]           && ok "modeless stack service present (Stack)"                || no "services/Stack.qml missing"
+[ -f "$C/bars/ModalStack.qml" ]          && ok "modeless host present (ModalStack — top-right, content-sized)" || no "bars/ModalStack.qml missing"
+[ -f "$C/components/HermesCard.qml" ] && ok "hermes card present (HermesCard)"               || no "components/HermesCard.qml missing"
+if grep -q 'Bubble' "$C/components/HermesCard.qml" 2>/dev/null && grep -q 'PermissionModal' "$C/components/HermesCard.qml" 2>/dev/null && grep -q 'InputBar' "$C/components/HermesCard.qml" 2>/dev/null; then
+  ok "card composes the modal language (InputBar + Bubble + human-in-the-loop PermissionModal)"
+else no "card not composed of the modal language"; fi
+# modeless invariant — the host must NOT dim/blur the desktop (no full-screen backdrop)
+if grep -qE 'Qt\.rgba\(0, ?0, ?0|OverlayDim|dim backdrop' "$C/bars/ModalStack.qml" 2>/dev/null; then
+  no "ModalStack has a screen-dim backdrop (must be modeless / see-through)"
+else ok "modeless: no screen-dim backdrop — the desktop stays sharp"; fi
+
+grep -q 'function hermes' "$C/shell.qml" 2>/dev/null && ok "IPC verb wired (shell.qml cockpit.hermes)" || no "hermes IPC verb not wired"
+grep -q 'cockpitctl hermes' "$NIRI" 2>/dev/null && ok "summon keybind wired (niri → cockpitctl hermes)" || no "hermes summon keybind missing"
+
+# Liquid Retina v3 — memory ops units (on-demand by design: lean boot) + the
+# tokens bridge into the Surface/Hermes web face.
+U="$HOME/.dotfiles/systemd-user/.config/systemd/user"
+[ -f "$U/sl-qdrant.service" ] && [ -f "$U/sl-mem.service" ] \
+  && ok "memory ops units shipped (sl-qdrant + sl-mem, on-demand)" || no "sl-qdrant/sl-mem user units missing"
+systemctl --user list-unit-files sl-mem.service >/dev/null 2>&1 \
+  && ok "sl-mem unit loadable (systemd sees it)" || no "sl-mem unit not loadable (stow systemd-user?)"
+SURF="$HOME/SlicedLabs/tools/surface/surface/frontend"
+TOK="$HOME/.dotfiles/system/brand-assets/surface/liquid-tokens.css.tmpl"
+[ -f "$TOK" ] && ok "face tokens .tmpl tracked (liquid-tokens.css.tmpl)" || no "surface liquid-tokens .tmpl missing"
+if [ -f "$SURF/liquid-tokens.css" ] && grep -q 'fam-lavender' "$SURF/liquid-tokens.css" 2>/dev/null; then
+  ok "face wears the v3 tokens (frontend/liquid-tokens.css synced)"
+else no "surface face tokens not synced (just sync-tokens in tools/surface/surface)"; fi
+grep -q 'liquid-tokens.css' "$SURF/index.html" 2>/dev/null \
+  && ok "face loads the tokens after style.css (override order)" || no "index.html does not load liquid-tokens.css"
+
+echo
+if [ $rc -eq 0 ]; then echo "hermes: present · sovereign-local · composed · summonable ✓"
+else echo "hermes: GAPS above" >&2; fi
+exit $rc

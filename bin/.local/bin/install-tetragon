@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # install-tetragon — install Cilium Tetragon (eBPF runtime security) from the
 # OFFICIAL release. The AUR `tetragon-bin` is a different/joke binary; real
 # Tetragon ships an out-of-band tarball + install.sh (same pattern as our

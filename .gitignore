@@ -36,6 +36,10 @@ zellij/.config/zellij/layouts/engine-dev.kdl
 zellij/.config/zellij/layouts/grant.kdl
 zellij/.config/zellij/layouts/agent.kdl
 zellij/.config/zellij/layouts/monitor-side.kdl
+zellij/.config/zellij/layouts/ci.kdl
+zellij/.config/zellij/layouts/vim.kdl
+zellij/.config/zellij/layouts/vm.kdl
+zellij/.config/zellij/layouts/studio.kdl
 mako/.config/mako/config
 wofi/.config/wofi/style.css
 swaylock/.config/swaylock/config
@@ -52,7 +56,12 @@ lazygit/.config/lazygit/config.yml
 gh-dash/.config/gh-dash/config.yml
 git/.config/git/delta-theme.gitconfig
 cava/.config/cava/config
+cava/.config/cava/shaders/eye_of_phi.frag
 spotify-player/.config/spotify-player/theme.toml
+qt6ct/.config/qt6ct/colors/slicedlabs.conf
+obs/.config/obs-studio/themes/SlicedLabs.ovt
+fastfetch/.config/fastfetch/slicedlabs-logo.txt
+vim/.vim/colors/slicedlabs.vim
 
 # Rendered wallpapers — `bin/render-brand` substitutes tokens into
 # system/wallpapers/templates/*.svg.tmpl and rasterizes to PNG. The .tmpl
@@ -66,6 +75,7 @@ system/wallpapers/*.jpg
 system/brand-assets/logo/*.svg
 system/brand-assets/logo/*.png
 system/brand-assets/scenes/brand.css
+system/brand-assets/surface/liquid-tokens.css
 system/brand-assets/thumbnails/*.svg
 system/brand-assets/thumbnails/*.png
 
@@ -114,3 +124,21 @@ slicedlabs-team/dist/
 # Python bytecode anywhere (color.py lib + render-* imports)
 __pycache__/
 *.pyc
+
+# Fisher-managed (vendored) fish plugins — declared in fish_plugins, reinstalled
+# by `fisher update` (bootstrap layer_J). Vendor-quarantined; only user-authored
+# fish config is tracked (Charter §IV / repo-canon).
+fish/.config/fish/functions/*
+fish/.config/fish/completions/*
+fish/.config/fish/conf.d/autopair.fish
+fish/.config/fish/conf.d/fzf.fish
+fish/.config/fish/conf.d/z.fish
+fish/.config/fish/conf.d/_tide_init.fish
+!fish/.config/fish/functions/cb.fish
+!fish/.config/fish/functions/gt.fish
+!fish/.config/fish/functions/slc.fish
+!fish/.config/fish/functions/sl.fish
+!fish/.config/fish/functions/with-rocm.fish
+!fish/.config/fish/functions/with-vulkan.fish
+!fish/.config/fish/functions/harden-snap.fish
+!fish/.config/fish/functions/fish_greeting.fish

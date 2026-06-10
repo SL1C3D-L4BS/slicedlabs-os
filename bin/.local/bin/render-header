@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+# SlicedLabs · tools · render-header
+# Stamp the SlicedLabs ownership mark on every owned file — idempotently, per filetype,
+# shebang-aware (Canon §VIII.15 — nothing unbranded). Re-running is a no-op.
+# © 2026 SlicedLabs
+"""render-header — apply the SlicedLabs ownership mark across the owned surface.
+
+Idempotent: a file already carrying "SlicedLabs" in its head (or md frontmatter) is
+skipped. Code files get one comment line after any shebang; markdown gets YAML
+frontmatter. Usage:
+    render-header [--check] [ROOT ...]   # default roots: bin quickshell system niri + the codex
+  --check  = report unbranded files, write nothing, exit 1 if any (the verify-branding core).
+"""
+from __future__ import annotations
+import os, sys, re
+from pathlib import Path
+
+DOT = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+CODEX = Path.home() / "SlicedLabs/library/codex"
+YEAR = "2026"
+
+# extension → ("line"|"md", comment-leader)
+HASH = {".sh", ".bash", ".fish", ".toml", ".conf", ".py", ".ini", ".tmpl", ".yml", ".yaml", ".env"}
+SLASH = {".qml", ".js", ".rs", ".c", ".h", ".cpp", ".kdl"}   # // comments (KDL included)
+CSS = {".css", ".scss", ".qss"}                               # CSS-family → /* */
+MD = {".md"}
+
+def domain_for(p: Path) -> str:
+    s = str(p)
+    if "/library/codex/" in s: return "mind"
+    if "/bin/" in s: return "tools"
+    return "body"   # quickshell · niri · system · waybar-era configs
+
+def has_mark(text: str, is_md: bool) -> bool:
+    head = text[:600]
+    if is_md:
+        return bool(re.match(r"^---\n.*slicedlabs:", text, re.S)) or "SlicedLabs" in head
+    return "SlicedLabs" in head
+
+def stamp(p: Path, check: bool) -> bool:
+    """Return True if the file is (or was) branded; False if it needs branding (check mode)."""
+    try: text = p.read_text()
+    except (UnicodeDecodeError, OSError): return True  # binary/unreadable — not an owned text file
+    ext = p.suffix.lower()
+    if ext == ".tmpl": ext = Path(p.stem).suffix.lower() or ".tmpl"  # config.kdl.tmpl → .kdl
+    is_md = ext in MD
+    if has_mark(text, is_md): return True
+    if check: return False
+    dom = domain_for(p)
+    if is_md:
+        fm = f"---\nslicedlabs: true\ndomain: {dom}\ncopyright: \"© {YEAR} SlicedLabs\"\n"
+        if text.startswith("---\n"):                       # merge into existing frontmatter
+            end = text.find("\n---", 4)
+            if end != -1:
+                new = text[:end] + f"\nslicedlabs: true\ndomain: {dom}\ncopyright: \"© {YEAR} SlicedLabs\"" + text[end:]
+            else: new = fm + "---\n\n" + text
+        else: new = fm + "---\n\n" + text
+    else:
+        if ext in CSS:     mark = f"/* SlicedLabs · {dom} · © {YEAR} SlicedLabs */\n"
+        elif ext in SLASH: mark = f"// SlicedLabs · {dom} · © {YEAR} SlicedLabs\n"
+        else:              mark = f"# SlicedLabs · {dom} · © {YEAR} SlicedLabs\n"
+        if text.startswith("#!"):                          # after the shebang
+            nl = text.find("\n") + 1
+            new = text[:nl] + mark + text[nl:]
+        else:
+            new = mark + text
+    p.write_text(new)
+    return True
+
+def owned_files(roots):
+    skip = re.compile(r"/(\.git|node_modules|\.venv|__pycache__|generated|brand-assets|charter-site|corpus|system/etc|system/archive)/")
+    for root in roots:
+        if not root.exists(): continue
+        for p in root.rglob("*"):
+            if not p.is_file() or p.is_symlink(): continue
+            if skip.search(str(p) + "/"): continue
+            if p.suffix.lower() in (HASH | SLASH | CSS | MD): yield p
+        # also bare-name scripts (no extension) under bin
+        if root.name == "bin" or "/bin" in str(root):
+            for p in root.rglob("*"):
+                if p.is_file() and not p.is_symlink() and p.suffix == "" and os.access(p, os.X_OK)\
+                   and not skip.search(str(p)+"/"):
+                    try:
+                        if p.read_text(errors="ignore").startswith("#!"): yield p
+                    except OSError: pass
+
+def main():
+    args = [a for a in sys.argv[1:] if a != "--check"]
+    check = "--check" in sys.argv
+    roots = [Path(a) for a in args] or [DOT/"bin", DOT/"quickshell", DOT/"system", DOT/"niri", CODEX]
+    seen, unbranded, stamped = set(), [], 0
+    for p in owned_files(roots):
+        if p in seen: continue
+        seen.add(p)
+        if check:
+            if not stamp(p, True): unbranded.append(p)
+        else:
+            before = has_mark(p.read_text(errors="ignore"), p.suffix.lower() in MD)
+            stamp(p, False)
+            if not before: stamped += 1
+    if check:
+        if unbranded:
+            print(f"render-header --check: {len(unbranded)} unbranded owned file(s):", file=sys.stderr)
+            for u in unbranded[:25]: print(f"  {u}", file=sys.stderr)
+            sys.exit(1)
+        print(f"render-header: all {len(seen)} owned files carry the SlicedLabs mark ✓")
+    else:
+        print(f"render-header: stamped {stamped} newly-branded file(s) ({len(seen)} owned files scanned)")
+
+if __name__ == "__main__":
+    main()

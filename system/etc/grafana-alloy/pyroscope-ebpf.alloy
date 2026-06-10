@@ -14,14 +14,14 @@ discovery.process "all" {
 discovery.relabel "named" {
   targets = discovery.process.all.targets
 
-  // Profile ONLY the [ENGINE] workspace binaries (~/Projects/engine/...), not
+  // Profile ONLY the [ENGINE] workspace binaries (~/SlicedLabs/tools/slicedengine/...), not
   // all ~191 host processes. Profiles appear in Pyroscope once you run the
   // engine (e.g. `cargo run`); until then the profiler is healthy but idle.
   // To broaden: widen/duplicate this regex, or delete this rule to profile
   // everything (named by basename via the rule below).
   rule {
     source_labels = ["__meta_process_exe"]
-    regex         = "/home/doodlebob/Projects/engine/.*"
+    regex         = "/home/doodlebob/SlicedLabs/tools/slicedengine/.*"
     action        = "keep"
   }
 

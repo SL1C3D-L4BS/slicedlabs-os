@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-test — the project Test Explorer. Detect + run the suite (cargo-nextest · pytest · bun/npm
+# test · ctest), list or watch. Runs in $SL_PROJECT / cwd. Owned terminal-native Test Explorer.
+#   sl-test [filter]   run the suite (optionally only tests matching <filter>)
+#   sl-test list       list the tests
+#   sl-test watch      re-run on file change
+set -uo pipefail
+B=$'\033[1m'; N=$'\033[0m'
+have() { command -v "$1" >/dev/null 2>&1; }
+kind() {
+    if [ -f Cargo.toml ]; then echo rust
+    elif [ -f package.json ]; then echo node
+    elif [ -f pyproject.toml ] || [ -d tests ] || compgen -G 'test_*.py' >/dev/null 2>&1; then echo python
+    elif [ -f CMakeLists.txt ]; then echo cmake
+    else echo generic; fi
+}
+K="$(kind)"
+run() {
+    local f="${1:-}"
+    case "$K" in
+        rust)   if have cargo-nextest; then
+                    [ -n "$f" ] && cargo nextest run -E "test(/$f/)" || cargo nextest run
+                else [ -n "$f" ] && cargo test "$f" || cargo test; fi ;;
+        python) [ -n "$f" ] && pytest -k "$f" || pytest ;;
+        node)   if [ -f bun.lockb ]; then bun test; else npm test; fi ;;
+        cmake)  [ -n "$f" ] && ctest --test-dir build -R "$f" || ctest --test-dir build ;;
+        *)      echo "sl-test: no test runner detected"; return 1 ;;
+    esac
+}
+list() {
+    case "$K" in
+        rust)   have cargo-nextest && cargo nextest list 2>/dev/null || cargo test -- --list 2>/dev/null ;;
+        python) pytest --collect-only -q 2>/dev/null ;;
+        node)   [ -f bun.lockb ] && bun test --list 2>/dev/null || echo "(see package.json scripts)" ;;
+        cmake)  ctest --test-dir build -N 2>/dev/null ;;
+        *)      echo "(no tests detected)" ;;
+    esac
+}
+case "${1:-run}" in
+    list)      printf '%s⏿ tests — %s project%s\n' "$B" "$K" "$N"; list ;;
+    watch)     have entr || { echo "sl-test: --watch needs entr"; exit 1; }
+               fd -e rs -e py -e ts -e js 2>/dev/null | entr -c "$0" ;;
+    run)       run "" ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *)         run "$1" ;;
+esac

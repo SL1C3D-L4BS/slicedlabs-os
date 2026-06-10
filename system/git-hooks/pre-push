@@ -13,7 +13,7 @@ set -euo pipefail
 
 # If the repo defines a `just ci` recipe, run it first — the dotfiles
 # pre-push is intentionally a superset of any project's existing gate so
-# repos like ~/Projects/engine keep their CI without bypass.
+# repos like ~/SlicedLabs/tools/slicedengine keep their CI without bypass.
 if command -v just >/dev/null 2>&1 \
         && [ -f "$(git rev-parse --show-toplevel)/justfile" ] \
         && just --list 2>/dev/null | grep -qE '^\s+ci\b'; then

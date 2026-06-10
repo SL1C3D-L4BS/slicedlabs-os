@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# SlicedLabs · governance · © 2026 SlicedLabs
+# commit-msg: reject AI co-author trailers / generation markers.
+# SlicedLabs history carries one author. See codex 20-architect/branding-canon.
+set -euo pipefail
+
+MSG_FILE="$1"
+
+if grep -qiE '(co-authored-by:.*(claude|anthropic)|generated with.*claude)' "$MSG_FILE"; then
+  cat >&2 <<'MSG'
+
+commit-msg: AI co-author trailer / generation marker detected. Commit aborted.
+  SlicedLabs commits carry one author — strip the trailer and retry:
+    git commit --amend   (after removing the offending line)
+  This hook is the always-on guard behind verify-no-ai-trailers.
+MSG
+  exit 1
+fi

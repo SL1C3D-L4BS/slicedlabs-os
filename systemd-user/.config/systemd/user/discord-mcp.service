@@ -1,11 +1,11 @@
 [Unit]
 Description=Discord MCP server (SL1C3D-L4BS bot wrapper)
-Documentation=file://%h/discord-mcp/README.md
+Documentation=file://%h/SlicedLabs/tools/discord/README.md
 After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/uv run --quiet --script %h/discord-mcp/server.py
+ExecStart=/usr/bin/uv run --quiet --script %h/SlicedLabs/tools/discord/server.py
 WorkingDirectory=%h/discord-mcp
 Restart=on-failure
 RestartSec=5s

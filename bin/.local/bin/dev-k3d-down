@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # dev-k3d-down — tear down the local k3d cluster.
 set -euo pipefail
 NAME="${K3D_NAME:-dev}"

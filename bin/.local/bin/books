@@ -1,34 +1,58 @@
 #!/usr/bin/env bash
-# books — TUI reader for the ~/Resources/books corpus. fzf-pick a book with a live
-# extracted-text preview, then read it in the terminal. Prefers a real TUI PDF
-# viewer (tdf — `cargo install tdf`) for in-terminal graphical pages; falls back to
-# zathura (GUI), else extracted text (pdftotext) in a pager. Part of the `research`
-# dev-cockpit (zellij layout `research`).
+# books — TUI picker for the ~/SlicedLabs/vendor/corpus/books corpus. fzf-pick a book with a live extracted-text
+# preview, then open the REAL file for a TRUE read: a native viewer (Enter), the browser's pdf.js
+# (ctrl-g), or in-pane extracted text (ctrl-t). The picker LOOPS — it stays your shelf. Part of the
+# `research` dev-cockpit (zellij layout `research`).
+#
+#   enter    open the true PDF in the native viewer (sioyek → zathura) as its own niri window
+#   ctrl-g   open the true PDF in Firefox (pdf.js)
+#   ctrl-t   read extracted text in the pane (pdftotext → pager; SSH/headless)
+#   esc      quit
+# .epub → foliate (enter) · Firefox (ctrl-g) · pandoc text (ctrl-t).
 set -euo pipefail
 
-DIR="${BOOKS_DIR:-$HOME/Resources/books}"
+DIR="${BOOKS_DIR:-$HOME/SlicedLabs/vendor/corpus/books}"
 [ -d "$DIR" ] || { echo "books: $DIR not found" >&2; exit 1; }
 cd "$DIR"
+have() { command -v "$1" >/dev/null 2>&1; }
 
-mapfile -t items < <(ls -1 ./*.pdf ./*.epub 2>/dev/null | sed 's|^\./||' | sort)
-((${#items[@]})) || { echo "books: no PDFs/EPUBs in $DIR" >&2; exit 1; }
+pdf_gui() { if have sioyek; then echo sioyek; elif have zathura; then echo zathura; else echo ""; fi; }
 
-sel="$(printf '%s\n' "${items[@]}" | fzf \
-    --prompt='books › ' --info=inline --border=rounded --cycle \
-    --preview='pdftotext -q -f 1 -l 4 {} - 2>/dev/null | sed "/^[[:space:]]*$/d" | head -80' \
-    --preview-window='right:58%:wrap' \
-    --header='enter: read · ctrl-g: open in GUI · esc: quit' \
-    --expect=ctrl-g)" || exit 0
+read_text() {  # in-pane extracted text — headless/SSH fallback
+    local f="$1" ext="${1##*.}"
+    if [ "${ext,,}" = epub ] && have pandoc; then pandoc "$f" -t plain 2>/dev/null | ${PAGER:-less -R}
+    else pdftotext -q "$f" - 2>/dev/null | ${PAGER:-less -R}; fi
+}
+open_native() {  # detached so it's a niri window and the picker survives
+    local f="$1" ext="${1##*.}" v
+    if [ "${ext,,}" = epub ]; then
+        have foliate && { setsid -f foliate "$f" >/dev/null 2>&1; return; }
+    else
+        v="$(pdf_gui)"; [ -n "$v" ] && { setsid -f "$v" "$f" >/dev/null 2>&1; return; }
+    fi
+    echo "books: no native viewer (install: zathura zathura-pdf-mupdf · foliate) — reading as text"; sleep 1
+    read_text "$f"
+}
+open_browser() {  # true PDF via pdf.js (epub needs an addon → text fallback handled by ctrl-t)
+    local f="$1"
+    have firefox && { setsid -f firefox --new-window "$DIR/$f" >/dev/null 2>&1; return; }
+    echo "books: firefox not found"; sleep 1
+}
 
-key="$(head -1 <<<"$sel")"; book="$(tail -1 <<<"$sel")"
-[ -n "$book" ] || exit 0
-
-if [ "$key" = "ctrl-g" ] && command -v zathura >/dev/null 2>&1; then
-    exec zathura "$book"
-elif command -v tdf >/dev/null 2>&1; then
-    exec tdf "$book"
-elif command -v zathura >/dev/null 2>&1; then
-    exec zathura "$book"
-else
-    pdftotext -q "$book" - 2>/dev/null | ${PAGER:-less -R}
-fi
+while :; do
+    mapfile -t items < <(ls -1 ./*.pdf ./*.epub 2>/dev/null | sed 's|^\./||' | sort)
+    ((${#items[@]})) || { echo "books: no PDFs/EPUBs in $DIR" >&2; exit 1; }
+    sel="$(printf '%s\n' "${items[@]}" | fzf \
+        --prompt='books › ' --info=inline --border=rounded --cycle \
+        --preview='pdftotext -q -f 1 -l 4 {} - 2>/dev/null | sed "/^[[:space:]]*$/d" | head -80' \
+        --preview-window='right:58%:wrap' \
+        --header='enter: read (native) · ctrl-g: browser · ctrl-t: text · esc: quit' \
+        --expect=ctrl-g,ctrl-t)" || exit 0
+    key="$(head -1 <<<"$sel")"; book="$(tail -1 <<<"$sel")"
+    [ -n "$book" ] || exit 0
+    case "$key" in
+        ctrl-g) open_browser "$book" ;;
+        ctrl-t) read_text "$book" ;;
+        *)      open_native "$book" ;;
+    esac
+done

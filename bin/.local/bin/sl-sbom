@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-sbom — generate CycloneDX SBOMs for the owned repos (supply-chain trust, L2;
+# TOOLING-ARCHITECTURE §GAP1, Canon §IV.10-11). syft scans each repo (Cargo.lock +
+# Python reqs + more) → ~/.cache/sl-sbom/<repo>.cdx.json: the build-time component
+# inventory + the input to signing/attestation. `--scan` also runs grype and fails
+# on High/Critical vulnerabilities.
+#
+# Usage: sl-sbom            # generate SBOMs to the cache
+#        sl-sbom --scan     # ...and grype-scan each (fail on High/Critical)
+set -uo pipefail
+OUT="${XDG_CACHE_HOME:-$HOME/.cache}/sl-sbom"; mkdir -p "$OUT"
+REPOS=("$HOME/SlicedLabs/tools/slicedengine" "$HOME/SlicedLabs/mind/ai" "$HOME/SlicedLabs/tools/surface")
+scan="${1:-}"; rc=0
+for r in "${REPOS[@]}"; do
+    [ -d "$r" ] || continue
+    name=$(basename "$r"); f="$OUT/$name.cdx.json"
+    # Scan DECLARED deps (lockfiles/manifests), not dev artifacts — a supply-chain
+    # SBOM reflects what we ship/lock, not a stale local .venv.
+    syft scan "dir:$r" --exclude '**/.venv/**' --exclude '**/node_modules/**' --exclude '**/target/**' \
+        -o cyclonedx-json -q > "$f" 2>/dev/null
+    n=$(python3 -c "import json;print(len(json.load(open('$f')).get('components',[])))" 2>/dev/null || echo 0)
+    printf "  %-16s %4s components → %s\n" "$name" "$n" "${f/#$HOME/\~}"
+    { [ "$n" -ge 1 ]; } 2>/dev/null || { echo "    ✗ empty SBOM ($name)"; rc=1; }
+    if [ "$scan" = "--scan" ]; then
+        if grype "sbom:$f" -q -o table 2>/dev/null | grep -qiE "(Critical|High)"; then
+            echo "    ✗ grype: High/Critical vulns in $name"; rc=1
+        else echo "    ✓ grype: no High/Critical ($name)"; fi
+    fi
+done
+exit "$rc"

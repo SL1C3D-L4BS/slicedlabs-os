@@ -113,18 +113,18 @@ layer_2_cross() {
     wasm32-unknown-unknown wasm32-wasip1 \
     aarch64-unknown-linux-gnu aarch64-apple-darwin x86_64-apple-darwin
 
-  if [[ ! -x "$HOME/tools/osxcross/target/bin/aarch64-apple-darwin25-clang" ]]; then
+  if [[ ! -x "$HOME/SlicedLabs/vendor/osxcross/target/bin/aarch64-apple-darwin25-clang" ]]; then
     local sdk
-    sdk=$(ls -1 "$HOME"/Resources/sdks/MacOSX*.sdk.tar.xz 2>/dev/null | sort -V | tail -1 || true)
+    sdk=$(ls -1 "$HOME"/SlicedLabs/vendor/sdks/MacOSX*.sdk.tar.xz 2>/dev/null | sort -V | tail -1 || true)
     if [[ -n "$sdk" ]]; then
       sub "building osxcross from $(basename "$sdk")"
-      run mkdir -p "$HOME/tools"
-      [[ -d "$HOME/tools/osxcross/.git" ]] || \
-        run git clone --depth=1 https://github.com/tpoechtrager/osxcross.git "$HOME/tools/osxcross"
-      run cp -n "$sdk" "$HOME/tools/osxcross/tarballs/"
-      ( cd "$HOME/tools/osxcross" && run env UNATTENDED=1 ./build.sh )
+      run mkdir -p "$HOME/SlicedLabs/vendor"
+      [[ -d "$HOME/SlicedLabs/vendor/osxcross/.git" ]] || \
+        run git clone --depth=1 https://github.com/tpoechtrager/osxcross.git "$HOME/SlicedLabs/vendor/osxcross"
+      run cp -n "$sdk" "$HOME/SlicedLabs/vendor/osxcross/tarballs/"
+      ( cd "$HOME/SlicedLabs/vendor/osxcross" && run env UNATTENDED=1 ./build.sh )
     else
-      warn "no macOS SDK at ~/Resources/sdks/MacOSXNN.sdk.tar.xz — osxcross not built"
+      warn "no macOS SDK at ~/SlicedLabs/vendor/sdks/MacOSXNN.sdk.tar.xz — osxcross not built"
     fi
   fi
 }
@@ -425,6 +425,24 @@ layer_S_system_hardening() {
   run sudo systemctl disable grafana.service grafana-alloy.service prometheus.service \
         prometheus-node-exporter.service pyroscope.service vector.service \
         cups.service cups.socket cups.path upower.service 2>/dev/null || true
+
+  # --- USBGuard: block unknown USB devices by default (peripheral trust). The
+  # rule set is HOST-PRIVATE — generated from the devices attached at first run,
+  # so RUN BOOTSTRAP AT THE CONSOLE with your keyboard/mouse plugged in or you
+  # will be locked out. Our policy targets are sed'd in (block unknown · keep
+  # controllers · apply-policy to present/inserted); rules.conf is never tracked.
+  # Idempotent: existing rules are preserved. Gate: verify-usbguard.
+  if command -v usbguard >/dev/null 2>&1; then
+    run sudo sed -i -E \
+      -e 's|^#?[[:space:]]*ImplicitPolicyTarget=.*|ImplicitPolicyTarget=block|' \
+      -e 's|^#?[[:space:]]*PresentDevicePolicy=.*|PresentDevicePolicy=apply-policy|' \
+      -e 's|^#?[[:space:]]*PresentControllerPolicy=.*|PresentControllerPolicy=keep|' \
+      -e 's|^#?[[:space:]]*InsertedDevicePolicy=.*|InsertedDevicePolicy=apply-policy|' \
+      /etc/usbguard/usbguard-daemon.conf
+    sudo test -s /etc/usbguard/rules.conf \
+      || run sudo sh -c 'umask 077; usbguard generate-policy > /etc/usbguard/rules.conf'
+    run sudo systemctl enable --now usbguard.service
+  fi
 }
 
 # --------------------------------------------------------------------------- #
@@ -620,7 +638,7 @@ layer_L_knowledge_ingestion() {
       run uv tool install -e "$DOTFILES_ROOT/slicedlabs-team[tui]" 2>/dev/null || \
       warn "slicedlabs-team editable install failed; run \`uv pip install --system -e ~/.dotfiles/slicedlabs-team[tui]\` manually"
   fi
-  sub "Run \`ingest-books\` to bulk-ingest ~/Resources/books/ (1-2 hours)."
+  sub "Run \`ingest-books\` to bulk-ingest ~/SlicedLabs/vendor/corpus/books/ (1-2 hours)."
 }
 
 # --------------------------------------------------------------------------- #

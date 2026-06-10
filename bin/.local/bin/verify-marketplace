@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-marketplace — the SlicedLabs Marketplace invariants: the catalog SSOT bakes to a valid
+# catalog, the cockpit panel + Market service are wired, and the render-marketplace baker +
+# sl-pull installer are on PATH. The owned layer a SlicedLabsOS user pulls from. CI / pre-commit.
+set -u
+pass=0; fail=0
+ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; pass=$((pass+1)); }
+no() { printf '  \033[31m✗\033[0m %s\n' "$1"; fail=$((fail+1)); }
+chk() { if eval "$2" >/dev/null 2>&1; then ok "$1"; else no "$1"; fi; }
+
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+QS="$HOME/.config/quickshell/cockpit"
+
+echo "── Marketplace · the owned layer ──"
+chk "catalog SSOT (system/marketplace.toml)"   "[ -f '$ROOT/system/marketplace.toml' ]"
+chk "render-marketplace baker on PATH"          "command -v render-marketplace"
+chk "sl-pull installer on PATH"                 "command -v sl-pull"
+chk "baked catalog is valid JSON"               "python3 -m json.tool '$QS/generated/marketplace.json' >/dev/null"
+chk "catalog non-empty"                         "grep -q '\"id\"' '$QS/generated/marketplace.json'"
+chk "Market service registered (qmldir)"        "grep -q 'singleton Market' '$QS/services/qmldir'"
+chk "Marketplace panel present"                 "[ -f '$QS/bars/Marketplace.qml' ]"
+chk "panel instantiated in shell.qml"           "grep -q 'Marketplace {' '$QS/shell.qml'"
+chk "LeftPill summons the Marketplace"          "grep -q 'Market.toggle' '$QS/bars/LeftPill.qml'"
+chk "panel Pull → sl-pull (real install)"       "grep -q 'sl-pull' '$QS/bars/Marketplace.qml'"
+chk "cockpitctl market verb"                    "grep -q 'market)' '$ROOT/bin/.local/bin/cockpitctl'"
+chk "sl-pull --list runs"                       "sl-pull --list"
+chk "gMarket glyph baked"                        "grep -q 'gMarket' '$QS/generated/Theme.qml'"
+
+[ $fail -eq 0 ] && echo "marketplace: catalog · panel · sl-pull coherent ✓"
+exit $fail

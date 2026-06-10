@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# verify-slicedlabs — PATH shim to the L4 gate (Sliced Surface · BFF · receipts ·
+# conformance) that lives in the slicedlabs-stack repo. Lets the OS-wide verify-all call
+# the L4 gate by name (the one green board includes L4, MASTERPLAN M2) without the repo
+# being on PATH. Override the repo location with $SLICEDLABS_STACK.
+#
+# If the repo is not checked out on this host, the gate is SKIPPED (green) — same posture
+# as verify-all's optional tier, so a fresh machine without L4 still passes the board.
+set -uo pipefail
+GATE="${SLICEDLABS_STACK:-$HOME/SlicedLabs/tools/surface}/tools/verify-slicedlabs"
+if [[ ! -x "$GATE" ]]; then
+  printf '  \033[33m•\033[0m verify-slicedlabs: slicedlabs-stack not on this host — skipped\n'
+  exit 0
+fi
+exec "$GATE" "$@"

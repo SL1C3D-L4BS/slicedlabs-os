@@ -1,3 +1,4 @@
+// SlicedLabs · body · © 2026 SlicedLabs
 import QtQuick
 import Quickshell
 import Quickshell.Wayland

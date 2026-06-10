@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # ingest-notes — personal notes + Claude transcripts + design docs → Qdrant.
 set -euo pipefail
 exec python3 -m slicedlabs_team.ingest.notes "$@"

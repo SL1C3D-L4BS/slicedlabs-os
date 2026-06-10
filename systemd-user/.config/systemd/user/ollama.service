@@ -1,17 +1,23 @@
 [Unit]
-Description=Ollama (Vulkan-primary backend)
+Description=Ollama (auto-detect backend — CPU now, Vulkan-ready)
 Documentation=https://github.com/ollama/ollama
 After=default.target
 Conflicts=ollama-rocm.service
 
 [Service]
 ExecStart=/usr/bin/ollama serve
-Environment="OLLAMA_LLM_LIBRARY=vulkan"
+# No OLLAMA_LLM_LIBRARY: let ollama auto-detect the backend (CPU today; Vulkan
+# engages automatically on a future Vulkan-capable GPU/binary). The OLLAMA_VULKAN
+# + GPU vars stay set so it's ready with no further config.
 Environment="OLLAMA_VULKAN=1"
 Environment="OLLAMA_HOST=127.0.0.1:11434"
 Environment="OLLAMA_NUM_GPU=1"
 Environment="OLLAMA_GPU_OVERHEAD=0"
-Environment="HSA_OVERRIDE_GFX_VERSION=8.0.3"
+# Flash Attention auto-enables on CPU in ollama 0.24 and is pathologically slow there
+# (~1 tok/s) — force it off so CPU inference runs at full speed (hermes is local/offline).
+Environment="OLLAMA_FLASH_ATTENTION=0"
+# Keep the model resident between asks so hermes stays snappy (no per-ask reload).
+Environment="OLLAMA_KEEP_ALIVE=30m"
 Restart=on-failure
 RestartSec=3
 

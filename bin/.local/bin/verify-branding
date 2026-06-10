@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-branding — Canon §VIII.15 (one body · nothing unbranded). Assert every owned
+# file carries the SlicedLabs ownership mark; delegates to `render-header --check`
+# (idempotent scan of the owned surface, exit 1 on any unbranded file).
+set -uo pipefail
+exec render-header --check

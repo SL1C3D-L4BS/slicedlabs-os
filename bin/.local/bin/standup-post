@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # standup-post — post the daily standup. Uses `slicedlabs standup` when present;
 # otherwise notifies that the poster is unconfigured. Wired to the agenda HUD
 # standup chip's on-click.

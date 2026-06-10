@@ -3,8 +3,8 @@ singleton Vitals 1.0 Vitals.qml
 singleton Build 1.0 Build.qml
 singleton Cava 1.0 Cava.qml
 singleton Audio 1.0 Audio.qml
-singleton Modals 1.0 Modals.qml
-singleton Menu 1.0 Menu.qml
-singleton CC 1.0 CC.qml
+singleton Bt 1.0 Bt.qml
 singleton Warden 1.0 Warden.qml
 singleton Spend 1.0 Spend.qml
+singleton Stack 1.0 Stack.qml
+singleton Market 1.0 Market.qml

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # pull-llm-models — Ollama model pulls for the local AI tier.
 # Skips models already present; ~10 GB total over the listed set.
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-tooling — the tooling design cascade (Track 8) is intact:
 #   1. no unrendered {{tokens}} left in any rendered tool config,
 #   2. the key configs PARSE (ghostty / nvim engine colorscheme),
@@ -7,7 +8,7 @@
 #      that keeps ls/TUIs sane while identity/semantic ride on the chrome.
 set -uo pipefail
 ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
-cd "$ROOT"
+cd "$ROOT" || exit 1
 fail=0
 ok() { echo "  ✓ $1"; }
 no() { echo "  ✗ $1" >&2; fail=1; }
@@ -28,9 +29,11 @@ if command -v ghostty >/dev/null 2>&1; then
         || echo "  · ghostty +show-config unavailable headless (skipped)"
 fi
 
-# 3) identity headline wired
-command -v sl-identity >/dev/null 2>&1 && [[ "$(sl-identity engine)" == "#D85A30" ]] \
-    && ok "sl-identity: engine → #D85A30" || no "sl-identity broken"
+# 3) identity headline wired — the expected hex comes from color.py ANCHORS
+# (the SSOT) so a deliberate re-hue (Liquid Retina v3) never stales this gate.
+ENGINE_HEX="$(python3 -c "import sys; sys.path.insert(0, \"$HOME/.dotfiles/bin/.local/bin/lib\"); import color; print(color.ANCHORS[\"engine\"])")"
+command -v sl-identity >/dev/null 2>&1 && [[ "$(sl-identity engine)" == "$ENGINE_HEX" ]] \
+    && ok "sl-identity: engine → $ENGINE_HEX" || no "sl-identity broken"
 grep -q 'SL_IDENTITY=' bin/.local/bin/lib/scene.sh \
     && ok "scene.sh exports SL_IDENTITY on spawn" || no "scene.sh missing SL_IDENTITY export"
 grep -q 'SL_IDENTITY' fish/.config/fish/conf.d/sl-fzf.fish.tmpl \

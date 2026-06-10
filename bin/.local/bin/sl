@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl — the unified SlicedLabs front door. `sl <verb>` runs the owned tool `sl-<verb>`;
+# `sl ai` opens (or one-shots) the sovereign AI workspace, routed through the owned
+# Gateway (PII-guard → cost-cap → route owned↔rented → signed receipt). Naming canon:
+# everything is `slicedlabs`/`sl`; only the assistant is `hermes` (ships P3).
+set -uo pipefail
+
+BIN="$(dirname "$(readlink -f "$0")")"
+
+# Owned verbs = every `sl-*` sibling; the verb is the suffix (auto-discovers new tools).
+_verbs() {
+  local f
+  for f in "$BIN"/sl-*; do
+    [ -e "$f" ] || continue
+    basename "$f" | sed 's/^sl-//'
+  done | sort
+}
+
+_help() {
+  printf '\033[1msl\033[0m — the SlicedLabs front door\n\n'
+  printf '  \033[36msl ai\033[0m [prompt]     sovereign AI — no prompt opens the workspace TUI;\n'
+  printf '                      a prompt one-shots it through the owned Gateway\n'
+  printf '  \033[36msl\033[0m <verb> [args]   run an owned tool (sl-<verb>)\n'
+  printf '  \033[36msl help\033[0m            this list\n\n'
+  printf '\033[1mowned verbs:\033[0m\n'
+  _verbs | sed 's/^/  /'
+}
+
+cmd="${1:-help}"
+case "$cmd" in
+  help|-h|--help) _help ;;
+  ai)
+    shift
+    if [ "$#" -eq 0 ]; then
+      exec slicedlabs                                   # the federated AI workspace TUI
+    else
+      exec slicedlabs ask "${SL_AI_ROLE:-architect}" "$*"   # one-shot via the owned Gateway
+    fi
+    ;;
+  ask)
+    shift
+    if command -v hermes >/dev/null 2>&1; then exec hermes ask "$*"   # the local-only assistant
+    else echo "sl: hermes not found on PATH" >&2; exit 127; fi
+    ;;
+  *)
+    verb="$cmd"; shift
+    if command -v "sl-$verb" >/dev/null 2>&1; then
+      exec "sl-$verb" "$@"
+    fi
+    echo "sl: unknown command '$verb' — try 'sl help'" >&2
+    exit 127
+    ;;
+esac

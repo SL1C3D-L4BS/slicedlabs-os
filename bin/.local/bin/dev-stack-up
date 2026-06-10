@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # dev-stack-up — bring up the local data + observability mesh.
 # Idempotent: re-running is a no-op when containers already exist.
 #
@@ -9,7 +10,8 @@
 #   dev-stack-data.service → "data" (staged by the coding/engine scene)
 set -euo pipefail
 
-export POSTGRES_PASSWORD="$(cat "$HOME/.config/postgres/dev.password" 2>/dev/null || true)"
+POSTGRES_PASSWORD="$(cat "$HOME/.config/postgres/dev.password" 2>/dev/null || true)"  # SC2155: assign then export
+export POSTGRES_PASSWORD
 
 profile_args=()
 for p in ${DEV_STACK_PROFILES:-data obs}; do profile_args+=(--profile "$p"); done

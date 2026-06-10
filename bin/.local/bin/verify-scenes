@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-scenes — the scene-DSL gate (spec P11): validate the workspaces.toml registry
 # (the declarative scene "DSL" read by lib/scene.sh) against its schema, so drift is
 # caught here rather than as a silently-unstaged window at login. Non-destructive.
@@ -20,18 +21,41 @@ def no(m):
 VALID_OUT    = {"DP-2", "DP-3"}
 VALID_LAYOUT = {"columns", "single", "delegate"}
 VALID_TILING = {"auto", "manual"}
+VALID_TIER   = {"resident", "on-demand"}  # Canon §V — resource budget / cost tier
 meta = d.get("meta", {})
 ws   = d.get("workspaces", {})
 ok(f"workspaces.toml parses ({len(ws)} workspaces)")
 
 for a in meta.get("auto", []):
     (ok if a in ws else no)(f"meta.auto '{a}' references a defined workspace")
+    # Canon §V (Systems Performance + the 2026-06-01 login-storm OOM): only light
+    # "resident" scenes may auto-stage. A heavy "on-demand" scene in auto is a
+    # saturation regression — fail it here, not as an OOM-culled cockpit at login.
+    if a in ws:
+        (ok if ws[a].get("tier") == "resident" else no)(
+            f"meta.auto '{a}' is tier=resident (heavy scenes stay on-demand)"
+        )
 
 for name, w in ws.items():
     (ok if w.get("output") in VALID_OUT else no)(f"{name}.output={w.get('output')!r} valid")
     lay = w.get("layout")
     (ok if lay in VALID_LAYOUT else no)(f"{name}.layout={lay!r} valid")
     (ok if w.get("tiling", "auto") in VALID_TILING else no)(f"{name}.tiling valid")
+    (ok if w.get("tier") in VALID_TIER else no)(f"{name}.tier={w.get('tier')!r} valid")
+    # Project-scoped workspaces (2026-06-03): must declare a default_project fallback and
+    # must NOT hardcode a project path — every pane's working-directory binds to $SL_PROJECT
+    # so the whole cockpit attaches to the bound project. (Risk-audit gate #5/#8.)
+    ps = w.get("project_scoped", False)
+    if ps is not False:
+        (ok if isinstance(ps, bool) else no)(f"{name}.project_scoped is a bool")
+        (ok if isinstance(w.get("default_project"), str) and w.get("default_project") else no)(
+            f"{name} declares default_project (project_scoped fallback)")
+        for a in w.get("apps", []):
+            cmd = a.get("cmd", "")
+            if "--working-directory=" in cmd:
+                wd = cmd.split("--working-directory=", 1)[1].split()[0]
+                (ok if "$SL_PROJECT" in wd else no)(
+                    f"{name}.{a.get('id','?')} working-directory binds $SL_PROJECT (no hardcoded path)")
     if lay == "delegate":
         (ok if w.get("delegate") else no)(f"{name} sets a delegate script"); continue
     apps = w.get("apps", [])

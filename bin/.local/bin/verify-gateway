@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-gateway — L7 AI-gateway control-plane gate (TOOLING-ARCHITECTURE §GAP2,
+# Canon §II.5 "the verifier at the top"). Assert the single model-call chokepoint
+# exists and enforces PII-guard + owned↔rented routing + audit, and that the CLI
+# routes through it (no model call bypasses the boundary).
+set -uo pipefail
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+PKG="$HOME/.dotfiles/slicedlabs-team/slicedlabs_team"
+[ -f "$PKG/gateway.py" ] && ok "gateway module present" || no "gateway.py missing"
+
+if python3 - <<'PY' 2>/dev/null
+from slicedlabs_team import gateway
+_, n = gateway.redact("a@b.com 4111 1111 1111 1111 ghp_abcd1234efgh5678")
+assert n >= 2, "PII not redacted"
+r = gateway.route_for("claude-opus-4-7")
+assert r.kind in ("owned", "rented")
+assert hasattr(gateway, "complete") and hasattr(gateway, "REGION")
+PY
+then ok "gateway import + PII-guard + routing functional"
+else no "gateway import/behaviour failed"; fi
+
+if python3 - <<'PY' 2>/dev/null
+from slicedlabs_team import gateway as g
+assert g.route_for("local/llama3.2").kind == "local"          # local (Ollama/llama.cpp) — free, sovereign
+assert g._rented_backend("deepseek-chat") == "deepseek"       # DeepSeek
+assert g._rented_backend("openrouter/x/y") == "openrouter"    # OpenRouter
+assert set(g.OPENAI_COMPAT_BASE) >= {"openai", "deepseek", "openrouter"}
+assert hasattr(g, "_call_openai_compat")
+PY
+then ok "federation breadth: local · deepseek · openrouter (+ owned/anthropic/openai)"
+else no "federation breadth routing missing"; fi
+
+grep -q "gateway.complete" "$PKG/cli.py" 2>/dev/null \
+    && ok "CLI 'ask' routes through the gateway (no bypass)" || no "CLI not wired to gateway"
+grep -q "audit.record" "$PKG/gateway.py" 2>/dev/null \
+    && ok "gateway audits every call (Warden ledger)" || no "gateway does not audit"
+
+echo
+if [ $rc -eq 0 ]; then echo "gateway: control-plane chokepoint live (PII · route · cap · audit) ✓"
+else echo "gateway: GAPS above" >&2; fi
+exit $rc

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-stabilization — Track A invariants: the box stays fast, calm, and
 # OOM-resilient. Asserts the root causes found in the live audit stay fixed:
 #   localsearch indexer off · scx_lavd (not crash-looping rusty) · system not

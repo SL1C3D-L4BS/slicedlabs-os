@@ -1,0 +1,64 @@
+// vm — the "VM Stack" column of the coding/engine command center
+// (com.slicedlabs.coding-vm, ~50%). A terminal cockpit for the rootless
+// qemu:///session libvirt stack: domain status on top, a console/boot shell
+// below. This is the MANAGEMENT surface — the live guest framebuffer is the
+// separate opaque `virt-viewer` window summoned by `coding-vm` / Mod+Ctrl+Shift+V.
+// Launched as `zj vm`. NEUTRAL bar (rides coding + engine); niri ring carries hue.
+//
+//   status : vm list (falls back to virsh qemu:///session list --all)
+//   console: shell for `vm console <domain>` · `vm boot <domain>` · `vm snapshot`
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                format_left   " {mode} {tabs}"
+                format_center ""
+                format_right  "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{icon.clock}} {datetime} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}} "
+                format_space  "#[bg={{color.bg}}]"
+                format_precedence "lrc"
+                border_enabled "false"
+
+                tab_normal    "#[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{semantic.text_secondary}},bg={{semantic.bg_tertiary}}] {name} #[fg={{semantic.bg_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_active    "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] {{powerline.dot}} {name} #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                tab_separator "#[bg={{color.bg}}] "
+
+                mode_normal   "#[fg={{color.success}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{color.success}},bold] NORMAL #[fg={{color.success}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_locked   "#[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_left}}#[fg={{color.bg}},bg={{semantic.text_tertiary}},bold] LOCKED #[fg={{semantic.text_tertiary}},bg={{color.bg}}]{{powerline.round_right}}"
+                mode_default_to_mode "normal"
+
+                datetime          "{format}"
+                datetime_format   "%H:%M"
+                datetime_timezone "America/Los_Angeles"
+            }
+        }
+        children
+    }
+
+    tab name="vm" focus=true {
+        pane split_direction="horizontal" {
+            pane size="50%" name="VM Stack" command="fish" {
+                args "-C" "vm list 2>/dev/null; or virsh -c qemu:///session list --all"
+            }
+            pane size="50%" name="console" command="fish" {
+                args "-C" "vm list 2>/dev/null; echo '› vm console <domain> · vm boot <domain> · vm sandbox'"
+            }
+        }
+    }
+    tab name="snapshots" {
+        pane name="snapshots" command="fish" {
+            args "-C" "vm list 2>/dev/null; echo '› vm snapshot <domain> [name] · virsh -c qemu:///session snapshot-list <domain>'"
+        }
+    }
+    tab name="iso" {
+        pane name="iso" command="fish" {
+            args "-C" "ls -lh ~/.dotfiles/iso/out/slicedlabs-os-*.iso 2>/dev/null; echo '› vm iso  (boot+console the SlicedLabs ISO) · build: iso/build.sh'"
+        }
+    }
+    // logger — LIVE VM console/log. Tails the newest qemu:///session log through lnav; if no
+    // guest has booted yet, drops to a shell with the live serial-console command ready.
+    tab name="logger" {
+        pane name="VM logger" command="sl-log" {
+            args "--vm"   // live tail of the newest qemu:///session guest log via lnav
+        }
+    }
+}

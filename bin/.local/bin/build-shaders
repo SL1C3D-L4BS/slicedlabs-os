@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # build-shaders — compile the Cockpit's GLSL fragment shaders → .qsb (Qt6 RHI).
 # qsb ships with qt6-shadertools (independent of quickshell). Idempotent.
 set -euo pipefail

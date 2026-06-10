@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-terminal — the terminal-richness gate (Liquid Retina v3, P3):
+#   1. branded fastfetch greeting (wordmark logo rendered + selected, rich modules)
+#   2. fish_greeting fires once per session (zellij pane-0 guard)
+#   3. nvim/vim schemes rendered fresh from tokens (v3 vocabulary present)
+#   4. content rides the [ansi] SSOT — ghostty + zellij rendered configs carry
+#      all 16 terminal colours verbatim (the content-vs-chrome law, executable)
+set -u
+ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+rc=0
+fail() { echo "  ✗ $1"; rc=1; }
+ok()   { echo "  ✓ $1"; }
+
+# 1 — fastfetch greeting
+FF="$ROOT/fastfetch/.config/fastfetch"
+[ -f "$FF/slicedlabs-logo.txt.tmpl" ] && ok "logo .tmpl tracked" || fail "logo .tmpl missing"
+[ -f "$FF/slicedlabs-logo.txt" ] && ok "logo rendered" || fail "logo not rendered (run render-templates)"
+grep -q '"source": *"~/.config/fastfetch/slicedlabs-logo.txt"' "$FF/config.jsonc" \
+    && ok "config.jsonc selects the wordmark logo" || fail "config.jsonc does not select the logo"
+grep -q '"type": *"file-raw"' "$FF/config.jsonc" \
+    && ok "logo type file-raw (truecolor escapes)" || fail "logo type is not file-raw"
+for mod in host packages disk localip media; do
+    grep -q "\"type\": *\"$mod\"" "$FF/config.jsonc" \
+        && ok "module: $mod" || fail "module missing: $mod (the greeting must inform)"
+done
+
+# 2 — fish greeting (once per session, not per pane)
+FG="$ROOT/fish/.config/fish/functions/fish_greeting.fish"
+[ -f "$FG" ] && ok "fish_greeting function exists" || fail "fish_greeting function missing"
+grep -q 'ZELLIJ_PANE_ID' "$FG" 2>/dev/null \
+    && ok "zellij pane-0 guard present" || fail "zellij guard missing (greeting would spam panes)"
+
+# 3 — editor schemes carry the v3 vocabulary
+NP="$ROOT/nvim/.config/nvim/lua/engine/palette.lua"
+[ -f "$NP" ] && grep -q "lavender" "$NP" && grep -q "primary_700" "$NP" \
+    && ok "nvim palette rendered with families + ramps" || fail "nvim palette stale (no v3 vocabulary)"
+VS="$ROOT/vim/.vim/colors/slicedlabs.vim"
+[ -f "$VS" ] && ok "vim slicedlabs scheme rendered" || fail "vim scheme not rendered"
+grep -q "colorscheme slicedlabs" "$ROOT/vim/.vimrc" \
+    && ok ".vimrc selects slicedlabs" || fail ".vimrc does not select slicedlabs"
+
+# 4 — [ansi] SSOT verbatim in the terminal stack (content vs chrome law)
+# ghostty owns the full 16-colour terminal palette; zellij's UI theme takes
+# only the 8 base hues (brights aren't part of its theme spec — apps get them
+# from ghostty's palette).
+mapfile -t MISSING < <(python3 - "$ROOT" <<'EOF'
+import sys, tomllib, pathlib
+root = pathlib.Path(sys.argv[1])
+t = tomllib.load(open(root / "system/tokens.toml", "rb"))
+full = [str(v) for v in {**t["ansi"], **t["ansi_bright"]}.values()]
+base = [str(v) for v in t["ansi"].values()]
+for target, hexes in (
+    ("ghostty/.config/ghostty/config", full),
+    ("zellij/.config/zellij/config.kdl", base),
+):
+    p = root / target
+    if not p.is_file():
+        print(f"{target}: NOT RENDERED")
+        continue
+    text = p.read_text()
+    missing = [h for h in hexes if h.lower() not in text.lower()]
+    if missing:
+        print(f"{target}: missing {' '.join(missing)}")
+EOF
+)
+if [ "${#MISSING[@]}" -eq 0 ] || [ -z "${MISSING[0]:-}" ]; then
+    ok "ansi SSOT verbatim (ghostty: 16 · zellij: base 8)"
+else
+    for m in "${MISSING[@]}"; do [ -n "$m" ] && fail "ansi SSOT: $m"; done
+fi
+
+echo
+if [ "$rc" -eq 0 ]; then
+    echo "verify-terminal: ✓ branded greeting · per-session fire · v3 editor schemes · ansi SSOT verbatim"
+else
+    echo "verify-terminal: ✗ failures above"
+fi
+exit $rc

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-body — Canon §VIII.14 (the telos: the organism is whole, owned, reproducible).
+# The meta-gate over the whole SlicedLabs Body: every component repo committed·pushed·
+# clean · the home repo retired · stow intact · bidirectional package parity · /etc +
+# kernel pinned · the manifest + rebuild present. The proof the body is one whole, owned,
+# forkable slice. Exit 1 on any gap.
+set -uo pipefail
+BODY="${SL_BODY:-$HOME/SlicedLabs}"; DOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+# (1) every body repo committed · pushed · clean
+for repo in "$BODY" "$BODY/mind/ai" "$BODY/library" "$BODY/tools/slicedengine" "$BODY/tools/surface" "$BODY/tools/discord" "$BODY/body/os" "$DOT"; do
+  name=${repo#"$HOME"/}
+  [ -e "$repo/.git" ] || { no "missing repo: $name"; continue; }
+  d=$(git -C "$repo" status --porcelain 2>/dev/null | grep -c .)
+  u=$(git -C "$repo" log '@{u}..HEAD' --oneline 2>/dev/null | grep -c .)
+  { [ "$d" -eq 0 ] && [ "$u" -eq 0 ]; } && ok "repo clean+pushed: $name" || no "repo NOT clean+pushed: $name (${d} dirty, ${u} unpushed)"
+done
+
+# (2) home repo retired (sole $HOME SSOT) + stow intact
+[ ! -d "$HOME/.git" ] && ok "home repo retired — env.git is the sole \$HOME SSOT" || no "\$HOME/.git exists (competing root)"
+broken=$(find "$HOME/.config" "$HOME/.local" -maxdepth 5 -xtype l -lname '*dotfiles*' 2>/dev/null | grep -c .)
+[ "$broken" -eq 0 ] && ok "dotfiles stow symlinks resolve (0 broken)" || no "$broken broken dotfiles symlink(s)"
+
+# (3) bidirectional package parity (the §IX reproducible contract)
+inst=$(pacman -Qqe 2>/dev/null | LC_ALL=C sort -u)          # explicit only (for drift)
+allinst=$(pacman -Qq 2>/dev/null | LC_ALL=C sort -u)        # everything installed (deps incl.)
+decl=$(grep -vhE '^\s*#|^\s*$' "$DOT/system/packages.txt" "$DOT/system/packages-aur.txt" 2>/dev/null | LC_ALL=C sort -u)
+und=$(LC_ALL=C comm -23 <(printf '%s\n' "$inst") <(printf '%s\n' "$decl") | grep -c .)
+nin=$(LC_ALL=C comm -13 <(printf '%s\n' "$allinst") <(printf '%s\n' "$decl") | grep -c .)
+[ "$und" -eq 0 ] && ok "every explicit package is declared (no undeclared drift)" || no "$und installed package(s) not in the manifest"
+[ "$nin" -eq 0 ] && ok "every declared package is installed" || no "$nin declared package(s) not installed"
+
+# (4) /etc capture matches what's deployed (host-portable files; boot files referenced, not /etc-mapped)
+etcd=0
+while IFS= read -r f; do
+  rel=${f#"$DOT"/system/etc/}
+  case "$rel" in loader.conf) continue ;; esac   # lives in /boot, captured for reference
+  [ -r "/etc/$rel" ] || continue
+  cmp -s "$f" "/etc/$rel" || etcd=$((etcd+1))
+done < <(find "$DOT/system/etc" -type f 2>/dev/null)
+[ "$etcd" -eq 0 ] && ok "/etc capture matches deployed" || no "$etcd /etc file(s) drifted from capture (re-capture into system/etc)"
+
+# (5) kernel + boot pinned and running
+{ uname -r | grep -q lts && pacman -Q linux-lts >/dev/null 2>&1; } \
+  && ok "kernel pinned + running (linux-lts · $(uname -r))" || no "kernel pin drift (uname=$(uname -r))"
+
+# (6) the manifest + the rebuild
+{ [ -f "$BODY/body.toml" ] && [ -x "$BODY/restore.sh" ]; } && ok "body.toml + restore.sh present (forkable)" || no "body.toml / restore.sh missing"
+
+echo
+[ $rc -eq 0 ] && echo "body: the organism is whole — every repo owned·pushed·clean, system pinned, forkable ✓" \
+             || echo "body: gaps above" >&2
+exit $rc

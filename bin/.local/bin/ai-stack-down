@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # ai-stack-down — tear down the personal AI team mesh (the sibling of
 # ai-stack-up). `down` removes the project's containers across all profiles.
 # Manual path only: does NOT touch ai-stack.service auto-start. Idempotent.

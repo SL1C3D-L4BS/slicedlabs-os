@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-SRC="${LLAMACPP_SRC:-$HOME/Code/vendor/llama.cpp}"
+SRC="${LLAMACPP_SRC:-$HOME/SlicedLabs/vendor/llama.cpp}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
 mkdir -p "$CACHE" "$HOME/.local/bin" "$(dirname "$SRC")"
 

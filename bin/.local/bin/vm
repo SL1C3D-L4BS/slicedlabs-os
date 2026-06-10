@@ -2,7 +2,7 @@
 # vm — libvirt/KVM control for the coding command center (rootless qemu:///session).
 #
 # Establishes + drives the workstation VMs: the SlicedLabs ISO dogfood target, a
-# persistent Arch sandbox (virtiofs-shares ~/Projects), and ad-hoc cross-platform
+# persistent Arch sandbox (virtiofs-shares ~/SlicedLabs), and ad-hoc cross-platform
 # guests. All KVM-accelerated, UEFI (OVMF) + swtpm TPM2, SPICE + virtio-gpu console
 # via virt-viewer. ROOTLESS by design: qemu:///session needs no libvirt group, no
 # relogin, no root — images live under ~/.local/share/libvirt, the daemon is a
@@ -39,6 +39,7 @@ _running()    { [ "$(virsh domstate "$1" 2>/dev/null)" = "running" ]; }
 # outbound NAT), SPICE + virtio-gpu, boot menu on.
 _OVMF_CODE="/usr/share/edk2/x64/OVMF_CODE.4m.fd"
 _OVMF_VARS="/usr/share/edk2/x64/OVMF_VARS.4m.fd"
+# shellcheck disable=SC2054  # commas are virt-install sub-option separators inside arg values, not array separators
 _VI_COMMON=(--cpu host-passthrough
             --boot "loader=${_OVMF_CODE},loader.readonly=yes,loader.type=pflash,nvram.template=${_OVMF_VARS},bootmenu.enable=yes"
             --tpm backend.type=emulator,model=tpm-crb,version=2.0
@@ -82,15 +83,15 @@ ensure_sandbox_domain() {
   local disk="$POOL_DIR/arch-sandbox.qcow2"
   [ -f "$disk" ] || qemu-img create -f qcow2 "$disk" 40G >/dev/null
   local iso; iso="$(_latest_iso)" || true
-  # Persistent Arch sandbox: virtio disk + a virtiofs share of ~/Projects (needs shared
+  # Persistent Arch sandbox: virtio disk + a virtiofs share of ~/SlicedLabs (needs shared
   # memory backing). Boots the SlicedLabs ISO first time so you can install into it.
   _define --name arch-sandbox --osinfo archlinux --memory 8192 --vcpus 4 \
     "${_VI_COMMON[@]}" \
     --disk path="$disk",format=qcow2,bus=virtio \
-    --filesystem "$HOME/Projects",projects,driver.type=virtiofs \
+    --filesystem "$HOME/SlicedLabs",projects,driver.type=virtiofs \
     --memorybacking access.mode=shared,source.type=memfd \
     ${iso:+--cdrom "$iso"}
-  echo "vm: defined arch-sandbox (40G qcow2 + virtiofs ~/Projects)"
+  echo "vm: defined arch-sandbox (40G qcow2 + virtiofs ~/SlicedLabs)"
 }
 
 console() {

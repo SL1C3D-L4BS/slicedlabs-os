@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-log — context-aware live log console (lnav: live tail + SQL + format detection).
+#
+#   sl-log              auto: a project ./logs|./log dir if present, else the user journal (live)
+#   sl-log --journal    user journal only — journalctl --user -f → lnav
+#   sl-log --vm [dom]   newest qemu:///session guest log (or <dom>), live
+#   sl-log --stack      dev-stack-obs container logs (dev-stack logs -f / podman), live
+#
+# Never dies on a missing source — falls back to an interactive shell.
+set -uo pipefail
+shell="${SHELL:-/usr/bin/fish}"
+have() { command -v "$1" >/dev/null 2>&1; }
+have lnav || { echo "sl-log: lnav not installed (pacman -S lnav)"; exec "$shell"; }
+
+case "${1:-auto}" in
+  --journal)
+     exec bash -c 'journalctl --user -f -o json | lnav -q' ;;
+  --vm)
+     d="$HOME/.cache/libvirt/qemu/log"; dom="${2:-}"
+     if [ -n "$dom" ]; then f="$d/$dom.log"; else f="$(ls -t "$d"/*.log 2>/dev/null | head -1)"; fi
+     if [ -n "${f:-}" ] && [ -f "$f" ]; then exec lnav -q "$f"; fi
+     echo "sl-log --vm: no qemu:///session log yet. Boot a guest (vm boot <domain> / coding-vm),"
+     echo "             then live serial: virsh -c qemu:///session console <domain>"
+     exec "$shell" ;;
+  --stack)
+     if have dev-stack; then exec bash -c 'dev-stack logs -f 2>&1 | lnav -q'
+     elif have podman; then exec bash -c 'c=$(podman ps -q | head -1); [ -n "$c" ] && podman logs -f "$c" 2>&1 | lnav -q || { echo "sl-log --stack: no running containers"; exec "${SHELL:-fish}"; }'
+     else echo "sl-log --stack: no dev-stack/podman"; exec "$shell"; fi ;;
+  -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+  auto|*)
+     for ld in logs log var/log; do [ -d "$ld" ] && exec lnav -q "$ld"; done
+     exec bash -c 'journalctl --user -f -o json | lnav -q' ;;
+esac

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "count": 11,
+  "installed": 9,
+  "categories": [
+    "AI",
+    "Design",
+    "Engine",
+    "Scenes",
+    "Shell",
+    "Tooling"
+  ],
+  "items": [
+    {
+      "id": "sl-ai",
+      "name": "Federated AI",
+      "glyph": "gAi",
+      "category": "AI",
+      "version": "2026.6",
+      "summary": "One front door (sl) to every model — local + APIs routed through the owned Gateway.",
+      "cmd": "cockpitctl inspect ai",
+      "installed": true
+    },
+    {
+      "id": "liquid-glass",
+      "name": "Liquid Glass",
+      "glyph": "gMarket",
+      "category": "Design",
+      "version": "2026.6",
+      "summary": "The owned design-token cascade — one tokens.toml SSOT, OKLCH identity, no raw hex.",
+      "cmd": "cockpitctl system",
+      "installed": true
+    },
+    {
+      "id": "engine-pkg",
+      "name": "[ENGINE]",
+      "glyph": "gEngine",
+      "category": "Engine",
+      "version": "0.x",
+      "summary": "The Rust game engine — ECS, rendering, asset pipeline. The sovereign render core.",
+      "cmd": "cockpit engine",
+      "installed": true
+    },
+    {
+      "id": "coding",
+      "name": "Coding Cockpit",
+      "glyph": "gCoding",
+      "category": "Scenes",
+      "version": "2026.6",
+      "summary": "The zellij dev deck — editor, AI pair, live debugger & logger, project-scoped.",
+      "cmd": "cockpit coding",
+      "installed": true
+    },
+    {
+      "id": "engine",
+      "name": "Engine Cockpit",
+      "glyph": "gEngine",
+      "category": "Scenes",
+      "version": "2026.6",
+      "summary": "The render-dev deck — the just recipes, the shader pipeline, RenderDoc, oracles.",
+      "cmd": "cockpit engine",
+      "installed": true
+    },
+    {
+      "id": "research",
+      "name": "Research Deck",
+      "glyph": "gResearch",
+      "category": "Scenes",
+      "version": "2026.6",
+      "summary": "Deep-work surfaces — study, architect, synthesize, audit; Obsidian alongside.",
+      "cmd": "cockpit research",
+      "installed": true
+    },
+    {
+      "id": "cockpit",
+      "name": "Cockpit",
+      "glyph": "gControl",
+      "category": "Shell",
+      "version": "2026.6",
+      "summary": "The Liquid-Glass instrument-cluster HUD — pills, the living Reactor, the System menu.",
+      "cmd": "cockpitctl system",
+      "installed": true
+    },
+    {
+      "id": "governance",
+      "name": "Governance",
+      "glyph": "gWarden",
+      "category": "Tooling",
+      "version": "2026.6",
+      "summary": "The Warden Penalty Box — the AI crew's signed governance ledger, live.",
+      "cmd": "cockpitctl system governance",
+      "installed": true
+    },
+    {
+      "id": "keymap",
+      "name": "Keymap",
+      "glyph": "⌨",
+      "category": "Tooling",
+      "version": "2026.6",
+      "summary": "The keyboard SSOT — every owned binding, searchable, in its tool's hue.",
+      "cmd": "cockpitctl system keys",
+      "installed": true
+    },
+    {
+      "id": "alt-brain",
+      "name": "Alt brain · Gemma 2B",
+      "glyph": "gAi",
+      "category": "AI",
+      "version": "gemma2:2b",
+      "summary": "An optional alternate local brain for hermes — pull it, then set HERMES_MODEL=gemma2:2b to try a different voice.",
+      "cmd": "",
+      "installed": false
+    },
+    {
+      "id": "hermes",
+      "name": "hermes",
+      "glyph": "✦",
+      "category": "AI",
+      "version": "2026.6",
+      "summary": "The local-only, fully-offline assistant — grounded in the codex, keys & configs.",
+      "cmd": "cockpitctl hermes",
+      "installed": false
+    }
+  ]
+}

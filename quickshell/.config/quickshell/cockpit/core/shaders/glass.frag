@@ -27,6 +27,7 @@ layout(std140, binding = 0) uniform buf {
     float ambientBleed;
     float quality;       // 1 high · 0.5 low · 0 off
     float reduceMotion;  // 0/1
+    float rimBrandMix;   // v3: rim light picks up the brand hue (0 = pure white)
     vec4  tint;          // frosted fill rgba
     vec4  brand;         // ambient bleed hue
     vec4  wallRect;      // (x,y,w,h) of this surface in wallpaper UV
@@ -94,9 +95,9 @@ void main(){
     }
     col += spec;
 
-    // Fresnel rim — thin grazing-edge light
+    // Fresnel rim — thin grazing-edge light, brand-tinted per rimBrandMix (v3)
     float rim = 1.0 - smoothstep(0.0, max(rimWidth, 0.5), abs(d));
-    col += rim * rimOpacity;
+    col += rim * rimOpacity * mix(vec3(1.0), brand.rgb, rimBrandMix);
 
     // anti-banding dither
     col += (hash(px) - 0.5) * 0.02;

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # sl-sandbox — run a command inside the capability-sandbox cgroup (sl-agents.slice):
 # CPU/memory-capped at the OS level so an autonomous agent (or any heavy job) can never
 # starve the interactive desktop. The hard floor under Warden's soft governance (P11).

@@ -3,7 +3,8 @@ Description=Daily borg backup when the LUKS drive is connected
 
 [Timer]
 OnCalendar=daily
-Persistent=true          # catch up after the drive reconnects / a missed run
+# catch up after the drive reconnects / a missed run
+Persistent=true
 RandomizedDelaySec=30m
 
 [Install]

@@ -1,0 +1,1 @@
+cryptdevice=UUID=5bf89c1d-e0a2-4256-9bdf-1414ffd4a53e:cryptlvm root=/dev/ArchinstallVg/root zswap.enabled=0 rootflags=subvol=@ rw rootfstype=btrfs

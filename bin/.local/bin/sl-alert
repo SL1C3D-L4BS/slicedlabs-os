@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-alert — fan a critical alert out to every configured channel: the
+# self-hosted ntfy (sovereign primary) + a Discord webhook (mirror). This is
+# the ALWAYS-ON, obs-independent path that reaches the Founder when the heavy
+# Grafana stack is down (the boot contract keeps it off by default).
+#
+#   sl-alert [-p default|low|high|urgent] [-t "Title"] [-g tag] "message"
+#
+# Best-effort: an unreachable or unconfigured channel is logged, never fatal.
+# Exit 0 if at least one configured channel accepted; 1 if all attempts failed.
+set -uo pipefail
+
+PRIORITY="default"; TITLE="SlicedLabs"; TAG="warning"
+while getopts "p:t:g:" o; do
+  case "$o" in p) PRIORITY="$OPTARG" ;; t) TITLE="$OPTARG" ;; g) TAG="$OPTARG" ;; *) ;; esac
+done
+shift $((OPTIND - 1))
+MSG="${*:-}"
+[ -n "$MSG" ] || { echo "usage: sl-alert [-p prio] [-t title] [-g tag] <message>" >&2; exit 2; }
+
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}/alert"
+# shellcheck source=/dev/null
+[ -r "${CFG}/config" ] && . "${CFG}/config"
+NTFY_URL="${NTFY_URL:-http://127.0.0.1:8090}"
+NTFY_TOPIC="${NTFY_TOPIC:-founder-alerts}"
+WEBHOOK_FILE="${CFG}/discord-webhook"   # render-secrets output (gitignored)
+
+log() { echo "sl-alert: $*" >&2; }
+sent=0
+
+# 1) ntfy — the sovereign primary
+if curl -fsS --max-time 5 -H "Title: ${TITLE}" -H "Priority: ${PRIORITY}" -H "Tags: ${TAG}" \
+        -d "${MSG}" "${NTFY_URL}/${NTFY_TOPIC}" >/dev/null 2>&1; then
+  sent=$((sent + 1))
+else
+  log "ntfy publish failed (${NTFY_URL}/${NTFY_TOPIC}) — is ntfy.service up?"
+fi
+
+# 2) Discord webhook — the mirror (only when a real webhook URL is present;
+#    comment/placeholder lines in the secret file are ignored)
+hook="$(grep -m1 '^https://' "${WEBHOOK_FILE}" 2>/dev/null || true)"
+if [ -n "$hook" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    payload="$(jq -nc --arg t "$TITLE" --arg p "$PRIORITY" --arg m "$MSG" \
+      '{username:"SlicedLabs", content:("**"+$t+"** ["+$p+"]\n"+$m)}')"
+  else
+    esc=${MSG//\\/\\\\}; esc=${esc//\"/\\\"}; esc=${esc//$'\n'/\\n}
+    payload="$(printf '{"username":"SlicedLabs","content":"**%s** [%s]\\n%s"}' "$TITLE" "$PRIORITY" "$esc")"
+  fi
+  if curl -fsS --max-time 5 -H "Content-Type: application/json" -d "${payload}" "${hook}" >/dev/null 2>&1; then
+    sent=$((sent + 1))
+  else
+    log "discord webhook post failed"
+  fi
+fi
+
+[ "$sent" -gt 0 ] && exit 0
+log "no channel accepted the alert"
+exit 1

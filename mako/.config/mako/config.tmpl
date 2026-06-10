@@ -9,15 +9,15 @@
 font={{font.mono}} {{font.ui_size}}
 background-color={{color_rgba.backdrop}}
 text-color={{color.fg}}
-border-color={{color.primary}}
+border-color={{ramp.primary_400}}
 border-size={{geom.border}}
-border-radius={{geom.radius_lg}}
-padding=14,18
+border-radius={{modal.radius}}
+padding=18,22
 margin={{geom.gap}}
-height=200
-width=400
+height=300
+width=520
 icon-path=/usr/share/icons/Tela-circle-purple-dark:/usr/share/icons/hicolor
-max-icon-size=48
+max-icon-size=64
 default-timeout=5000
 ignore-timeout=0
 max-visible=5
@@ -49,13 +49,13 @@ background-color={{color_rgba.notify_critical}}
 border-size=3
 default-timeout=0
 
-# App-specific styling — Discord pings get the tertiary accent so they're
-# distinguishable from generic high-urgency build/CI failures.
+# App-specific styling — Discord pings get the tangerine family accent so
+# they're distinguishable from generic high-urgency build/CI failures.
 [app-name=discord]
-border-color={{color.tertiary}}
+border-color={{family.tangerine}}
 
 [app-name=\[ENGINE\]]
-border-color={{color.secondary}}
+border-color={{color.engine}}
 
 # Do-Not-Disturb mode — entered by mako-workspace-mode daemon when the user
 # focuses the `engine` workspace (deep-work zone, no pop interruption).

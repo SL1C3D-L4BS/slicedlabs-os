@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
+"""hermes — the SlicedLabsOS assistant (local-only, grounded).
+
+The ONE thing named hermes (naming canon §VIII.17). It routes a prompt through the
+owned Gateway with a LOCAL open-weights model (Ollama / llama.cpp) — sovereign, offline,
+free, and Warden-receipted. Never the cloud, never the book corpus.
+
+Knowledge is THIS body: before answering it RETRIEVES the most relevant owned facts —
+the codex (~/SlicedLabs/library/codex), every keybinding (keys.json), and a curated set
+of system facts — and grounds the model in them. So a newcomer following the founder's
+videos can ask anything about files, configs, keybinds, or owned tools and get the exact
+answer. (Offline BM25 over the body — no vector DB, no network, no books.)
+
+    hermes ask "how do I open the command palette?"
+    hermes "where does tokens.toml live?"            # bare prompt also works
+    hermes --context tokens.toml "what hue is engine?"   # attach files too
+    hermes know "marketplace"                         # show the retrieved grounding
+    hermes history --json 20                          # recent exchanges (for the cockpit)
+"""
+from __future__ import annotations
+
+import json
+import math
+import os
+import re
+import sys
+import time
+
+# The local model hermes speaks through (a Cookbook pick; override via env).
+_MODEL_TAG = os.environ.get("HERMES_MODEL", "llama3.2:3b")
+MODEL = "local/" + _MODEL_TAG
+SYSTEM = (
+    "You are hermes, the offline assistant for SlicedLabsOS — the guide for newcomers using "
+    "THIS exact system. CRITICAL RULES: (1) Answer ONLY from the 'System knowledge' block in the "
+    "user's message. (2) Quote the exact keybinding, path, or command VERBATIM from it. (3) This "
+    "is a custom niri + Quickshell system — generic answers (VS Code, GNOME, vim, browser "
+    "shortcuts) are WRONG; never use them. (4) If the knowledge doesn't contain the answer, say "
+    "'I don't see that in the system knowledge yet' and point to the closest owned tool — never "
+    "invent or guess a keybinding or path. Be concise, concrete, and encouraging. Never use the "
+    "web or the book corpus."
+)
+
+_HOME = os.path.expanduser("~")
+_DATA_DIR = os.path.join(os.environ.get("XDG_DATA_HOME", os.path.join(_HOME, ".local/share")), "hermes")
+_HISTORY = os.path.join(_DATA_DIR, "history.jsonl")
+_CTX_BUDGET = 8000          # max chars read per attached file
+_GROUND_BUDGET = 1600       # max chars of retrieved grounding (lean → fast CPU prompt-eval)
+
+# Owned knowledge roots — offline, never the book corpus (canon §VII).
+_KEYS_JSON = os.path.join(_HOME, ".config/quickshell/cockpit/generated/keys.json")
+_CODEX = os.path.join(_HOME, "SlicedLabs/library/codex")
+
+# Curated, always-true facts — ground the most common newcomer questions even when the
+# codex phrases them differently. Kept terse and accurate to the live system.
+_FACTS = [
+    "The SlicedLabs body lives at ~/SlicedLabs: mind/ai (the owned model), tools/slicedengine (the game engine), tools/surface (the Surface monorepo + crews), body/os (the public showcase), library/codex (the docs + memory library). ~/.dotfiles (env.git) is the sole $HOME source of truth, stowed as symlinks.",
+    "tokens.toml is the design-token source of truth at ~/.dotfiles/system/tokens.toml. render-quickshell bakes it into the cockpit's generated/Theme.qml. Never hand-write raw hex — bind to Theme.* tokens (the verify-design-language gate enforces this).",
+    "keys.toml is the keyboard source of truth at ~/.dotfiles/system/keys.toml. render-keys bakes the niri binds (config.kdl) and the cockpit Keys tab (keys.json). Always edit the SSOT and re-render, never the generated file.",
+    "verify-all runs every gate and is the one source of truth for system health. Notable gates: verify-cockpit, verify-keys, verify-design-language, verify-branding, verify-paths, verify-hermes, verify-marketplace.",
+    "cockpit <workspace> realizes a workspace scene (coding, engine, research, browser, monitoring, streaming, gaming, media). cockpitctl drives the HUD: cockpitctl system [tab], hermes, market, inspect <domain>, media <transport>, theme toggle.",
+    "The cockpit is the Quickshell HUD at ~/.config/quickshell/cockpit (a symlink into ~/.dotfiles/quickshell). Floating pills sit on top; modeless cards (System, Inspector, hermes) snap to the top-right; the Marketplace is the independent left panel.",
+    "hermes — this assistant — is local-only and fully offline. Summon it with Mod+Grave or the ✦ glyph in the bar's right cluster. It answers about THIS system from the codex, keybindings, configs and live state. Slash commands: /attach <path>, /history, /keys, /system, /verify, /help.",
+    "The Marketplace — the storefront glyph at the far left of the bar, or Mod+Alt+M — is the owned layer you pull tools, scenes and design packs from. Its catalog source of truth is ~/.dotfiles/system/marketplace.toml.",
+    "The System menu (the ⚙ glyph, or Mod+Alt+C) consolidates six tabs: Controls, Bluetooth, Media, Keys, Governance, Power. Mod+Alt+K/B/Y jump straight to the Keys/Bluetooth/Governance tabs.",
+    "The Inspector (Mod+Alt+I context, N net, A ai, T agenda) is the read-only HUD inspector. Governance — the Warden Penalty Box under System → Governance — is the AI crew's signed governance ledger.",
+]
+
+
+class _Spec:
+    per_task_usd_cap = 0.0  # local inference is free — the cap is irrelevant
+
+
+class _Agent:
+    name = "hermes"
+    model = MODEL
+    system_prompt = SYSTEM
+    spec = _Spec()
+
+
+def _help() -> int:
+    print("hermes — the local-only, grounded SlicedLabsOS assistant")
+    print('  hermes ask "<question>"        instant grounded answer (offline · cited)')
+    print('  hermes --think "<question>"    synthesized prose via the local model (slower)')
+    print('  hermes --context <path> "<q>"  attach files (with --think)')
+    print('  hermes know "<query>"          show the raw retrieved grounding')
+    print("  hermes history [--json] [n]    recent exchanges")
+    print(f"  model (--think): {MODEL}   (override: HERMES_MODEL=<ollama-tag>)")
+    return 0
+
+
+# ---- offline knowledge retrieval (BM25 over the owned body) -------------------
+_WORD = re.compile(r"[a-z0-9][a-z0-9_+-]*")
+_STOP = {"the", "a", "an", "is", "are", "to", "of", "in", "on", "for", "and", "or", "how", "do",
+         "i", "what", "where", "when", "can", "my", "me", "you", "it", "this", "that", "with",
+         "does", "at", "be", "as", "from", "by", "if", "so", "we", "us", "into", "use", "using"}
+
+
+def _tok(s: str) -> list[str]:
+    return [w for w in _WORD.findall(s.lower()) if w not in _STOP]
+
+
+def _chunk_md(text: str, rel: str) -> list[tuple[str, str]]:
+    """Split a codex doc into (heading-path, body) chunks on its markdown headings."""
+    out: list[tuple[str, str]] = []
+    head, buf = "", []
+
+    def flush() -> None:
+        body = "\n".join(buf).strip()
+        if body:
+            label = rel + (f" › {head}" if head else "")
+            out.append((label, body[:1200]))
+
+    for line in text.splitlines():
+        m = re.match(r"^#{1,4}\s+(.*)", line)
+        if m:
+            flush()
+            buf, head = [], m.group(1).strip()
+        else:
+            buf.append(line)
+    flush()
+    return out
+
+
+def _gather() -> list[tuple[str, str]]:
+    """Every owned knowledge doc as (text, source). Cheap enough to build per call."""
+    docs: list[tuple[str, str]] = [(f, "fact") for f in _FACTS]
+    try:
+        d = json.load(open(_KEYS_JSON, encoding="utf-8"))
+        for t in d.get("tools", []):
+            tn = t.get("name", "")
+            for c in t.get("categories", []):
+                cn = c.get("name", "")
+                for b in c.get("binds", []):
+                    docs.append((f"Keybinding {b.get('key', '')}: {b.get('desc', '')} — tool {tn}, {cn}", f"keys/{tn}"))
+    except (OSError, ValueError):
+        pass
+    for root, _dirs, files in os.walk(_CODEX):
+        for fn in files:
+            if not fn.endswith(".md"):
+                continue
+            p = os.path.join(root, fn)
+            rel = os.path.relpath(p, _CODEX)
+            try:
+                text = open(p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            for label, body in _chunk_md(text, rel):
+                docs.append((f"{label}\n{body}", f"codex/{rel}"))
+    return docs
+
+
+def _retrieve(query: str, k: int = 3) -> list[tuple[str, str]]:
+    docs = _gather()
+    qtok = set(_tok(query))
+    if not qtok or not docs:
+        return []
+    doc_toks = [_tok(t) for t, _ in docs]
+    n = len(docs)
+    dl = [len(dt) or 1 for dt in doc_toks]
+    avgdl = sum(dl) / n
+    df: dict[str, int] = {}
+    for dt in doc_toks:
+        for w in set(dt):
+            df[w] = df.get(w, 0) + 1
+    k1, b = 1.5, 0.75
+    scored: list[tuple[float, int]] = []
+    for i, dt in enumerate(doc_toks):
+        tf: dict[str, int] = {}
+        for w in dt:
+            if w in qtok:
+                tf[w] = tf.get(w, 0) + 1
+        if not tf:
+            continue
+        s = 0.0
+        for w, f in tf.items():
+            idf = math.log(1 + (n - df[w] + 0.5) / (df[w] + 0.5))
+            s += idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * dl[i] / avgdl))
+        src = docs[i][1]  # prefer canonical short sources: facts ≥ system (niri) keys ≥ app keys ≥ codex
+        s *= (1.35 if src == "fact"
+              else 1.3 if src == "keys/niri"
+              else 1.15 if src.startswith("keys/")
+              else 1.0)
+        scored.append((s, i))
+    scored.sort(reverse=True)
+    return [docs[i] for _s, i in scored[:k]]
+
+
+def _grounding(query: str) -> str:
+    hits = _retrieve(query)
+    if not hits:
+        return ""
+    blocks, total = [], 0
+    for text, src in hits:
+        piece = f"[{src}] {text}"
+        if total + len(piece) > _GROUND_BUDGET:
+            break
+        blocks.append(piece)
+        total += len(piece)
+    return ("### System knowledge (retrieved from the SlicedLabs body — codex · keys · facts)\n"
+            + "\n\n".join(blocks))
+
+
+def _know(argv: list[str]) -> int:
+    q = " ".join(a for a in argv if not a.startswith("-")).strip()
+    if not q:
+        print('usage: hermes know "<query>"', file=sys.stderr)
+        return 2
+    g = _grounding(q)
+    print(g if g else "(no matching system knowledge — try different words)")
+    return 0
+
+
+def _oneline(text: str, src: str) -> str:
+    """A clean one-line rendering of a retrieved doc for the instant answer."""
+    t = " ".join(text.split())
+    if src.startswith("keys/"):
+        m = re.match(r"Keybinding (\S+): (.+?) — tool", t)
+        if m:
+            return f"{m.group(1)} — {m.group(2)}"
+    body = t[:220] + ("…" if len(t) > 220 else "")
+    return f"{body}   [{src}]"
+
+
+def _answer(query: str) -> str:
+    """The DEFAULT answer: the grounded facts themselves, cited — instant, offline, accurate
+    (no model). For a synthesized prose answer use `--think` (slower; shines on a GPU)."""
+    hits = _retrieve(query, k=4)
+    if not hits:
+        return ("I don't see that in the system knowledge yet. Try rephrasing, or run "
+                "`hermes know \"<words>\"` to search the body directly.")
+    out = ["Here's what the SlicedLabs body has on that:", ""]
+    out += ["• " + _oneline(text, src) for text, src in hits]
+    out += ["", "· grounded · offline · instant — add --think for a synthesized answer"]
+    return "\n".join(out)
+
+
+# ---- context attachments + history -------------------------------------------
+def _read_contexts(paths: list[str]) -> tuple[str, list[str]]:
+    blocks, names = [], []
+    for p in paths:
+        ap = os.path.expanduser(p)
+        try:
+            with open(ap, "r", encoding="utf-8", errors="replace") as fh:
+                body = fh.read(_CTX_BUDGET + 1)
+        except OSError as e:
+            print(f"hermes: skipping context '{p}' ({type(e).__name__})", file=sys.stderr)
+            continue
+        if len(body) > _CTX_BUDGET:
+            body = body[:_CTX_BUDGET] + "\n…(truncated)"
+        blocks.append(f"### Context — {os.path.basename(ap)}\n{body}")
+        names.append(os.path.basename(ap))
+    return ("\n\n".join(blocks), names)
+
+
+def _record(prompt: str, answer: str, attachments: list[str]) -> None:
+    try:
+        os.makedirs(_DATA_DIR, exist_ok=True)
+        with open(_HISTORY, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "ts": int(time.time()), "prompt": prompt, "answer": answer,
+                "attachments": attachments, "model": MODEL,
+            }, ensure_ascii=False) + "\n")
+    except OSError:
+        pass  # history is a convenience, never block an answer on it
+
+
+def _history(argv: list[str]) -> int:
+    as_json = "--json" in argv
+    nums = [a for a in argv if a.isdigit()]
+    n = int(nums[0]) if nums else 20
+    rows: list[dict] = []
+    try:
+        with open(_HISTORY, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if line:
+                    try:
+                        rows.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+    except OSError:
+        rows = []
+    rows = rows[-n:][::-1]
+    if as_json:
+        sys.stdout.write(json.dumps(rows, ensure_ascii=False) + "\n")
+    else:
+        for r in rows:
+            sys.stdout.write(f"· {r.get('prompt', '')}\n")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        return _help()
+    if argv[0] == "history":
+        return _history(argv[1:])
+    if argv[0] == "know":
+        return _know(argv[1:])
+
+    # parse: [ask] [--think] [--context <path>]... [--no-history] [--no-rag] <prompt words…>
+    args = argv[1:] if argv[0] == "ask" else argv
+    contexts: list[str] = []
+    record = rag = True
+    think = False
+    words: list[str] = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--context" and i + 1 < len(args):
+            contexts.append(args[i + 1]); i += 2; continue
+        if a == "--no-history":
+            record = False; i += 1; continue
+        if a == "--no-rag":
+            rag = False; i += 1; continue
+        if a in ("--think", "--llm"):
+            think = True; i += 1; continue
+        words.append(a); i += 1
+    prompt = " ".join(words).strip()
+    if not prompt:
+        print('usage: hermes ask "<question>"   ·   hermes --think "<question>"', file=sys.stderr)
+        return 2
+
+    # DEFAULT — the instant, grounded, offline answer (no model): fast + accurate + cited.
+    if not think:
+        ans = _answer(prompt)
+        sys.stdout.write(ans + "\n")
+        if record:
+            _record(prompt, ans, [])
+        return 0
+
+    # --think — a synthesized prose answer via the local model (slower on CPU; shines on a GPU).
+    parts: list[str] = []
+    if rag:
+        ground = _grounding(prompt)
+        if ground:
+            parts.append(ground)
+    ctx_block, attached = _read_contexts(contexts)
+    if ctx_block:
+        parts.append(ctx_block)
+    parts.append("### Question\n" + prompt)
+    full = "\n\n".join(parts)
+
+    try:
+        from slicedlabs_team import gateway
+    except Exception as e:  # noqa: BLE001 — honest, never a fake answer
+        print(f"hermes: the owned Gateway is unavailable ({type(e).__name__}).", file=sys.stderr)
+        return 1
+    try:
+        res = gateway.complete_traced(_Agent(), full, max_tokens=192, actor="hermes")
+    except Exception as e:  # noqa: BLE001 — local model down ⇒ say so, never fabricate
+        print(
+            f"hermes: local model '{_MODEL_TAG}' unavailable ({type(e).__name__}). "
+            f"Start it:  ollama serve  &&  sl models pull {_MODEL_TAG}",
+            file=sys.stderr,
+        )
+        return 1
+
+    answer = res.text.rstrip()
+    sys.stdout.write(answer + "\n")
+    if record:
+        _record(prompt, answer, attached)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

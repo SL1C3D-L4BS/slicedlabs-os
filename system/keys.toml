@@ -38,7 +38,7 @@
 version = 1
 mod = "Super"                       # niri "Mod" → the Super/Windows key
 layers = ["Mod", "Mod+Shift", "Mod+Ctrl", "Mod+Alt", "Mod+Ctrl+Shift", "Fn", "Other"]
-tools  = ["niri", "slicedlabs", "ghostty", "zellij", "nvim", "lazygit", "rmpc", "gh-dash", "fish", "media"]
+tools  = ["niri", "slicedlabs", "zellij", "ghostty", "fish", "nvim", "vim", "lazygit", "gh-dash", "lnav", "btop", "gdb", "lazydocker", "fzf", "atuin", "spotify_player", "cava", "mpv", "obsidian", "firefox", "rmpc", "obs", "steam"]
 # Gaming/app-launch *menu* actions (Steam/Lutris/…) are not chords — they live in
 # docs/SYSTEM-MAP.md. Gaming *keys* are niri binds tagged category="Gaming".
 
@@ -83,7 +83,7 @@ layer = "Mod+Alt"
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+E"
-action = 'spawn "sh" "-c" "ghostty --working-directory=$HOME/Projects/engine"'
+action = 'spawn "sh" "-c" "ghostty --working-directory=$HOME/SlicedLabs/tools/slicedengine"'
 desc = "Open the [ENGINE] repo in a terminal"
 category = "Launch"
 layer = "Mod+Alt"
@@ -571,64 +571,80 @@ layer = "Mod"
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+K"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal keys"'
-desc = "Keybindings console — every key, searchable"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system keys"'
+desc = "Keymap — the System menu's Keys tab, searchable"
 category = "HUD"
 layer = "Mod+Alt"
 
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+C"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl control"'
-desc = "Control Center — toggles · sliders · stats · media · power"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system"'
+desc = "System menu — Controls · Bluetooth · Media · Keys · Governance · Power"
 category = "HUD"
 layer = "Mod+Alt"
 
 [[bind]]
 tool = "niri"
+key = "Mod+Grave"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl hermes"'
+desc = "hermes — the local-only assistant (ask · act · offline)"
+category = "HUD"
+layer = "Mod"
+
+[[bind]]
+tool = "niri"
 key = "Mod+Alt+I"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal context"'
-desc = "HUD inspector: focused workspace context"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect context"'
+desc = "Inspector — the focused workspace's context"
 category = "HUD"
 layer = "Mod+Alt"
 
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+M"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal media"'
-desc = "HUD inspector: media / leisure hub"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl market"'
+desc = "SlicedLabs Marketplace — the owned layer you pull from"
 category = "HUD"
 layer = "Mod+Alt"
 
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+N"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal net"'
-desc = "HUD inspector: network / VPN / security"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect net"'
+desc = "Inspector — network / VPN / security"
+category = "HUD"
+layer = "Mod+Alt"
+
+[[bind]]
+tool = "niri"
+key = "Mod+Alt+B"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system bluetooth"'
+desc = "System menu — Bluetooth devices (pair · connect · forget)"
 category = "HUD"
 layer = "Mod+Alt"
 
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+A"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal ai"'
-desc = "HUD inspector: AI team / spend"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect ai"'
+desc = "Inspector — AI team / spend"
 category = "HUD"
 layer = "Mod+Alt"
 
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+T"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal agenda"'
-desc = "HUD inspector: agenda / standup"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl inspect agenda"'
+desc = "Inspector — agenda / standup"
 category = "HUD"
 layer = "Mod+Alt"
 
 [[bind]]
 tool = "niri"
 key = "Mod+Alt+Y"
-action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl modal system"'
-desc = "HUD inspector: system"
+action = 'spawn "sh" "-c" "$HOME/.local/bin/cockpitctl system governance"'
+desc = "System menu — Governance (the Warden Penalty Box)"
 category = "HUD"
 layer = "Mod+Alt"
 
@@ -1293,3 +1309,1722 @@ key = "coding-vm"
 desc = "Summon the VM console onto the coding workspace"
 category = "Command"
 layer = "Other"
+
+# ===========================================================================
+# vim / neovim — the MOTION GRAMMAR (universal: vim, the nvim editor, vim-mode
+# surfaces). layer="Other" so the niri poster ignores them; they render into
+# docs/keys/vim.md + the combined SYSTEM-KEYS.md + the Cockpit modal (Mod+Alt+K).
+# Grammar = operator + count + motion/text-object. src="default" = built-in vim.
+# ===========================================================================
+
+# ---- Motions ----
+[[bind]]
+tool='vim'
+key='h / l'
+desc="Char left / right"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='j / k'
+desc="Line down / up"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='w / W'
+desc="Next word / WORD start"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='e / E'
+desc="Next word / WORD end"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='b / B'
+desc="Prev word / WORD start"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='ge / gE'
+desc="Prev word / WORD end"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='0 / ^ / $'
+desc="Line start / first non-blank / end"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='gg / G'
+desc="First line / last line"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='{n}G  or  :{n}'
+desc="Go to line n"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='{ / }'
+desc="Prev / next paragraph"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='( / )'
+desc="Prev / next sentence"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='H / M / L'
+desc="Screen top / middle / bottom"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='%'
+desc="Jump to matching pair () [] {}"
+category="Motion"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='f{c} / F{c}'
+desc="To next / prev char {c} on line"
+category="Find on line"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='t{c} / T{c}'
+desc="Till before next / prev char {c}"
+category="Find on line"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='; / ,'
+desc="Repeat / reverse last f F t T"
+category="Find on line"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='* / #'
+desc="Search word under cursor fwd / back"
+category="Search"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='n / N'
+desc="Next / prev search match"
+category="Search"
+layer="Other"
+src="default"
+
+# ---- Scroll ----
+[[bind]]
+tool='vim'
+key='Ctrl-d / Ctrl-u'
+desc="Half page down / up"
+category="Scroll"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Ctrl-f / Ctrl-b'
+desc="Full page down / up"
+category="Scroll"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='zz / zt / zb'
+desc="Center / top / bottom cursor line"
+category="Scroll"
+layer="Other"
+src="default"
+
+# ---- Operators (operator + motion/text-object) ----
+[[bind]]
+tool='vim'
+key='d{m} / c{m} / y{m}'
+desc="Delete / change / yank over motion {m}"
+category="Operator"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='dd / cc / yy'
+desc="Whole line: delete / change / yank"
+category="Operator"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='D / C / Y'
+desc="To end of line: delete / change / yank"
+category="Operator"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='>{m} / <{m}'
+desc="Indent / dedent over motion"
+category="Operator"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='={m}'
+desc="Auto-indent over motion"
+category="Operator"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='gu{m} / gU{m} / g~{m}'
+desc="Lowercase / uppercase / toggle case"
+category="Operator"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='gq{m}'
+desc="Format / hard-wrap over motion"
+category="Operator"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='x / X'
+desc="Delete char under / before cursor"
+category="Edit"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='r{c} / R'
+desc="Replace one char / enter Replace mode"
+category="Edit"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='s / S'
+desc="Substitute char / whole line"
+category="Edit"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='p / P'
+desc="Paste after / before cursor"
+category="Edit"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='J / gJ'
+desc="Join line below (with / without space)"
+category="Edit"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='~'
+desc="Toggle case of char under cursor"
+category="Edit"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='.'
+desc="Repeat last change"
+category="Edit"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='u / Ctrl-r'
+desc="Undo / redo"
+category="Edit"
+layer="Other"
+src="default"
+
+# ---- Text objects (use after d/c/y/v) ----
+[[bind]]
+tool='vim'
+key='iw / aw'
+desc="Inner / a word"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='iW / aW'
+desc="Inner / a WORD"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='ip / ap'
+desc="Inner / a paragraph"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='is / as'
+desc="Inner / a sentence"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key = 'i" / a"'
+desc="Inner / around double quotes"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key="i' / a'"
+desc="Inner / around single quotes"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='i( / a(  (ib)'
+desc="Inner / around parentheses"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='i[ / a['
+desc="Inner / around brackets"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='i{ / a{  (iB)'
+desc="Inner / around braces"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='i< / a<'
+desc="Inner / around angle brackets"
+category="Text object"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='it / at'
+desc="Inner / around tag (HTML/XML)"
+category="Text object"
+layer="Other"
+src="default"
+
+# ---- Insert-mode entry + insert keys ----
+[[bind]]
+tool='vim'
+key='i / I'
+desc="Insert before cursor / at first non-blank"
+category="Insert"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='a / A'
+desc="Append after cursor / at line end"
+category="Insert"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='o / O'
+desc="Open new line below / above"
+category="Insert"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='gi'
+desc="Insert at last insert position"
+category="Insert"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Ctrl-w / Ctrl-u  (insert)'
+desc="Delete word / to line start"
+category="Insert"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Ctrl-r {reg}  (insert)'
+desc="Insert contents of register"
+category="Insert"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Ctrl-n / Ctrl-p  (insert)'
+desc="Keyword completion next / prev"
+category="Insert"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Esc  or  Ctrl-['
+desc="Leave insert/visual mode"
+category="Insert"
+layer="Other"
+src="default"
+
+# ---- Visual mode ----
+[[bind]]
+tool='vim'
+key='v / V / Ctrl-v'
+desc="Charwise / linewise / block visual"
+category="Visual"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='gv'
+desc="Reselect last visual selection"
+category="Visual"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='o'
+desc="Jump to other end of selection"
+category="Visual"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='I / A  (block)'
+desc="Insert / append on every block line"
+category="Visual"
+layer="Other"
+src="default"
+
+# ---- Marks & jumps ----
+[[bind]]
+tool='vim'
+key='m{a-z}'
+desc="Set mark {a-z}"
+category="Marks & jumps"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key = "`{mark} / '{mark}"
+desc="Jump to mark (exact / line)"
+category="Marks & jumps"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Ctrl-o / Ctrl-i'
+desc="Jump list: back / forward"
+category="Marks & jumps"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='gf'
+desc="Go to file under cursor"
+category="Marks & jumps"
+layer="Other"
+src="default"
+
+# ---- Registers & macros ----
+[[bind]]
+tool='vim'
+key = '"{reg}{cmd}'
+desc="Operate using register {reg}"
+category="Registers & macros"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key = '"+y / "+p'
+desc="Yank / paste system clipboard"
+category="Registers & macros"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key = '"0p'
+desc="Paste last yank (yank register)"
+category="Registers & macros"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key=':reg'
+desc="Show all registers"
+category="Registers & macros"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='q{reg} … q'
+desc="Record macro to {reg}, stop with q"
+category="Registers & macros"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='@{reg} / @@'
+desc="Play macro / replay last macro"
+category="Registers & macros"
+layer="Other"
+src="default"
+
+# ---- Folds ----
+[[bind]]
+tool='vim'
+key='za / zA'
+desc="Toggle fold / recursively"
+category="Folds"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='zo / zc'
+desc="Open / close fold"
+category="Folds"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='zR / zM'
+desc="Open all / close all folds"
+category="Folds"
+layer="Other"
+src="default"
+
+# ---- Search & replace (ex) ----
+[[bind]]
+tool='vim'
+key='/{pat} / ?{pat}'
+desc="Search forward / backward"
+category="Search & replace"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key=':s/old/new/g'
+desc="Replace all in current line"
+category="Search & replace"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key=':%s/old/new/g'
+desc="Replace all in file"
+category="Search & replace"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key=':%s/old/new/gc'
+desc="Replace in file, confirm each"
+category="Search & replace"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key=':noh'
+desc="Clear search highlight"
+category="Search & replace"
+layer="Other"
+src="default"
+
+# ---- Windows / tabs / files (core vim) ----
+[[bind]]
+tool='vim'
+key='Ctrl-w s / Ctrl-w v'
+desc="Split horizontal / vertical"
+category="Windows & files"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Ctrl-w h/j/k/l'
+desc="Move focus between splits"
+category="Windows & files"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='Ctrl-w q / Ctrl-w o'
+desc="Close split / keep only this split"
+category="Windows & files"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='gt / gT'
+desc="Next / prev tab"
+category="Windows & files"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key=':w / :q / :wq / :q!'
+desc="Write / quit / write-quit / force-quit"
+category="Windows & files"
+layer="Other"
+src="default"
+[[bind]]
+tool='vim'
+key='ZZ / ZQ'
+desc="Save and quit / quit without saving"
+category="Windows & files"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# nvim (LazyVim configured binds) — DAP, LSP, find, UI. <leader> = Space.
+# These render with the existing nvim binds into docs/keys/nvim.md + the master.
+# ===========================================================================
+
+# ---- Debug (DAP) — lldb-dap / dlv / debugpy ----
+[[bind]]
+tool='nvim'
+key='<leader>dc'
+desc="Run / Continue"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>db'
+desc="Toggle breakpoint"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dB'
+desc="Breakpoint condition"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>di'
+desc="Step into"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dO'
+desc="Step over"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>do'
+desc="Step out"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dC'
+desc="Run to cursor"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dl'
+desc="Run last"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dr'
+desc="Toggle REPL"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dt'
+desc="Terminate session"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dP'
+desc="Pause"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>dw'
+desc="Hover widget (inspect value)"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>du'
+desc="Toggle DAP UI"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>de'
+desc="Evaluate expression (normal / visual)"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>da'
+desc="Run with args"
+category="Debug (DAP)"
+layer="Other"
+src="default"
+
+# ---- LSP & Code ----
+[[bind]]
+tool='nvim'
+key='gd'
+desc="Go to definition"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='gr'
+desc="References"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='gI'
+desc="Go to implementation"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='gy'
+desc="Go to type definition"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='K'
+desc="Hover documentation"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='gK'
+desc="Signature help"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>ca'
+desc="Code action"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>cr'
+desc="Rename symbol"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>cf'
+desc="Format buffer"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key=']d / [d'
+desc="Next / prev diagnostic"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key=']e / [e'
+desc="Next / prev error"
+category="LSP & Code"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='gcc  /  gc{m}'
+desc="Toggle comment line / over motion"
+category="LSP & Code"
+layer="Other"
+src="default"
+
+# ---- Find & Search (Telescope) ----
+[[bind]]
+tool='nvim'
+key='<leader>ff'
+desc="Find files (root dir)"
+category="Find & Search"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>fg  /  <leader>sg'
+desc="Live grep (root dir)"
+category="Find & Search"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>fb'
+desc="Open buffers"
+category="Find & Search"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>fr'
+desc="Recent files"
+category="Find & Search"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>sw'
+desc="Grep word under cursor"
+category="Find & Search"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>sk'
+desc="Search keymaps"
+category="Find & Search"
+layer="Other"
+src="default"
+
+# ---- UI, Windows & Buffers ----
+[[bind]]
+tool='nvim'
+key='<leader>e'
+desc="Toggle file explorer (neo-tree)"
+category="UI & Windows"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<C-h> / <C-l>'
+desc="Focus split left / right"
+category="UI & Windows"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<C-j> / <C-k>'
+desc="Focus split down / up"
+category="UI & Windows"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>-  /  <leader>|'
+desc="Split below / right"
+category="UI & Windows"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<S-h> / <S-l>'
+desc="Prev / next buffer"
+category="UI & Windows"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>bd'
+desc="Delete buffer"
+category="UI & Windows"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>l'
+desc="Lazy plugin manager"
+category="UI & Windows"
+layer="Other"
+src="default"
+[[bind]]
+tool='nvim'
+key='<leader>qq'
+desc="Quit all"
+category="UI & Windows"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# lnav — the log navigator (live tail + SQL + format detection)
+# ===========================================================================
+[[bind]]
+tool='lnav'
+key='/ {pat}  /  ? {pat}'
+desc="Search forward / backward"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='n / N'
+desc="Next / prev search match"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='g / G'
+desc="Top / bottom of log"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='Space / b'
+desc="Page down / up"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='e / E'
+desc="Next / prev error"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='w / W'
+desc="Next / prev warning"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='TAB / Shift-TAB'
+desc="Cycle to next / prev view"
+category="Views"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='i'
+desc="Toggle histogram view"
+category="Views"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='q'
+desc="Pop view / quit"
+category="Views"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='?'
+desc="Help"
+category="Views"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key=':'
+desc="Command prompt (:filter-in, :filter-out, …)"
+category="Query & filter"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key=';'
+desc="SQL query prompt over the logs"
+category="Query & filter"
+layer="Other"
+src="default"
+[[bind]]
+tool='lnav'
+key='m'
+desc="Bookmark the current line"
+category="Query & filter"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# btop — the system / process monitor
+# ===========================================================================
+[[bind]]
+tool='btop'
+key='Esc / m'
+desc="Open / close the main menu"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='q'
+desc="Quit"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='+ / -'
+desc="Increase / decrease update timer"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='f'
+desc="Filter processes"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='Up / Down'
+desc="Select a process"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='Enter'
+desc="Show process details"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='k'
+desc="Kill selected process (signal menu)"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='p / P'
+desc="Cycle / reverse preset layouts"
+category="btop"
+layer="Other"
+src="default"
+[[bind]]
+tool='btop'
+key='1 2 3 4'
+desc="Toggle cpu / mem / net / proc boxes"
+category="btop"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# gdb / lldb — the debuggers (short forms work in both). Driven from the cockpit
+# Debugger console (sl-debug) and nvim-DAP.
+# ===========================================================================
+[[bind]]
+tool='gdb'
+key='b {loc}'
+desc="Set breakpoint (break)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='r'
+desc="Run the program (run)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='c'
+desc="Continue (continue)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='n'
+desc="Step over (next)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='s'
+desc="Step into (step)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='finish'
+desc="Run until current frame returns"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='bt'
+desc="Backtrace (call stack)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='p {expr}'
+desc="Print / evaluate expression (print)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='info locals'
+desc="Local variables (lldb: frame variable)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='watch {expr}'
+desc="Break when expression changes"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='up / down'
+desc="Move up / down the stack frames"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+[[bind]]
+tool='gdb'
+key='q'
+desc="Quit the debugger (quit)"
+category="Debugger (gdb/lldb)"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# spotify_player (the `tunes` / music cockpit). Defaults shown; press ? in-app
+# for the authoritative, complete keymap (playback/device/search), customizable
+# via ~/.config/spotify-player/keymap.toml.
+# ===========================================================================
+[[bind]]
+tool='spotify_player'
+key='?'
+desc="Show ALL shortcuts in-app (authoritative list)"
+category="General"
+layer="Other"
+src="default"
+[[bind]]
+tool='spotify_player'
+key='C-c'
+desc="Quit"
+category="General"
+layer="Other"
+src="default"
+[[bind]]
+tool='spotify_player'
+key='enter'
+desc="Choose / play the selected item"
+category="General"
+layer="Other"
+src="default"
+[[bind]]
+tool='spotify_player'
+key='esc'
+desc="Close popup / go back"
+category="General"
+layer="Other"
+src="default"
+[[bind]]
+tool='spotify_player'
+key='/'
+desc="Search within the current page"
+category="General"
+layer="Other"
+src="default"
+[[bind]]
+tool='spotify_player'
+key='j / k  (or arrows)'
+desc="Move selection down / up"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='spotify_player'
+key='g g / G'
+desc="Top / bottom of list"
+category="Navigate"
+layer="Other"
+src="default"
+[[bind]]
+tool='spotify_player'
+key='tab'
+desc="Switch focus between panels"
+category="Navigate"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# fzf — the fuzzy finder (sl-debug attach picker, fish C-r/C-t, zoxide zi, …)
+# ===========================================================================
+[[bind]]
+tool='fzf'
+key='C-j / C-n / Down'
+desc="Move cursor down"
+category="fzf"
+layer="Other"
+src="default"
+[[bind]]
+tool='fzf'
+key='C-k / C-p / Up'
+desc="Move cursor up"
+category="fzf"
+layer="Other"
+src="default"
+[[bind]]
+tool='fzf'
+key='Enter'
+desc="Accept selection"
+category="fzf"
+layer="Other"
+src="default"
+[[bind]]
+tool='fzf'
+key='Esc / C-c / C-g'
+desc="Abort"
+category="fzf"
+layer="Other"
+src="default"
+[[bind]]
+tool='fzf'
+key='Tab / Shift-Tab'
+desc="Toggle mark + move (multi-select)"
+category="fzf"
+layer="Other"
+src="default"
+[[bind]]
+tool='fzf'
+key='C-/'
+desc="Toggle the preview window"
+category="fzf"
+layer="Other"
+src="default"
+[[bind]]
+tool='fzf'
+key='Shift-Up / Shift-Down'
+desc="Scroll the preview"
+category="fzf"
+layer="Other"
+src="default"
+[[bind]]
+tool='fzf'
+key='C-u / C-w'
+desc="Clear query / delete word"
+category="fzf"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# cava — the audio visualizer (media cockpit, beside tunes)
+# ===========================================================================
+[[bind]]
+tool='cava'
+key='Up / Down'
+desc="Raise / lower sensitivity"
+category="cava"
+layer="Other"
+src="default"
+[[bind]]
+tool='cava'
+key='Left / Right'
+desc="Fewer / more bars"
+category="cava"
+layer="Other"
+src="default"
+[[bind]]
+tool='cava'
+key='f / b'
+desc="Cycle foreground / background color"
+category="cava"
+layer="Other"
+src="default"
+[[bind]]
+tool='cava'
+key='r / c'
+desc="Reload config / reload colors"
+category="cava"
+layer="Other"
+src="default"
+[[bind]]
+tool='cava'
+key='q  (or C-c)'
+desc="Quit"
+category="cava"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# lazydocker — the dev-stack-obs container TUI (monitor-side cockpit)
+# ===========================================================================
+[[bind]]
+tool='lazydocker'
+key='Tab  /  [ ]'
+desc="Next panel / cycle panels"
+category="lazydocker"
+layer="Other"
+src="default"
+[[bind]]
+tool='lazydocker'
+key='j / k  (arrows)'
+desc="Navigate the list"
+category="lazydocker"
+layer="Other"
+src="default"
+[[bind]]
+tool='lazydocker'
+key='enter'
+desc="Focus panel / select"
+category="lazydocker"
+layer="Other"
+src="default"
+[[bind]]
+tool='lazydocker'
+key='x'
+desc="Open the keybindings menu"
+category="lazydocker"
+layer="Other"
+src="default"
+[[bind]]
+tool='lazydocker'
+key='d'
+desc="Remove container / image / volume"
+category="lazydocker"
+layer="Other"
+src="default"
+[[bind]]
+tool='lazydocker'
+key='s / r'
+desc="Stop / restart container"
+category="lazydocker"
+layer="Other"
+src="default"
+[[bind]]
+tool='lazydocker'
+key='a'
+desc="Attach to container"
+category="lazydocker"
+layer="Other"
+src="default"
+[[bind]]
+tool='lazydocker'
+key='q  (or C-c)'
+desc="Quit"
+category="lazydocker"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# atuin — magical shell history (C-r). In-TUI navigation below.
+# ===========================================================================
+[[bind]]
+tool='atuin'
+key='C-r'
+desc="Open history search (toggles filter mode in-TUI)"
+category="atuin"
+layer="Other"
+src="default"
+[[bind]]
+tool='atuin'
+key='Up / Down  (C-p / C-n)'
+desc="Navigate matches"
+category="atuin"
+layer="Other"
+src="default"
+[[bind]]
+tool='atuin'
+key='enter'
+desc="Run the selected command"
+category="atuin"
+layer="Other"
+src="default"
+[[bind]]
+tool='atuin'
+key='tab'
+desc="Edit selected at the prompt (do not run)"
+category="atuin"
+layer="Other"
+src="default"
+[[bind]]
+tool='atuin'
+key='esc / C-c'
+desc="Cancel"
+category="atuin"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# mpv — video player (local media / cinema)
+# ===========================================================================
+[[bind]]
+tool='mpv'
+key='Space  (or p)'
+desc="Pause / play"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key='Left / Right'
+desc="Seek -5s / +5s"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key='Down / Up'
+desc="Seek -1min / +1min"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key='f'
+desc="Toggle fullscreen"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key='9 / 0'
+desc="Volume down / up"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key='m'
+desc="Mute"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key='[ / ]'
+desc="Playback speed down / up"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key=', / .'
+desc="Step back / forward one frame"
+category="mpv"
+layer="Other"
+src="default"
+[[bind]]
+tool='mpv'
+key='q  (or Q)'
+desc="Quit (Q saves resume position)"
+category="mpv"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# obsidian — the research vault (GUI)
+# ===========================================================================
+[[bind]]
+tool='obsidian'
+key='Ctrl-O'
+desc="Quick switcher (open note)"
+category="obsidian"
+layer="Other"
+src="default"
+[[bind]]
+tool='obsidian'
+key='Ctrl-P'
+desc="Command palette"
+category="obsidian"
+layer="Other"
+src="default"
+[[bind]]
+tool='obsidian'
+key='Ctrl-Shift-F'
+desc="Search across the vault"
+category="obsidian"
+layer="Other"
+src="default"
+[[bind]]
+tool='obsidian'
+key='Ctrl-E'
+desc="Toggle edit / preview"
+category="obsidian"
+layer="Other"
+src="default"
+[[bind]]
+tool='obsidian'
+key='Ctrl-N'
+desc="New note"
+category="obsidian"
+layer="Other"
+src="default"
+[[bind]]
+tool='obsidian'
+key='Ctrl-G'
+desc="Graph view"
+category="obsidian"
+layer="Other"
+src="default"
+[[bind]]
+tool='obsidian'
+key='[['
+desc="Insert a wikilink"
+category="obsidian"
+layer="Other"
+src="default"
+[[bind]]
+tool='obsidian'
+key='Ctrl-Tab'
+desc="Next tab / pane"
+category="obsidian"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# firefox / zen — the browser (standard shortcuts)
+# ===========================================================================
+[[bind]]
+tool='firefox'
+key='Ctrl-T / Ctrl-W'
+desc="New / close tab"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='Ctrl-Tab / Ctrl-Shift-Tab'
+desc="Next / prev tab"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='Ctrl-Shift-T'
+desc="Reopen last closed tab"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='Ctrl-L  (Alt-D)'
+desc="Focus the address bar"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='Ctrl-R  (F5)'
+desc="Reload page"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='Ctrl-F  (/)'
+desc="Find on page / quick find"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='Ctrl-+ / Ctrl-- / Ctrl-0'
+desc="Zoom in / out / reset"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='Alt-Left / Alt-Right'
+desc="Back / forward"
+category="firefox / zen"
+layer="Other"
+src="default"
+[[bind]]
+tool='firefox'
+key='F11'
+desc="Toggle fullscreen"
+category="firefox / zen"
+layer="Other"
+src="default"
+
+# ===========================================================================
+# steam — the gaming client (mostly mouse/controller; the key default)
+# ===========================================================================
+[[bind]]
+tool='steam'
+key='Shift+Tab'
+desc="Toggle the in-game overlay"
+category="steam"
+layer="Other"
+src="default"
+
+# spotify_player — the explicit playback binds now SET in keymap.toml (validated):
+[[bind]]
+tool='spotify_player'
+key='space'
+desc="Play / pause (ResumePause)"
+category="Playback"
+layer="Other"
+[[bind]]
+tool='spotify_player'
+key='n / p'
+desc="Next / previous track"
+category="Playback"
+layer="Other"
+[[bind]]
+tool='spotify_player'
+key='C-s'
+desc="Toggle shuffle"
+category="Playback"
+layer="Other"
+[[bind]]
+tool='spotify_player'
+key='C-r'
+desc="Cycle repeat mode"
+category="Playback"
+layer="Other"
+[[bind]]
+tool='spotify_player'
+key='z'
+desc="Play a random track (PlayRandom)"
+category="Playback"
+layer="Other"
+
+# ===========================================================================
+# OBS Studio — the RECOMMENDED hotkey scheme. OBS owns its own hotkey store
+# (written when you save Settings → Hotkeys), so these are documented, not
+# auto-applied (auto-editing the Engine scene collection risks it + the Wave XLR
+# mic behaviour). Set them once in OBS → Settings → Hotkeys to match this map.
+# ===========================================================================
+[[bind]]
+tool='obs'
+key='F9'
+desc="Start / Stop Streaming"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='F10'
+desc="Start / Stop Recording"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='Shift+F10'
+desc="Pause / Resume Recording"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='F8'
+desc="Start / Stop Virtual Camera"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='F12'
+desc="Save Replay Buffer"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='F4'
+desc="Toggle Studio Mode"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='F2'
+desc="Transition (Studio Mode)"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='F7'
+desc="Mute / Unmute mic (Wave XLR)"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"
+[[bind]]
+tool='obs'
+key='1 … 6'
+desc="Switch to scene N"
+category="OBS · set in Settings → Hotkeys"
+layer="Other"

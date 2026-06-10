@@ -1,0 +1,58 @@
+# [ENGINE] platform — MangoHud overlay · tokens from system/tokens.toml
+#
+# Bottom-right corner, F12 toggle. Palette matches Waybar gaming tab:
+#   primary  (Royal Blue)    — engine accent + RAM/VRAM
+#   secondary (Sky Blue)     — GPU/CPU base stats
+#   tertiary (Golden Orange) — frametime spikes
+#   error    (Coral Red)     — alarm threshold
+#   fg       (Soft White)    — base text
+#   fg_muted (Weathered Sand) — secondary I/O / media labels
+#
+# Edit ~/.dotfiles/system/tokens.toml then `render-templates` — never edit
+# this file directly (the rendered .conf is overwritten on every render).
+
+legacy_layout=false
+position=bottom-right
+table_columns=3
+round_corners=8
+background_alpha=0.5
+font_size=20
+text_color={{color_raw.fg}}
+gpu_color={{color_raw.secondary}}
+cpu_color={{color_raw.secondary}}
+engine_color={{color_raw.primary}}
+frametime_color={{color_raw.tertiary}}
+vram_color={{color_raw.primary}}
+ram_color={{color_raw.primary}}
+io_color={{color_raw.fg_muted}}
+media_player_color={{color_raw.fg_muted}}
+
+fps
+fps_color_change
+fps_value=30,60,100
+fps_color={{color_raw.error}},{{color_raw.tertiary}},{{color_raw.secondary}}
+frametime=1
+frame_timing=1
+
+gpu_stats
+gpu_temp
+gpu_core_clock
+gpu_mem_clock
+gpu_power
+vram
+
+cpu_stats
+cpu_temp
+cpu_power
+core_load
+
+ram
+swap
+io_read
+io_write
+
+gamemode
+
+toggle_hud=F12
+toggle_logging=Shift_L+F2
+output_folder=/home/doodlebob/Documents/mangohud-logs

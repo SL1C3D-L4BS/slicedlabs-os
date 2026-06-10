@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """niri-autotile — dynamic "full → halves, endless" tiling for niri.
 
 The behaviour (Track 9.3, user-specified):

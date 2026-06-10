@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-supply-chain — L2 supply-chain trust gate (TOOLING-ARCHITECTURE §GAP1,
+# Canon §IV.10-11 "prove the binary matches the source"). Fast posture check (no
+# regen in the hot path): SBOM tooling present, SBOMs have been generated, the
+# engine's deny + reproducible-build discipline is in place, and the owned repo
+# carries a committed SBOM + signing CI. Deep scan = `sl-sbom --scan` (CI/periodic).
+set -uo pipefail
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+# (1) Tooling — SBOM, signing, vuln-scan.
+for t in syft cosign grype; do
+    command -v "$t" >/dev/null 2>&1 && ok "tool present: $t" || no "missing supply-chain tool: $t"
+done
+command -v sl-sbom >/dev/null 2>&1 && ok "generator present: sl-sbom" || no "sl-sbom not on PATH"
+
+# (2) SBOMs have been generated (non-empty) for each present owned repo.
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/sl-sbom"
+for entry in "slicedengine:tools/slicedengine" "ai:mind/ai" "surface:tools/surface"; do
+    name="${entry%%:*}"; [ -d "$HOME/SlicedLabs/${entry#*:}" ] || continue
+    f="$CACHE/$name.cdx.json"
+    if [ -s "$f" ] && python3 -c "import json,sys;sys.exit(0 if json.load(open('$f')).get('components') else 1)" 2>/dev/null; then
+        ok "SBOM generated: $name"
+    else
+        no "SBOM missing/empty for $name — run 'sl-sbom'"
+    fi
+done
+
+# (3) Engine supply-chain discipline (deny policy + reproducible build).
+ENG="$HOME/SlicedLabs/tools/slicedengine"
+[ -f "$ENG/deny.toml" ] && ok "engine cargo-deny policy present" || no "engine deny.toml missing"
+[ -f "$ENG/.github/workflows/reproducible-build.yml" ] && ok "engine reproducible-build CI present" \
+    || no "engine reproducible-build workflow missing"
+
+# (4) Owned repo (slicedlabs-ai) attestation posture.
+AI="$HOME/SlicedLabs/mind/ai"
+if [ -d "$AI" ]; then
+    [ -f "$AI/sbom.cdx.json" ] && ok "slicedlabs-ai committed SBOM present" || no "slicedlabs-ai sbom.cdx.json missing — run 'sl-sbom' + commit"
+    [ -f "$AI/.github/workflows/ci.yml" ] && ok "slicedlabs-ai CI (test + SBOM + cosign attest) present" \
+        || no "slicedlabs-ai CI workflow missing"
+fi
+
+echo
+if [ $rc -eq 0 ]; then echo "supply-chain: SBOMs generated · scan-ready · signing-ready ✓"
+else echo "supply-chain: GAPS above (deep scan: sl-sbom --scan)" >&2; fi
+exit $rc

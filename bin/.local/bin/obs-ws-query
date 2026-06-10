@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """obs-ws-query — one-shot OBS WebSocket v5 request.
 
 Usage:

@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
+"""sl-wallpaper — generative Liquid Retina brand wallpapers from tokens.toml.
+
+The glass shader refracts whatever the wallpaper is (engine-backdrop blurs it
+into ~/.cache/engine-backdrop.png), so the wallpaper IS part of the material.
+
+Usage:
+  sl-wallpaper                 # THE MARK — the SlicedLabs chevron mark, living
+                               # wheel gradients (default; ref brand-assets/logo/ref)
+  sl-wallpaper mark --tick     # advance the mark to the next gradient frame
+                               # (driven by sl-wallpaper-cycle.timer — the
+                               # chevrons change colour all the time)
+  sl-wallpaper mark --build-cycle  # (re)render the frame cache
+  sl-wallpaper liquid          # the liquid-retina gradient-field wallpaper
+  sl-wallpaper <hue>           # a monochrome identity/family mood (coding,
+                               # research, lavender, jade …) — generated live
+  sl-wallpaper --list          # available hues
+  sl-wallpaper --random        # random identity mood
+
+Mark path: an owned vector redraw of the mark (two interlocked chevrons) on
+the deep warm base; each chevron wears a 3-stop gradient sampled from the v3
+wheel (identities + families sorted by OKLCH hue). The cycle pre-renders
+FRAMES hue-rotations into ~/.cache/sl-wallpaper-mark/ and --tick steps through
+them (awww transitions morph each step; engine-backdrop re-feeds the glass).
+"""
+from __future__ import annotations
+
+import os
+import random
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import color  # noqa: E402 — local OKLCH→sRGB lib alongside this script
+
+ROOT = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
+TOKENS = ROOT / "system/tokens.toml"
+WALLS = ROOT / "system/wallpapers"
+MARK_CACHE = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "sl-wallpaper-mark"
+MARK_FRAMES = 16  # one full wheel revolution = FRAMES ticks (~16 min at 1/min)
+
+IDENTITIES = ("coding", "research", "engine", "browser",
+              "monitoring", "streaming", "gaming", "media")
+
+
+def hues() -> dict[str, str]:
+    t = tomllib.load(TOKENS.open("rb"))
+    out: dict[str, str] = {}
+    for name in IDENTITIES:
+        h = color.to_hex(t["color"][name])
+        if h:
+            out[name] = h
+    for name, v in t.get("family", {}).items():
+        h = color.to_hex(v)
+        if h:
+            out[name] = h
+    return out
+
+
+def mood_svg(name: str, anchor_hex: str, base: str, white: str) -> str:
+    """A monochrome Liquid Retina mood: the hue's ramp breathing on the base."""
+    r = color.ramp_for_hex(anchor_hex)
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">
+  <defs>
+    <radialGradient id="a" cx="20%" cy="16%" r="68%">
+      <stop offset="0%" stop-color="{r['800']}" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="{r['800']}" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="b" cx="84%" cy="86%" r="64%">
+      <stop offset="0%" stop-color="{r['900']}" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="{r['900']}" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="c" cx="55%" cy="48%" r="50%">
+      <stop offset="0%" stop-color="{r['700']}" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="{r['700']}" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="slice" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="{r['600']}" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="{r['500']}" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="{white}" stop-opacity="0.04"/>
+      <stop offset="45%" stop-color="{white}" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="3840" height="2160" fill="{base}"/>
+  <rect width="3840" height="2160" fill="url(#a)"/>
+  <rect width="3840" height="2160" fill="url(#b)"/>
+  <rect width="3840" height="2160" fill="url(#c)"/>
+  <g transform="rotate(-24 1920 1080)">
+    <rect x="-400" y="640" width="4800" height="280" fill="url(#slice)"/>
+    <rect x="-400" y="1010" width="4800" height="150" fill="url(#slice)" opacity="0.75"/>
+  </g>
+  <rect width="3840" height="2160" fill="url(#sheen)"/>
+</svg>
+"""
+
+
+def wheel_ring(table: dict[str, str]) -> list[str]:
+    """Identity + family hexes sorted by OKLCH hue — the gradient ring."""
+    return sorted(table.values(), key=lambda h: color.hex_to_oklch(h)[2])
+
+
+def mark_svg(top: list[str], bot: list[str], base: str, glow: str) -> str:
+    """The SlicedLabs mark — an owned vector redraw of the two interlocked
+    chevrons (ref: system/brand-assets/logo/ref/slicedlabs-mark.png) on the
+    deep warm base. Each chevron wears a 3-stop gradient along its run; a
+    faint leading-hue glow gives the glass something to lens."""
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">
+  <defs>
+    <linearGradient id="top" x1="172" y1="98" x2="300" y2="254" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="{top[0]}"/>
+      <stop offset="50%" stop-color="{top[1]}"/>
+      <stop offset="100%" stop-color="{top[2]}"/>
+    </linearGradient>
+    <linearGradient id="bot" x1="291" y1="230" x2="163" y2="386" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="{bot[0]}"/>
+      <stop offset="50%" stop-color="{bot[1]}"/>
+      <stop offset="100%" stop-color="{bot[2]}"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="42%">
+      <stop offset="0%" stop-color="{glow}" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="{glow}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="3840" height="2160" fill="{base}"/>
+  <rect width="3840" height="2160" fill="url(#halo)"/>
+  <!-- mark: viewBox-460 geometry scaled to ~46% of the canvas height, centered -->
+  <g transform="translate(1920 1080) scale(2.9) translate(-231 -242)">
+    <polyline points="300,98 172,176 300,254" fill="none" stroke="url(#top)" stroke-width="46"/>
+    <polyline points="163,230 291,308 163,386" fill="none" stroke="url(#bot)" stroke-width="46"/>
+  </g>
+</svg>
+"""
+
+
+def build_mark_cycle(table: dict[str, str], base: str) -> list[Path]:
+    """Pre-render MARK_FRAMES hue-rotations of the mark into MARK_CACHE."""
+    ring = wheel_ring(table)
+    n = len(ring)
+    MARK_CACHE.mkdir(parents=True, exist_ok=True)
+    frames: list[Path] = []
+    for i in range(MARK_FRAMES):
+        # the ring walks under the chevrons; bottom samples the far side of
+        # the wheel so the two blades always converse, never match
+        idx = round(i * n / MARK_FRAMES)
+        top = [ring[(idx + k) % n] for k in range(3)]
+        bot = [ring[(idx + n // 2 + k) % n] for k in range(3)]
+        png = MARK_CACHE / f"frame-{i:02d}.png"
+        with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
+            f.write(mark_svg(top, bot, base, top[1]))
+            tmp = Path(f.name)
+        try:
+            rasterize(tmp, png)
+        finally:
+            tmp.unlink(missing_ok=True)
+        frames.append(png)
+        print(f"sl-wallpaper: mark frame {i + 1}/{MARK_FRAMES}")
+    return frames
+
+
+def mark_tick(table: dict[str, str], base: str, advance: bool) -> int:
+    """Set the mark wallpaper; --tick advances to the next cached frame."""
+    state = MARK_CACHE / "index"
+    frames = sorted(MARK_CACHE.glob("frame-*.png"))
+    if len(frames) != MARK_FRAMES:
+        frames = build_mark_cycle(table, base)
+    idx = 0
+    if advance:
+        try:
+            idx = (int(state.read_text().strip()) + 1) % len(frames)
+        except (OSError, ValueError):
+            idx = 0
+    set_wall(frames[idx])
+    state.write_text(str(idx))
+    print(f"sl-wallpaper: mark frame {idx + 1}/{len(frames)} set")
+    return 0
+
+
+def rasterize(svg: Path, png: Path) -> None:
+    subprocess.run(
+        ["inkscape", str(svg), "--export-type=png",
+         f"--export-filename={png}", "--export-width=3840"],
+        check=True, capture_output=True,
+    )
+
+
+def set_wall(png: Path) -> None:
+    subprocess.run(["engine-wallpaper", str(png)], check=True)
+
+
+def main(argv: list[str]) -> int:
+    table = hues()
+    arg = argv[0] if argv else ""
+
+    if arg in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    if arg == "--list":
+        for n, h in table.items():
+            print(f"{n:<11} {h}")
+        return 0
+    if arg == "--random":
+        arg = random.choice(IDENTITIES)
+        print(f"sl-wallpaper: mood roll → {arg}")
+
+    t = tomllib.load(TOKENS.open("rb"))
+    base = color.to_hex(t["color"]["warm_shadow"]) or "#1A1612"
+    mark_base = color.to_hex(t["color"]["bg"]) or "#1E1E1E"  # dark grey field
+
+    if not arg or arg == "mark":
+        # THE MARK (default) — the chevron mark with living wheel gradients
+        if "--build-cycle" in argv:
+            build_mark_cycle(table, mark_base)
+            return 0
+        return mark_tick(table, mark_base, advance="--tick" in argv)
+
+    if arg in ("liquid", "liquid-retina"):
+        # the liquid-retina gradient field through the existing cascade
+        subprocess.run(["render-templates"], check=True, capture_output=True)
+        svg = WALLS / "templates/liquid-retina.svg"
+        png = WALLS / "liquid-retina.png"
+        if not png.is_file() or png.stat().st_mtime < svg.stat().st_mtime:
+            rasterize(svg, png)
+        set_wall(png)
+        print(f"sl-wallpaper: set {png.name}")
+        return 0
+
+    if arg not in table:
+        print(f"sl-wallpaper: unknown hue '{arg}' (see --list)", file=sys.stderr)
+        return 2
+
+    white = color.to_hex(t["ansi_bright"]["bright_white"]) or "#FFFFFF"
+    png = WALLS / f"liquid-{arg}.png"
+    with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
+        f.write(mood_svg(arg, table[arg], base, white))
+        tmp = Path(f.name)
+    try:
+        rasterize(tmp, png)
+    finally:
+        tmp.unlink(missing_ok=True)
+    set_wall(png)
+    print(f"sl-wallpaper: set {png.name} ({table[arg]})")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

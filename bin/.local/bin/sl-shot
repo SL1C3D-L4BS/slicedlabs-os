@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-shot — showcase screenshot composer (Liquid Retina v3). Captures via grim,
+# rounds the corners, floats it on a ramp-gradient brand frame with a soft
+# shadow + caption, and writes ~/Pictures/showcase/. Built for unixporn-grade
+# showcase shots and the public body/os README.
+#
+# Usage:
+#   sl-shot                      # region pick (slurp)
+#   sl-shot --output             # the focused output, whole screen
+#   sl-shot --window             # the focused niri window
+#   sl-shot ... --caption "txt"  # caption (default: SlicedLabs · <date>)
+#   sl-shot ... --hue coding     # frame gradient hue (default: primary)
+set -euo pipefail
+
+MODE="region"
+CAPTION=""
+HUE="primary"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output) MODE="output" ;;
+        --window) MODE="window" ;;
+        --caption) CAPTION="${2:-}"; shift ;;
+        --hue) HUE="${2:-primary}"; shift ;;
+        -h|--help) sed -n '3,14p' "$0"; exit 0 ;;
+        *) echo "sl-shot: unknown arg '$1'" >&2; exit 2 ;;
+    esac
+    shift
+done
+
+OUT_DIR="$HOME/Pictures/showcase"
+mkdir -p "$OUT_DIR"
+TS="$(date +%Y%m%d-%H%M%S)"
+OUT="$OUT_DIR/$TS-$MODE.png"
+RAW="$(mktemp --suffix=.png)"
+trap 'rm -f "$RAW"' EXIT
+
+case "$MODE" in
+    region) grim -g "$(slurp)" "$RAW" ;;
+    output) grim "$RAW" ;;
+    window)
+        geo="$(niri msg --json focused-window | python3 -c '
+import json, sys
+w = json.load(sys.stdin)
+x, y = w["layout"]["window_offset_in_tile"]
+# niri reports tile pos within the workspace; grim wants absolute logical px.
+# fall back to slurp if the math is unavailable.
+print("")' 2>/dev/null || true)"
+        if [ -n "$geo" ]; then grim -g "$geo" "$RAW"; else grim -g "$(slurp -o)" "$RAW"; fi ;;
+esac
+
+# brand colours from the token SSOT (ramp gradient ends + caption ink)
+read -r C1 C2 INK < <(python3 - "$HUE" <<'EOF'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path.home() / ".dotfiles/bin/.local/bin/lib"))
+import tomllib, color
+t = tomllib.load(open(Path.home() / ".dotfiles/system/tokens.toml", "rb"))
+hue = sys.argv[1]
+src = t.get("family", {}).get(hue) or t["color"].get(hue) or t["color"]["primary"]
+r = color.ramp_for_hex(color.to_hex(src))
+ink = color.to_hex(t["color"]["fg_muted"])
+print(r["900"], r["700"], ink)
+EOF
+)
+
+CAPTION="${CAPTION:-SlicedLabs · $(date +%Y-%m-%d)}"
+FONT="$(fc-match -f '%{file}' 'Geist Mono:weight=medium' 2>/dev/null || true)"
+W="$(magick identify -format %w "$RAW")"
+H="$(magick identify -format %h "$RAW")"
+PAD=96
+R=28
+
+# round the shot, float it with a soft shadow on the ramp gradient, caption it
+magick "$RAW" \
+    \( +clone -alpha extract \
+       -fill white -colorize 100 -fill black \
+       -draw "roundrectangle 0,0,$((W-1)),$((H-1)),$R,$R" -negate \) \
+    -alpha off -compose CopyOpacity -composite \
+    \( +clone -background black -shadow 55x22+0+16 \) +swap \
+    -background none -layers merge +repage \
+    -bordercolor none \
+    \( -size "$((W + PAD * 2))x$((H + PAD * 2 + 56))" "gradient:$C1-$C2" \) +swap \
+    -gravity north -geometry "+0+$PAD" -composite \
+    ${FONT:+-font "$FONT"} -pointsize 26 -fill "$INK" \
+    -gravity southeast -annotate "+36+22" "$CAPTION" \
+    "$OUT"
+
+echo "sl-shot: $OUT"
+command -v notify-send >/dev/null && notify-send "sl-shot" "$OUT" || true

@@ -1,0 +1,70 @@
+-- [ENGINE] Neovim palette — generated from ~/.dotfiles/system/tokens.toml
+-- via render-templates. DO NOT EDIT THE RENDERED FILE; edit tokens.toml.
+--
+-- A flat Lua table the engine.lua colorscheme reads. Keys mirror the
+-- semantic names in [color] / [color_raw] / [ansi] so Neovim stays in
+-- lockstep with the rest of the workstation.
+
+return {
+  -- Base layers
+  bg          = "{{color.bg}}",
+  bg_alt      = "{{color.bg_alt}}",
+  fg          = "{{color.fg}}",
+  fg_muted    = "{{color.fg_muted}}",
+
+  -- Global accent + status triad (status ≠ identity)
+  primary     = "{{color.primary}}",      -- Royal Blue — global accent
+  secondary   = "{{color.secondary}}",    -- Sky Blue — info
+  tertiary    = "{{color.tertiary}}",     -- Golden Orange — signal
+  error       = "{{color.error}}",        -- Coral Red — danger
+  success     = "{{color.success}}",      -- Lime Green — success
+
+  -- Workspace identities (Liquid Retina v3 wheel) — chrome accents
+  coding      = "{{color.coding}}",
+  research    = "{{color.research}}",
+  engine      = "{{color.engine}}",
+  browser     = "{{color.browser}}",
+  monitoring  = "{{color.monitoring}}",
+  streaming   = "{{color.streaming}}",
+  gaming      = "{{color.gaming}}",
+  media       = "{{color.media}}",
+
+  -- Family accents (v3 half-spokes)
+  lavender    = "{{family.lavender}}",
+  orchid      = "{{family.orchid}}",
+  jade        = "{{family.jade}}",
+  lime        = "{{family.lime}}",
+  tangerine   = "{{family.tangerine}}",
+  gold        = "{{family.gold}}",
+
+  -- Primary tonal ramp (v3) — chrome depth tiers
+  primary_300 = "{{ramp.primary_300}}",
+  primary_400 = "{{ramp.primary_400}}",
+  primary_600 = "{{ramp.primary_600}}",
+  primary_700 = "{{ramp.primary_700}}",
+  primary_800 = "{{ramp.primary_800}}",
+  primary_900 = "{{ramp.primary_900}}",
+
+  -- Surface modifiers
+  selection   = "{{color.selection}}",
+  inactive    = "{{color.inactive}}",
+  warm_shadow = "{{color.warm_shadow}}",
+
+  -- Extended palette
+  mist        = "{{color.mist}}",
+  sand        = "{{color.sand}}",
+  earth       = "{{color.earth}}",
+  wisteria    = "{{color.wisteria}}",
+  honey       = "{{color.honey}}",
+  brick       = "{{color.brick}}",
+
+  -- ANSI (terminal-style)
+  ansi_black   = "{{ansi.black}}",
+  ansi_red     = "{{ansi.red}}",
+  ansi_green   = "{{ansi.green}}",
+  ansi_yellow  = "{{ansi.yellow}}",
+  ansi_blue    = "{{ansi.blue}}",
+  ansi_magenta = "{{ansi.magenta}}",
+  ansi_cyan    = "{{ansi.cyan}}",
+  ansi_white   = "{{ansi.white}}",
+}

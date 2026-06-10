@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-studio — the teaching-studio gate (P4). Assert the studio is wired end-to-end:
+# the deck layout, the lesson pipeline, OBS control + obs-websocket, the brand overlays, and
+# the asset toolchain. Static (does not launch OBS). Into verify-all + verify-canon.
+set -uo pipefail
+DOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+REG="$HOME/.config/sliced-engine/workspaces.toml"
+LAYOUTS="$DOT/zellij/.config/zellij/layouts"
+OBSCFG="$HOME/.config/obs-studio/plugin_config/obs-websocket/config.json"
+rc=0
+ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no() { rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+# 1) the studio deck (source .tmpl + the 6 lesson tabs)
+[ -f "$LAYOUTS/studio.kdl.tmpl" ] && ok "studio deck template present" || no "studio.kdl.tmpl missing"
+tabs=$(grep -cE 'tab name=' "$LAYOUTS/studio.kdl.tmpl" 2>/dev/null || echo 0)
+[ "${tabs:-0}" -ge 6 ] && ok "studio deck has the lesson tabs ($tabs)" || no "studio deck thin ($tabs tabs)"
+for t in script animate slides demo broadcast assets; do
+    grep -q "tab name=\"$t\"" "$LAYOUTS/studio.kdl.tmpl" 2>/dev/null && ok "studio tab: $t" || no "studio tab missing: $t"
+done
+
+# 2) the streaming/WS6 slot is the lesson-scoped studio
+ps=$(python3 -c "import tomllib;w=tomllib.load(open('$REG','rb'))['workspaces'].get('streaming',{});print(1 if w.get('project_scoped') and w.get('default_project') else 0)" 2>/dev/null || echo 0)
+[ "$ps" = "1" ] && ok "streaming ws is lesson-scoped (project_scoped + default_project)" || no "streaming ws not project-scoped"
+
+# 3) the owned studio tools
+for t in sl-teach sl-obs render-obs teleprompter obs-ws-query; do
+    command -v "$t" >/dev/null 2>&1 && ok "tool on PATH: $t" || no "tool missing: $t"
+done
+for sub in new render chapters; do
+    grep -qE "^[[:space:]]*$sub\)" "$(command -v sl-teach)" 2>/dev/null && ok "sl-teach $sub" || no "sl-teach missing '$sub'"
+done
+
+# 4) OBS control is reachable in principle — obs-websocket enabled in the profile
+if [ -f "$OBSCFG" ]; then
+    en=$(python3 -c "import json;print(json.load(open('$OBSCFG')).get('server_enabled'))" 2>/dev/null || echo None)
+    [ "$en" = "True" ] && ok "obs-websocket enabled (server_enabled)" || no "obs-websocket present but not enabled"
+else
+    no "obs-websocket config missing (Tools ▸ WebSocket Server Settings ▸ Enable)"
+fi
+
+# 5) the asset toolchain (all four teaching formats)
+for tool in manim typst vhs; do command -v "$tool" >/dev/null 2>&1 && ok "asset tool: $tool" || no "asset tool missing: $tool"; done
+
+echo
+if [ $rc -eq 0 ]; then echo "studio: deck + lesson pipeline + OBS control + overlays + toolchain ✓"
+else echo "studio: gaps above" >&2; fi
+exit $rc

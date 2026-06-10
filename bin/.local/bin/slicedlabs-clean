@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # slicedlabs-clean — reclaim safe, regenerable caches. DRY-RUN by default; pass --apply
 # to execute. The default (SAFE) tier touches only caches that regenerate on demand —
 # nothing forces a rebuild or a re-pull you'll feel. The --heavy tier (opt-in) adds
@@ -31,7 +32,7 @@ clean_dirs(){ # <label> <dir...>
     ((${#present[@]})) || { printf '  %s· %-26s nothing%s\n' "$d" "$label" "$r"; return; }
     local size; size=$(du1 "${present[@]}")
     if ((APPLY)); then
-        for x in "${present[@]}"; do rm -rf -- "$x"/* "$x"/.[!.]* 2>/dev/null || true; done
+        for x in "${present[@]}"; do rm -rf -- "${x:?}"/* "${x:?}"/.[!.]* 2>/dev/null || true; done
         printf '  %s✓ %-26s reclaimed ~%s%s\n' "$g" "$label" "$size" "$r"
     else
         printf '  • %-26s ~%s\n' "$label" "$size"
@@ -92,8 +93,8 @@ clean_dirs "stale zellij sessions" "$HOME/.cache/zellij/contract_version_1/sessi
 
 if ((HEAVY)); then
     hdr "HEAVY tier — forces rebuilds / re-pulls (opt-in)"
-    clean_cmd  "engine target (cargo)" "$HOME/Projects/engine/target" \
-        bash -c 'cd "$HOME/Projects/engine" && cargo clean'
+    clean_cmd  "engine target (cargo)" "$HOME/SlicedLabs/tools/slicedengine/target" \
+        bash -c 'cd "$HOME/SlicedLabs/tools/slicedengine" && cargo clean'
     clean_cmd  "podman prune -a"   -  podman system prune -a --volumes -f
     clean_dirs "playwright browsers" "$HOME/.cache/ms-playwright"
     clean_dirs "puppeteer browsers"  "$HOME/.cache/puppeteer"

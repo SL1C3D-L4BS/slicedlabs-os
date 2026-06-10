@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-audit — code-audit console for the research `audit` pane: a quick repo snapshot, then a
+# shell primed with the review / static-analysis tools you actually have installed.
+#
+#   sl-audit          recent log + diffstat snapshot, then a shell with audit-command hints
+#
+# Surfaces when present: delta · ripgrep · semgrep · ruff · cargo clippy · gitleaks.
+# Grounding: "Working Effectively with Legacy Code" — read before you change. Never dies.
+set -uo pipefail
+shell="${SHELL:-/usr/bin/fish}"
+have() { command -v "$1" >/dev/null 2>&1; }
+
+case "${1:-}" in -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;; esac
+
+printf '⏿ sl-audit — code review & static analysis\n'
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -c color.ui=always log --oneline -10 2>/dev/null
+  echo '   ─'
+  git -c color.ui=always diff --stat 2>/dev/null | tail -n 20
+  echo '   ─'
+else
+  echo '   (not a git repo)'
+fi
+echo '   review : git diff | delta  ·  git add -p  ·  git diff --staged | delta'
+have rg       && echo '   search : rg -n <pat>  ·  rg --stats <pat>'
+have semgrep  && echo '   sast   : semgrep scan --config auto'
+have ruff     && echo '   python : ruff check .  ·  ruff format --diff .'
+have cargo    && echo '   rust   : cargo clippy --all-targets  ·  cargo fmt --check'
+have gitleaks && echo '   secrets: gitleaks detect --no-banner'
+exec "$shell"

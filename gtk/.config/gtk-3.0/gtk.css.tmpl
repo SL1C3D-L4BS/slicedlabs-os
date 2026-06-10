@@ -1,0 +1,54 @@
+/* [ENGINE] platform — GTK 3 accent overrides · tokens from system/tokens.toml
+ *
+ * Adwaita-dark remains the base shell theme (settings.ini); this CSS overrides
+ * accent + surface colors so GTK 3 apps (Nautilus, Inkscape, …) honor the
+ * nature palette. Library-level @define-color tokens are recognized by GTK 3
+ * widgets directly. */
+
+@define-color accent_color           {{color.primary}};
+@define-color accent_bg_color        {{color.primary}};
+@define-color accent_fg_color        {{color.fg}};
+
+@define-color window_bg_color        {{color.bg}};
+@define-color window_fg_color        {{color.fg}};
+@define-color view_bg_color          {{color.bg_alt}};
+@define-color view_fg_color          {{color.fg}};
+@define-color headerbar_bg_color     {{color.bg_alt}};
+@define-color headerbar_fg_color     {{color.fg}};
+
+@define-color destructive_color      {{color.error}};
+@define-color destructive_bg_color   {{color.error}};
+@define-color destructive_fg_color   {{color.fg}};
+
+@define-color success_color          {{color.success}};
+@define-color success_bg_color       {{color.success}};
+@define-color success_fg_color       {{color.bg}};
+
+@define-color warning_color          {{color.tertiary}};
+@define-color warning_bg_color       {{color.tertiary}};
+@define-color warning_fg_color       {{color.bg}};
+
+@define-color error_color            {{color.error}};
+@define-color error_bg_color         {{color.error}};
+@define-color error_fg_color         {{color.fg}};
+
+@define-color card_bg_color          {{color.bg_alt}};
+@define-color card_fg_color          {{color.fg}};
+@define-color popover_bg_color       {{color.bg_alt}};
+@define-color popover_fg_color       {{color.fg}};
+
+/* Selection / focus */
+@define-color theme_selected_bg_color  {{color.selection}};
+@define-color theme_selected_fg_color  {{color.fg}};
+
+/* Liquid Retina v3 — dialog/shade/scrollbar roles + ramp selection tier */
+@define-color dialog_bg_color          {{color.bg_alt}};
+@define-color dialog_fg_color          {{color.fg}};
+@define-color thumbnail_bg_color       {{color.bg_alt_light}};
+@define-color thumbnail_fg_color       {{color.fg}};
+@define-color shade_color              {{color_css.overlay_dim}};
+@define-color scrollbar_outline_color  {{semantic.border_tertiary}};
+
+selection { background-color: {{ramp.primary_600}}; color: {{color.fg}}; }
+*:link { color: {{color.secondary}}; }
+*:link:visited { color: {{color.wisteria}}; }

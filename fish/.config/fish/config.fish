@@ -12,14 +12,14 @@ end
 
 set -gx EDITOR nvim
 set -gx VISUAL nvim
-set -g fish_greeting
+# greeting = functions/fish_greeting.fish (branded fastfetch, once per session)
 
 fish_add_path $HOME/.cargo/bin
 fish_add_path $HOME/.local/bin
 fish_add_path $HOME/.bun/bin
-fish_add_path $HOME/go/bin
-fish_add_path $HOME/tools/FlameGraph
-fish_add_path $HOME/tools/osxcross/target/bin
+fish_add_path $HOME/SlicedLabs/vendor/go/bin
+fish_add_path $HOME/SlicedLabs/vendor/FlameGraph
+fish_add_path $HOME/SlicedLabs/vendor/osxcross/target/bin
 
 # Auto-start Niri on TTY1 login — no display manager (spec XVIII.2).
 # niri-session re-execs itself through the login shell, which re-sources this

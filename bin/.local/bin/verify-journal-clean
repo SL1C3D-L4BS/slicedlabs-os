@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-journal-clean — boot+runtime log-cleanliness gate (P6; Canon "no broken windows").
+# The OWNED surface (quickshell · niri · the Cockpit · our services + sl-*/render-*/verify-*
+# tools) must contribute ZERO warnings to THIS boot's journal, AND every remaining warning
+# must be attributable to an identifier in system/journal-allowlist.txt. A NEW owned warning
+# OR any unaccounted (non-owned, non-allowlisted) source fails here — the whole-journal
+# "0 unaccounted" invariant, enforced rather than merely triaged.
+set -uo pipefail
+DOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+ALLOW="${SL_JOURNAL_ALLOWLIST:-$DOT/system/journal-allowlist.txt}"
+
+python3 - "$ALLOW" <<'PY'
+import sys, json, re, subprocess, collections
+
+allow = set()
+try:
+    for ln in open(sys.argv[1]):
+        ln = ln.strip()
+        if ln and not ln.startswith("#"):
+            allow.add(ln)
+except OSError:
+    pass
+
+OWNED = re.compile(
+    r"quickshell|niri|cockpit|warden|slicedlabs|render-|^verify-|ghostty|zellij|^mako$|uair|^sl-|^qs$",
+    re.I,
+)
+
+def warnings():
+    c = collections.Counter()
+    for args in (
+        ["journalctl", "-b", "-p", "warning", "-o", "json", "--no-pager"],
+        ["journalctl", "--user", "-b", "-p", "warning", "-o", "json", "--no-pager"],
+    ):
+        try:
+            out = subprocess.run(args, capture_output=True, text=True, timeout=30).stdout
+        except Exception:
+            continue
+        for l in out.splitlines():
+            try:
+                e = json.loads(l)
+            except Exception:
+                continue
+            ident = e.get("SYSLOG_IDENTIFIER") or e.get("_COMM")
+            if not ident:
+                # Identifier-less lines: attribute the known rootless-libvirt pidfile race
+                # (virtnetworkd/virtqemud socket-activation lock contention) to its daemon —
+                # already allowlisted — so a benign, otherwise-unattributable line is not
+                # surfaced as "unlisted". Anything else stays "?" (still triaged).
+                msg = e.get("MESSAGE", "")
+                if isinstance(msg, list):
+                    msg = bytes(msg).decode("utf-8", "replace")
+                mm = re.search(r"/run/user/\d+/libvirt/(virt\w+)\.pid", msg)
+                ident = mm.group(1) if mm else "?"
+            c[ident] += 1
+    return c
+
+G, R, Y, N = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
+c = warnings()
+owned = {k: v for k, v in c.items() if OWNED.search(k or "")}
+allowed = {k: v for k, v in c.items() if not OWNED.search(k or "") and k in allow}
+unknown = {k: v for k, v in c.items() if not OWNED.search(k or "") and k not in allow}
+
+rc = 0
+if owned:
+    rc = 1
+    for k, v in sorted(owned.items(), key=lambda x: -x[1]):
+        print(f"  {R}✗{N} OWNED warning source: {k} ({v}) — fix at source, never allowlist", file=sys.stderr)
+else:
+    print(f"  {G}✓{N} owned surface SILENT — 0 warnings (quickshell · niri · Cockpit · our tools)")
+
+print(f"  {G}✓{N} {sum(allowed.values())} third-party warning(s) · {len(allowed)} allowlisted source(s)")
+if unknown:
+    rc = 1
+    for k, v in sorted(unknown.items(), key=lambda x: -x[1]):
+        print(f"  {R}✗{N} UNACCOUNTED source: {k} ({v}) — fix at source or justify in journal-allowlist.txt",
+              file=sys.stderr)
+
+print()
+if rc == 0:
+    print("journal: whole-journal clean — owned silent ✓, every warning accounted ✓")
+else:
+    print("journal: UNCLEAN — owned and/or unaccounted warnings above", file=sys.stderr)
+sys.exit(rc)
+PY

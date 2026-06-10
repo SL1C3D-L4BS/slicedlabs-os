@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# verify-paths — Canon §VIII (one body · one language at system scale). Assert no
+# owned file references a legacy/foreign code root: every product lives under the
+# ~/SlicedLabs/ umbrella (mind·body·tools·studio·vendor·lab) and the platform stays
+# at ~/.dotfiles. Legacy roots (~/Projects ~/Code ~/tools ~/go ~/Resources
+# ~/discord-mcp) must not appear in owned config/scripts/docs. Lone allowed
+# exception: the per-host mac-air engine fallback (~/Code/engine). Historical
+# records under system/archive/ are exempt (faithful snapshots, not live refs).
+set -uo pipefail
+DOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+# (1) no legacy-root references in owned files
+hits=$(grep -rnIE '(\$HOME|~|/home/[a-z]+)/(Projects|Code|tools|go|Resources|discord-mcp)([/"} .]|$)' "$DOT" 2>/dev/null \
+  | grep -vE '/\.git/|/SlicedLabs/|Code/engine|/system/archive/|/node_modules/|/\.venv/|/verify-paths:|/slicedlabs-team/' || true)
+if [ -z "$hits" ]; then ok "no legacy-root references in owned files (~/SlicedLabs is the one root)"
+else no "legacy-root references remain ($(printf '%s\n' "$hits" | wc -l)):"; printf '%s\n' "$hits" | sed 's|^|      |' | head -20 >&2; fi
+
+# (2) the umbrella ontology exists
+for d in mind tools studio vendor lab; do
+  [ -d "$HOME/SlicedLabs/$d" ] && ok "umbrella domain present: $d" || no "umbrella domain missing: $d"
+done
+
+# (3) products resolved into the umbrella (not stranded in old roots)
+for p in tools/slicedengine mind/ai tools/surface tools/discord; do
+  [ -d "$HOME/SlicedLabs/$p" ] && ok "product in place: ${p}" || no "product missing: ${p}"
+done
+
+echo
+if [ $rc -eq 0 ]; then echo "paths: one body — every owned reference lives under ~/SlicedLabs ✓"
+else echo "paths: legacy/foreign roots above" >&2; fi
+exit $rc

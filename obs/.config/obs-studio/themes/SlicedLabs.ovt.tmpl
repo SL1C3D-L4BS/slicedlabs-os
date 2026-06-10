@@ -1,0 +1,44 @@
+/* SlicedLabs · body · © 2026 SlicedLabs
+ * OBS Studio variant theme (.ovt, OBS 30.2+) — Liquid Retina v3, rendered
+ * from system/tokens.toml. Extends the stock Yami base; unknown/missing vars
+ * fall back to Yami gracefully, so this stays a safe overlay. */
+
+@OBSThemeMeta {
+    name: 'SlicedLabs Liquid';
+    id: 'com.slicedlabs.liquid';
+    extends: 'com.obsproject.Yami';
+    author: 'SlicedLabs';
+    dark: 'true';
+}
+
+@OBSThemeVars {
+    /* base surfaces */
+    --bg_window: {{color.bg}};
+    --bg_base: {{color.bg_alt}};
+    --bg_preview: {{color.warm_shadow}};
+
+    /* text tiers */
+    --text: {{color.fg}};
+    --text_light: {{ansi_bright.bright_white}};
+    --text_muted: {{color.fg_muted}};
+    --text_disabled: {{semantic.text_tertiary}};
+    --text_inactive: {{color.fg_muted}};
+
+    /* accent ramp — the primary family rides the v3 tonal ramp */
+    --primary: {{color.primary}};
+    --primary_light: {{ramp.primary_400}};
+    --primary_lighter: {{ramp.primary_300}};
+    --primary_dark: {{ramp.primary_600}};
+    --primary_darker: {{ramp.primary_700}};
+
+    /* status */
+    --warning: {{color.tertiary}};
+    --danger: {{color.error}};
+
+    /* chrome */
+    --border_color: {{semantic.border_tertiary}};
+    --highlight_color: {{color.primary}};
+    --input_bg: {{color.bg_alt}};
+    --button_bg: {{color.bg_alt_light}};
+    --list_item_bg_selected: {{color.selection}};
+}

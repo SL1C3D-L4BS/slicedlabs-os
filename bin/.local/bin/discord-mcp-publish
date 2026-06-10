@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# discord-mcp-publish — one-shot helper to push ~/discord-mcp/ to a private
+# discord-mcp-publish — one-shot helper to push ~/SlicedLabs/tools/discord/ to a private
 # SL1C3D-L4BS/discord-mcp repo. Run *after* you've authenticated `gh`:
 #   gh auth login   (web flow, GitHub.com, HTTPS)
 #

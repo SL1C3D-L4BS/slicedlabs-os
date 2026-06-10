@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # workspace-gaming-action — context-sensitive Mod+G handler.
 #
 # From the gaming workspace: opens the gaming actions Wofi menu.

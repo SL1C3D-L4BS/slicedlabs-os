@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-project — the project context manager for project-scoped cockpits.
+#
+# A workspace is meaningless without a project. This binds each project-scoped
+# workspace (coding · engine · research · studio) to a concrete project — existing or
+# scaffolded new — so the whole cockpit (every deck/pane) attaches to it (cwd → the
+# `sl-*` tools detect Cargo.toml/pyproject/git from there). The binding is per-ws state
+# read by `lib/scene.sh`; `.slproject` carries each project's type/hue/services.
+#
+#   sl-project list                     name⟶type⟶path for every project (mind/tools/studio/lab)
+#   sl-project new <name> [--type T]    scaffold dir + git init + .slproject (T: rust|
+#                                       python|web|research|engine|generic), print path
+#   sl-project pick [ws]                wofi/fzf picker (+ "✦ New project…") ⟶ path
+#   sl-project path <name|path>         resolve to an absolute project dir
+#   sl-project bind <ws> <name|path>    set the per-ws binding; print the bound path
+#   sl-project bound <ws>               print the bound path (empty if none)
+#   sl-project type <name|path>         project type (from .slproject or inferred)
+set -euo pipefail
+
+# The SlicedLabs umbrella is the project root; products live under its domains.
+PROJECTS_DIR="${SL_PROJECTS_DIR:-$HOME/SlicedLabs}"
+DOMAINS="${SL_PROJECT_DOMAINS:-mind tools studio lab}"   # umbrella domains scanned for projects
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/sliced/ws-project"
+NEW_LABEL="✦ New project…"
+
+die() { printf 'sl-project: %s\n' "$*" >&2; exit 1; }
+
+_meta() { # <project_dir> <field> -> value ("" if no .slproject / no field)
+    local mf="$1/.slproject"
+    [ -f "$mf" ] || { echo ""; return; }
+    python3 - "$mf" "$2" <<'PY' 2>/dev/null || true
+import sys, tomllib
+try: d = tomllib.load(open(sys.argv[1], "rb"))
+except Exception: sys.exit(0)
+print(d.get(sys.argv[2], ""))
+PY
+}
+
+_infer_type() { # <project_dir> -> best-guess type
+    [ -f "$1/Cargo.toml" ]     && { echo rust;   return; }
+    [ -f "$1/pyproject.toml" ] && { echo python; return; }
+    [ -f "$1/package.json" ]   && { echo web;    return; }
+    echo generic
+}
+
+_hue_for() { case "$1" in
+    rust | engine) echo engine ;; python) echo ai ;; web) echo browser ;;
+    research) echo research ;; *) echo coding ;;
+esac; }
+
+cmd_type() { local d; d="$(cmd_path "$1")" || die "no such project: $1"
+    local t; t="$(_meta "$d" type)"; [ -n "$t" ] && printf '%s\n' "$t" || _infer_type "$d"; }
+
+cmd_path() { # <name|path> -> absolute dir if it exists (searches the umbrella domains)
+    local x="$1" dom
+    if [ -d "$x" ]; then (cd "$x" && pwd); return 0; fi
+    [ -d "$PROJECTS_DIR/$x" ] && { printf '%s\n' "$PROJECTS_DIR/$x"; return 0; }
+    for dom in $DOMAINS; do
+        [ -d "$PROJECTS_DIR/$dom/$x" ] && { printf '%s\n' "$PROJECTS_DIR/$dom/$x"; return 0; }
+    done
+    return 1
+}
+
+cmd_list() { # name<TAB>type<TAB>path — every project across the umbrella domains
+    local d dom
+    for dom in $DOMAINS; do
+        for d in "$PROJECTS_DIR/$dom"/*/; do
+            [ -d "$d" ] || continue
+            d="${d%/}"
+            local t; t="$(_meta "$d" type)"; [ -n "$t" ] || t="$(_infer_type "$d")"
+            printf '%s\t%s\t%s\n' "$(basename "$d")" "$t" "$d"
+        done
+    done
+}
+
+_scaffold() { # <dir> <name> <type>
+    printf '# %s\n' "$2" > "$1/README.md"
+    case "$3" in
+        rust)     (cd "$1" && cargo init -q --name "$2" >/dev/null 2>&1 || true) ;;
+        python)   printf '[project]\nname = "%s"\nversion = "0.1.0"\nrequires-python = ">=3.13"\n' "$2" > "$1/pyproject.toml"
+                  mkdir -p "$1/src/${2//-/_}" "$1/tests" ;;
+        web)      printf '{\n  "name": "%s",\n  "version": "0.1.0",\n  "private": true\n}\n' "$2" > "$1/package.json" ;;
+        research) mkdir -p "$1/notes" "$1/figures"
+                  printf '# %s — research\n\n## Question\n\n## Sources\n\n## Notes\n' "$2" > "$1/NOTES.md" ;;
+        *)        : ;;
+    esac
+}
+
+cmd_new() {
+    local name="" type="generic"
+    while [ $# -gt 0 ]; do case "$1" in
+        --type) type="${2:-}"; shift 2 ;;
+        -*)     die "unknown flag: $1" ;;
+        *)      name="$1"; shift ;;
+    esac; done
+    [ -n "$name" ] || die "usage: sl-project new <name> [--type rust|python|web|research|engine|generic]"
+    case "$type" in rust | python | web | research | engine | generic) ;; *) die "unknown type: $type" ;; esac
+    local dir="$PROJECTS_DIR/lab/$name"   # new projects start in lab/ (scratch); promote to a domain later
+    [ -e "$dir" ] && die "refusing to clobber existing $dir"
+    mkdir -p "$dir"
+    (cd "$dir" && git init -q)
+    _scaffold "$dir" "$name" "$type"
+    {
+        echo "# sl-project metadata — per-project context for project-scoped cockpits."
+        printf 'name = "%s"\ntype = "%s"\nhue = "%s"\ndocs_url = ""\n' "$name" "$type" "$(_hue_for "$type")"
+    } > "$dir/.slproject"
+    (cd "$dir" && git add -A && git commit -q -m "init($type): scaffold $name via sl-project")
+    printf '%s\n' "$dir"
+}
+
+cmd_bind() { # <ws> <name|path>
+    [ $# -ge 2 ] || die "usage: sl-project bind <ws> <project>"
+    local p; p="$(cmd_path "$2")" || die "no such project: $2"
+    mkdir -p "$STATE_DIR"; printf '%s\n' "$p" > "$STATE_DIR/$1"
+    printf '%s\n' "$p"
+}
+
+cmd_bound() { [ $# -ge 1 ] || die "usage: sl-project bound <ws>"; cat "$STATE_DIR/$1" 2>/dev/null || true; }
+
+# The OWNED, token-styled picker — matches sliced-menu / gaming-actions: wofi --dmenu in a GUI
+# context (niri frosts the `wofi` namespace; wofi/style.css carries the design tokens), fzf only
+# on a TTY. NEVER raw fuzzel — it's off-design (unthemed) and single-instance-lock fragile.
+_menu() {  # <prompt>   list on stdin → selection on stdout
+    if [ -t 0 ] && [ -t 1 ] && command -v fzf >/dev/null 2>&1; then fzf --prompt="$1"
+    elif command -v wofi >/dev/null 2>&1; then wofi --dmenu --insensitive --width 760 --height 560 --prompt "$1" 2>/dev/null
+    else die "no picker (wofi/fzf) available; pass a project explicitly"; fi
+}
+_input() {  # <prompt>   freeform text entry
+    if [ -t 0 ] && [ -t 1 ]; then read -r -p "$1" REPLY < /dev/tty && printf '%s\n' "$REPLY"
+    elif command -v wofi >/dev/null 2>&1; then printf '' | wofi --dmenu --insensitive --prompt "$1" 2>/dev/null
+    else die "no input method (wofi/tty)"; fi
+}
+
+cmd_pick() { # [ws] -> chosen/created project path
+    local ws="${1:-}" rows sel
+    rows="$(cmd_list)"
+    # Present "name (type)"; the NEW entry first. cut back to the name on selection.
+    local menu; menu="$(printf '%s\n%s' "$NEW_LABEL" "$(printf '%s\n' "$rows" | awk -F'\t' 'NF{printf "%s (%s)\n",$1,$2}')")"
+    sel="$(printf '%s\n' "$menu" | _menu "project${ws:+ · $ws} › ")" || return 1
+    [ -n "$sel" ] || return 1
+    if [ "$sel" = "$NEW_LABEL" ]; then
+        local name type
+        name="$(_input 'new project name › ')"; [ -n "$name" ] || return 1
+        type="$(printf 'generic\nrust\npython\nweb\nresearch\nengine\n' | _menu 'type › ')"
+        cmd_new "$name" --type "${type:-generic}"
+    else
+        cmd_path "${sel%% (*}"
+    fi
+}
+
+case "${1:-}" in
+    list)            shift; cmd_list "$@" ;;
+    new)             shift; cmd_new "$@" ;;
+    pick)            shift; cmd_pick "$@" ;;
+    path)            shift; [ $# -ge 1 ] || die "usage: sl-project path <name|path>"; cmd_path "$1" || die "no such project: $1" ;;
+    bind)            shift; cmd_bind "$@" ;;
+    bound)           shift; cmd_bound "$@" ;;
+    type)            shift; [ $# -ge 1 ] || die "usage: sl-project type <name|path>"; cmd_type "$1" ;;
+    -h | --help | "") grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *)               die "unknown subcommand: $1 (try --help)" ;;
+esac

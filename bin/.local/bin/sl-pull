@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-pull — install a SlicedLabs Marketplace layer: run its `install` from the SSOT
+# (system/marketplace.toml), then re-bake the catalog so `installed` flips and the cockpit
+# reflects it. The cockpit's Marketplace panel calls this behind the permission gate (→ Warden).
+#   sl-pull <id>        install the layer (no-op if already installed / ships with the OS)
+#   sl-pull --dry <id>  print the install command without running it
+#   sl-pull --list      list every layer and whether it's installed
+from __future__ import annotations
+import os
+import subprocess
+import sys
+import pathlib
+
+try:
+    import tomllib  # py3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
+
+ROOT = pathlib.Path(os.environ.get("DOTFILES_ROOT", os.path.expanduser("~/.dotfiles")))
+SRC = ROOT / "system" / "marketplace.toml"
+RENDER = ROOT / "bin" / ".local" / "bin" / "render-marketplace"
+
+
+def _items() -> list[dict]:
+    return tomllib.loads(SRC.read_text(encoding="utf-8")).get("item", [])
+
+
+def _installed(it: dict) -> bool:
+    test = it.get("detect")
+    if not test:
+        return bool(it.get("installed", False))
+    try:
+        return subprocess.run(["bash", "-c", test], timeout=10,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _rebake() -> None:
+    subprocess.run([sys.executable, str(RENDER)], env={**os.environ, "DOTFILES_ROOT": str(ROOT)},
+                   stdout=subprocess.DEVNULL)
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] in ("-h", "--help"):
+        print("sl-pull — install a SlicedLabs Marketplace layer")
+        print("  sl-pull <id>   ·   sl-pull --dry <id>   ·   sl-pull --list")
+        return 0
+    if argv[0] == "--list":
+        for it in _items():
+            print(f"  {'✓' if _installed(it) else '·'} {it.get('id', ''):14} {it.get('name', '')}")
+        return 0
+
+    dry = "--dry" in argv
+    ids = [a for a in argv if not a.startswith("-")]
+    if not ids:
+        print("sl-pull: need an item id (try: sl-pull --list)", file=sys.stderr)
+        return 2
+    iid = ids[0]
+    it = next((i for i in _items() if i.get("id") == iid), None)
+    if it is None:
+        print(f"sl-pull: no such layer '{iid}' (try: sl-pull --list)", file=sys.stderr)
+        return 2
+
+    install = (it.get("install") or "").strip()
+    if not install:
+        print(f"sl-pull: '{iid}' ships with the OS — nothing to pull.")
+        return 0
+    if _installed(it):
+        print(f"sl-pull: '{iid}' is already installed.")
+        return 0
+    if dry:
+        print(f"would run: {install}")
+        return 0
+
+    print(f"sl-pull: installing '{iid}' …")
+    rc = subprocess.run(["bash", "-c", install]).returncode
+    _rebake()  # refresh installed-state so the cockpit Marketplace updates
+    print(f"sl-pull: '{iid}' installed ✓" if rc == 0 else f"sl-pull: '{iid}' install exited {rc}",
+          file=sys.stderr if rc else sys.stdout)
+    return rc
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

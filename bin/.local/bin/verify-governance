@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-governance — Warden integrity gate. Proves the three governance promises:
 #   1. the hash-chained ledger is tamper-evident (mutating a row breaks the chain),
 #   2. the monitor AUTO-benches an undeclared-resource action (red → suspended),

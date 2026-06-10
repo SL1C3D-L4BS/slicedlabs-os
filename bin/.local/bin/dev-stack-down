@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # dev-stack-down — tear down the local data + observability mesh (the sibling of
 # dev-stack-up). Manual path only: does NOT touch dev-stack.service auto-start.
 # Idempotent: a no-op when nothing is running.

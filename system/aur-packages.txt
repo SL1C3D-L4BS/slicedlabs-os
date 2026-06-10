@@ -10,6 +10,8 @@ grype-bin
 lib32-vkbasalt
 mutagen.io-bin
 obsidian-bin
+ollama-bin
+ollama-vulkan-bin
 protonup-rs
 pyroscope-bin
 quickshell-git

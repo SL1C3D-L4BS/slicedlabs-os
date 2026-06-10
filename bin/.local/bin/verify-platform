@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-platform — P11 OS invariants: UKI boot, atomic rollback (btrfs+snapper+snap-pac),
 # and the agent capability sandbox (sl-agents.slice). Non-destructive. verify-all (opt).
 set -uo pipefail

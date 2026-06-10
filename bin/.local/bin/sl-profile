@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-profile — the project Profiler: CPU flamegraph · perf counters · wall-time benchmark.
+# Runs in $SL_PROJECT / cwd. Owned terminal-native profiler (pairs with the engine's own).
+#   sl-profile [flame] [-- args] CPU flamegraph (cargo flamegraph for Rust; else perf+flamegraph)
+#   sl-profile bench <cmd...>    hyperfine wall-time benchmark
+#   sl-profile perf  <cmd...>    perf stat (cycles/instructions/cache/branch)
+set -uo pipefail
+have() { command -v "$1" >/dev/null 2>&1; }
+case "${1:-flame}" in
+    bench)      shift; have hyperfine || { echo "sl-profile: hyperfine not installed"; exit 1; }
+                [ $# -ge 1 ] || { echo "usage: sl-profile bench <cmd...>"; exit 1; }; hyperfine "$@" ;;
+    perf)       shift; have perf || { echo "sl-profile: perf not installed"; exit 1; }
+                [ $# -ge 1 ] || { echo "usage: sl-profile perf <cmd...>"; exit 1; }; perf stat -- "$@" ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    flame)      shift ;&
+    *)          if [ -f Cargo.toml ] && have cargo-flamegraph; then
+                    echo "▸ cargo flamegraph → flamegraph.svg"; cargo flamegraph "$@"
+                elif have flamegraph && have perf; then
+                    [ $# -ge 1 ] || { echo "usage: sl-profile flame -- <cmd...>"; exit 1; }
+                    echo "▸ perf record + flamegraph → flame.svg"
+                    perf record -g -- "$@" && perf script | flamegraph > flame.svg && echo "→ flame.svg"
+                else echo "sl-profile: need cargo-flamegraph (Rust) or perf + flamegraph"; exit 1; fi ;;
+esac

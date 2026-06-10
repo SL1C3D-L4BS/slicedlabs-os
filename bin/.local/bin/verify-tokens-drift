@@ -1,28 +1,25 @@
 #!/usr/bin/env bash
-# verify-tokens-drift — fail if generated Waybar config has drifted from its SSOT.
-#
-# Regenerates the GENERATED:* regions from tabs.toml (render-waybar) and checks
-# the tracked .tmpl files are unchanged. A non-empty diff means either tabs.toml
-# was edited without re-running render-waybar, or a GENERATED region was
-# hand-edited — both break the "registry is the single source of truth" rule.
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-tokens-drift — Canon §III.8 (content rides the SSOT; generated stays in sync).
+# Re-run the token→artifact render cascade and assert the TRACKED generated outputs are
+# byte-unchanged. A non-empty diff means system/tokens.toml changed without re-rendering,
+# or a generated file was hand-edited — both break the "tokens are the single source of
+# truth" rule. (Re-targeted from the retired Waybar bar to the live Cockpit generator.)
 # Run from anywhere; operates on $DOTFILES_ROOT. Exit 1 on drift (CI/pre-commit).
 set -euo pipefail
-
 ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
 cd "$ROOT"
 
-render-waybar >/dev/null
+render-quickshell >/dev/null 2>&1 || true
+render-templates  >/dev/null 2>&1 || true
 
 watched=(
-    waybar/.config/waybar/config.jsonc.tmpl
-    waybar/.config/waybar/style.css.tmpl
-    waybar/.config/waybar/scripts/lib/tabs.env
+    quickshell/.config/quickshell/cockpit/generated/Theme.qml
 )
-if ! git diff --quiet -- "${watched[@]}"; then
-    echo "token-drift: Waybar GENERATED regions were STALE — tabs.toml changed" >&2
-    echo "  without render-waybar, or a GENERATED region was hand-edited." >&2
-    echo "  They have now been regenerated; review and stage the diff:" >&2
+if ! git diff --quiet -- "${watched[@]}" 2>/dev/null; then
+    echo "token-drift: a generated artifact is STALE vs tokens.toml — it has now been" >&2
+    echo "  regenerated; review and stage the diff:" >&2
     git --no-pager diff --stat -- "${watched[@]}" >&2
     exit 1
 fi
-echo "token-drift: Waybar generated regions in sync with tabs.toml ✓"
+echo "token-drift: generated artifacts in sync with tokens.toml (Theme.qml) ✓"

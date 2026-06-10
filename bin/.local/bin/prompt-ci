@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # prompt-ci — pre-commit hook that:
 #   1. Renders .claude/agents/<name>.md from prompts/roles/<name>.md.
 #   2. Re-stages the rendered files if they changed.

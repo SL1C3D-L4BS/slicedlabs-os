@@ -1,0 +1,41 @@
+/* [ENGINE] platform — wlogout brand-styled menu
+   Tokens substituted by render-templates from system/tokens.toml. */
+
+* {
+    background-image: none;
+    box-shadow: none;
+    font-family: {{font.display}}, {{font.mono}};
+    font-weight: 500;
+}
+
+window {
+    background-color: {{color_css.backdrop}};
+}
+
+button {
+    color: {{color.fg}};
+    background-color: {{color.bg_alt}};
+    border: {{geom.border}}px solid {{color.inactive}};
+    border-radius: {{modal.radius}}px;
+    margin: 18px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 25%;
+    transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+button:focus, button:active, button:hover {
+    color: {{color.primary}};
+    background-color: {{color.selection}};
+    border-color: {{color.primary}};
+    /* Subtle scale via outline so layout doesn't reflow. */
+    outline: {{geom.border}}px solid {{family.tangerine}};
+    outline-offset: -6px;
+}
+
+/* Each button's icon — wlogout looks for these by label. */
+#lock     { background-image: url("/usr/share/wlogout/icons/lock.png"); }
+#suspend  { background-image: url("/usr/share/wlogout/icons/suspend.png"); }
+#logout   { background-image: url("/usr/share/wlogout/icons/logout.png"); }
+#reboot   { background-image: url("/usr/share/wlogout/icons/reboot.png"); }
+#shutdown { background-image: url("/usr/share/wlogout/icons/shutdown.png"); }

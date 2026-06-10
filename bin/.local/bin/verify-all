@@ -6,6 +6,10 @@
 set -u
 ROOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
 rc=0
+# `--live` adds the runtime cockpit tier (verify-cockpits-live): it SUMMONS each empty,
+# non-focused project-scoped workspace and asserts every pane is live + project-attached.
+# Off by default (it launches windows); the static gates below never spawn anything.
+LIVE=0; for _a in "$@"; do [ "$_a" = "--live" ] && LIVE=1; done
 run() {  # <label> <cmd...>
     local label="$1"; shift
     printf '\n\033[1m▶ %s\033[0m\n' "$label"
@@ -19,15 +23,42 @@ run "design language (#6)"     verify-design-language
 run "token drift"              verify-tokens-drift
 opt verify-keys       && run "keys SSOT"          verify-keys
 opt verify-governance && run "governance ledger"  verify-governance
+opt verify-no-ai-trailers && run "no AI trailers (one author · guard hooks)" verify-no-ai-trailers
 opt verify-tooling    && run "tooling cascade"    verify-tooling
+opt verify-terminal   && run "terminal richness (greeting · schemes · ansi SSOT)" verify-terminal
+run "tooling cohesion (shellcheck-clean)" verify-tooling-cohesion
 opt verify-boot-contract && run "boot contract"   verify-boot-contract
 opt verify-stabilization && run "stabilization (Track A)" verify-stabilization
+opt verify-backup     && run "backup (DR · drill · offsite)" verify-backup
+opt verify-secrets    && run "secrets (sops · gitleaks · untracked)" verify-secrets
+opt verify-alerting   && run "alerting (ntfy · watchdog · sovereign)" verify-alerting
+opt verify-usbguard   && run "usbguard (peripheral trust · no lockout)" verify-usbguard
+opt verify-network    && run "network Tier-2 (subchains · loopback pins · audit)" verify-network
 run "cockpit invariants"       verify-cockpit.sh
 opt verify-gaming.sh  && run "gaming stack"        verify-gaming.sh
 opt verify-vm.sh      && run "virtualization (VM)" verify-vm.sh
 opt verify-platform   && run "platform (UKI/atomic/sandbox)" verify-platform
 opt verify-scenes     && run "scene DSL"          verify-scenes
 opt verify-media      && run "media cockpit"      verify-media
+opt verify-marketplace && run "marketplace (catalog · panel · sl-pull)" verify-marketplace
+opt verify-studio     && run "teaching studio"    verify-studio
+opt verify-ide        && run "forever-IDE (pillars · LSP · DAP)" verify-ide
+
+run "reproducible system (manifest · stow)" verify-reproducible
+run "paths (one body · no foreign roots)" verify-paths
+run "branding (SlicedLabs mark · every owned file)" verify-branding
+run "body (whole · owned · pushed · forkable)" verify-body
+run "AI gateway (control plane · PII · route)" verify-gateway
+opt verify-slicedlabs && run "L4 sliced surface (BFF · receipts · conformance)" verify-slicedlabs
+opt verify-odysseus-wrap && run "L4 governance-wrap (gateway · receipt · vendor boundary)" verify-odysseus-wrap
+run "hermes (local assistant · sovereign · composed)" verify-hermes
+run "supply-chain trust (SBOM · scan · sign)" verify-supply-chain
+run "journal clean (owned surface → 0)" verify-journal-clean
+run "canon coverage (principles → gates)" verify-canon
+
+if [[ "$LIVE" == 1 ]] && opt verify-cockpits-live; then
+    run "cockpits LIVE (every pane · project-attached)" verify-cockpits-live
+fi
 
 echo
 if [[ $rc -eq 0 ]]; then

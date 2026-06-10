@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # engine-wallpaper — start the awww-daemon (if needed) and set the current
 # [ENGINE] wallpaper with a token-tuned transition. Idempotent; safe to call
 # from niri spawn-at-startup, swayidle, or interactively to reload.

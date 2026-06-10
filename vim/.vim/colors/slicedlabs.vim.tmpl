@@ -1,0 +1,67 @@
+" SlicedLabs · body · © 2026 SlicedLabs
+" slicedlabs.vim — minimal plain-vim colorscheme rendered from system/tokens.toml
+" (render-templates). The scratch/diff vim column speaks the same Liquid Retina
+" language as the LazyVim deck; gui colours only (the .vimrc sets termguicolors).
+set background=dark
+highlight clear
+if exists("syntax_on") | syntax reset | endif
+let g:colors_name = "slicedlabs"
+
+" editor core
+highlight Normal       guifg={{color.fg}}        guibg={{color.bg}}
+highlight NonText      guifg={{color.inactive}}
+highlight LineNr       guifg={{color.fg_muted}}
+highlight CursorLine   guibg={{color.bg_alt}}    cterm=NONE
+highlight CursorLineNr guifg={{color.primary}}   gui=bold
+highlight Visual       guibg={{color.selection}}
+highlight Search       guifg={{color.bg}}        guibg={{color.honey}}
+highlight IncSearch    guifg={{color.bg}}        guibg={{color.tertiary}}  gui=bold
+highlight MatchParen   guifg={{family.tangerine}} gui=bold,underline
+highlight StatusLine   guifg={{color.fg}}        guibg={{color.bg_alt}}    gui=bold
+highlight StatusLineNC guifg={{color.fg_muted}}  guibg={{color.bg_alt}}
+highlight VertSplit    guifg={{color.inactive}}
+highlight Pmenu        guifg={{color.fg}}        guibg={{color.bg_alt}}
+highlight PmenuSel     guifg={{color.fg}}        guibg={{color.selection}} gui=bold
+highlight Folded       guifg={{color.fg_muted}}  guibg={{color.bg_alt}}    gui=italic
+highlight ColorColumn  guibg={{color.bg_alt}}
+highlight ErrorMsg     guifg={{color.error}}     gui=bold
+highlight WarningMsg   guifg={{color.honey}}
+highlight Title        guifg={{color.primary}}   gui=bold
+highlight Directory    guifg={{color.secondary}}
+
+" syntax — mirrors the engine.lua mapping rationale
+highlight Comment      guifg={{color.fg_muted}}  gui=italic
+highlight Constant     guifg={{color.tertiary}}
+highlight String       guifg={{color.success}}
+highlight Character    guifg={{color.success}}
+highlight Number       guifg={{color.tertiary}}
+highlight Boolean      guifg={{color.tertiary}}  gui=bold
+highlight Identifier   guifg={{color.fg}}
+highlight Function     guifg={{color.mist}}      gui=bold
+highlight Statement    guifg={{color.primary}}
+highlight Conditional  guifg={{color.primary}}   gui=bold
+highlight Repeat       guifg={{color.primary}}   gui=bold
+highlight Keyword      guifg={{color.primary}}   gui=bold
+highlight Exception    guifg={{color.error}}     gui=bold
+highlight Operator     guifg={{color.fg}}
+highlight PreProc      guifg={{family.lavender}}
+highlight Include      guifg={{family.lavender}}
+highlight Define       guifg={{family.lavender}}
+highlight Macro        guifg={{family.lavender}}
+highlight Type         guifg={{color.secondary}}
+highlight Structure    guifg={{color.secondary}} gui=bold
+highlight Special      guifg={{color.tertiary}}
+highlight Delimiter    guifg={{color.fg_muted}}
+highlight Underlined   guifg={{color.secondary}} gui=underline
+highlight Error        guifg={{color.error}}     gui=bold
+highlight Todo         guifg={{color.bg}}        guibg={{color.honey}}     gui=bold
+
+" diff — the scratch/diff column's bread and butter
+highlight DiffAdd      guifg={{color.success}}   guibg={{color.bg_alt}}
+highlight DiffChange   guifg={{color.tertiary}}  guibg={{color.bg_alt}}
+highlight DiffDelete   guifg={{color.error}}     guibg={{color.bg_alt}}
+highlight DiffText     guifg={{color.fg}}        guibg={{color.warm_shadow}} gui=bold
+
+" spell
+highlight SpellBad     guisp={{color.error}}     gui=undercurl
+highlight SpellCap     guisp={{color.honey}}     gui=undercurl

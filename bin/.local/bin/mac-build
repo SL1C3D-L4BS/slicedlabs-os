@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # mac-build — run a build on the MacBook Air macOS node from this Linux box.
 #
 # Stateless by design: each invocation rsyncs the current project to the Mac

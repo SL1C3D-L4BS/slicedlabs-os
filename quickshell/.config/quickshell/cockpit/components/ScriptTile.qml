@@ -1,3 +1,4 @@
+// SlicedLabs · body · © 2026 SlicedLabs
 import QtQuick
 import Quickshell.Io
 import "../generated"
@@ -7,7 +8,7 @@ import "../generated"
 // empty (the guard, or genuine idle).
 Rectangle {
     id: tile
-    property string script: ""           // path under ~/.config/waybar/scripts/
+    property string script: ""           // path under ~/.config/quickshell/cockpit/scripts/
     property int interval: 5000
     property string text: ""
     property string cls: "empty"
@@ -44,7 +45,7 @@ Rectangle {
 
     Process {
         id: p
-        command: ["bash", "-c", "exec \"$HOME/.config/waybar/scripts/" + tile.script + "\""]
+        command: ["bash", "-c", "exec \"$HOME/.config/quickshell/cockpit/scripts/" + tile.script + "\""]
         stdout: StdioCollector {
             id: oc
             onStreamFinished: {

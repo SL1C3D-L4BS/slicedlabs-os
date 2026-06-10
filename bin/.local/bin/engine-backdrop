@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # engine-backdrop — render a softly-blurred copy of the wallpaper and show it
 # ONLY inside the niri overview backdrop (a swaybg surface that niri routes via
 # `place-within-backdrop`). Pairs with engine-wallpaper, which sets the CRISP
@@ -26,8 +27,14 @@ fi
 
 # Pre-blur: downscale → blur → upscale is a cheap, smooth heavy gaussian. Slight
 # darken + desaturate so the crisp overview tiles pop against the backdrop.
-magick "$src" -resize 20% -blur 0x6 -resize 500% -modulate 92,85 "$CACHE" 2>/dev/null \
-    || convert "$src" -resize 20% -blur 0x6 -resize 500% -modulate 92,85 "$CACHE"
+# Write to a temp file then atomically rename into place, so readers (the Cockpit
+# Glass.qml sampler + swaybg) never decode a half-written PNG at boot — the source
+# of the recurring libpng "Read Error". Atomic mv on one filesystem = readers see
+# either the old complete file or the new complete file, never a partial one.
+tmp="${CACHE}.tmp.$$.png"   # keep .png so ImageMagick infers the output format
+magick "$src" -resize 20% -blur 0x6 -resize 500% -modulate 92,85 "$tmp" 2>/dev/null \
+    || convert "$src" -resize 20% -blur 0x6 -resize 500% -modulate 92,85 "$tmp"
+mv -f "$tmp" "$CACHE"
 
 # (Re)launch the single backdrop swaybg instance showing the blurred image.
 pkill -x swaybg 2>/dev/null || true

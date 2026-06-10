@@ -178,6 +178,7 @@ services:
       COGNEE_GRAPH_PROVIDER: neo4j
       COGNEE_GRAPH_URL: bolt://ai-neo4j:7687
       COGNEE_LLM_PROVIDER: anthropic
+      LOG_LEVEL: WARNING            # quiet cognee's ingest INFO/DEBUG out of the journal
     volumes:
       - cogneedata:/var/lib/cognee
     networks: [ainet, devnet]

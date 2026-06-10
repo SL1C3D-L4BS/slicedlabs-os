@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # slicedlabs — thin shim that invokes the Python entry point.
 # After `uv pip install -e ~/.dotfiles/slicedlabs-team`, the `slicedlabs`
 # command shows up on PATH already; this shim is a backup for environments

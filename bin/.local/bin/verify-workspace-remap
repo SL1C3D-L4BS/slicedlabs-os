@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-workspace-remap — guarantee #1 (ownership): the stream→streaming rename and
 # the WS1..8 identity renumber left NO stray old literal in the active SSOT/config,
 # and the canonical order + Mod+1..8 mapping are intact. Pure grep gate; exit 1 on a

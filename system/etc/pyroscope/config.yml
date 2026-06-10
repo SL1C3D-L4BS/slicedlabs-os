@@ -1,0 +1,15 @@
+# [ENGINE] platform — Grafana Pyroscope (host service, on-demand monitoring).
+# Tier-2 pin: every listener + the memberlist mesh on loopback ONLY — the
+# component ring never advertises the primary IP (nftables guards the ports
+# as the backstop). Grafana + alloy reach it at 127.0.0.1:4040.
+# Tracked in dotfiles → installed to /etc/pyroscope by the bootstrap
+# system-hardening layer.
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 4040
+  grpc_listen_address: 127.0.0.1
+
+memberlist:
+  bind_addr:
+    - 127.0.0.1
+  advertise_addr: 127.0.0.1

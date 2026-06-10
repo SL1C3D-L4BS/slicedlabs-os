@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# SlicedLabs · governance · © 2026 SlicedLabs
+# verify-no-ai-trailers — SlicedLabs history carries one author: no AI co-author
+# trailers / generation markers in any owned repo, and the commit-msg guard hook
+# is installed everywhere so none can ever land again.
+#
+# The P8 scrub (2026-06-09, filter-repo + force-push) removed the two pre-guard
+# trailers; the allowlist is permanently empty — any future hit is a hard fail.
+set -euo pipefail
+
+PATTERN='co-authored-by:.*(claude|anthropic)|generated with.*claude'
+ALLOW=() # empty since the 2026-06-09 history scrub — keep it that way
+
+REPOS=("$HOME/.dotfiles" "$HOME/SlicedLabs")
+while IFS= read -r g; do
+    REPOS+=("$(dirname "$g")")
+done < <(find "$HOME/SlicedLabs" -mindepth 2 -maxdepth 3 -name .git \
+    -not -path "*/vendor/*" 2>/dev/null)
+
+rc=0
+for repo in "${REPOS[@]}"; do
+    [ -e "$repo/.git" ] || continue
+    name="${repo/#"$HOME"\//\~\/}"
+
+    # 1) full-history scan (all refs); foreign vendor trees are out of scope.
+    mapfile -t hits < <(git -C "$repo" log --all -i -E --grep="$PATTERN" --format='%h %s' 2>/dev/null || true)
+    bad=()
+    for h in "${hits[@]}"; do
+        [ -n "$h" ] || continue
+        short="${h%% *}"
+        skip=0
+        for a in "${ALLOW[@]}"; do
+            case "$short" in "$a"*) skip=1 ;; esac
+        done
+        [ "$skip" -eq 1 ] || bad+=("$h")
+    done
+    if [ "${#bad[@]}" -gt 0 ]; then
+        echo "✗ $name: AI trailer in history:"
+        printf '    %s\n' "${bad[@]}"
+        rc=1
+    fi
+
+    # 2) the always-on guard: commit-msg hook installed.
+    hooks="$(git -C "$repo" rev-parse --git-path hooks)"
+    case "$hooks" in /*) ;; *) hooks="$repo/$hooks" ;; esac
+    if [ ! -e "$hooks/commit-msg" ]; then
+        echo "✗ $name: commit-msg guard hook not installed (run: install-hooks $repo)"
+        rc=1
+    fi
+done
+
+if [ "$rc" -eq 0 ]; then
+    echo "verify-no-ai-trailers: ✓ one-author history (${#ALLOW[@]} pre-scrub allowed) + guard hooks installed"
+fi
+exit $rc

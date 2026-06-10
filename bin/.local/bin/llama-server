@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# llama-server — pick the first working backend.
+set -u
+for cand in "$HOME/.local/bin/llama-server-vk" "$HOME/.local/bin/llama-server-hip"; do
+    if [[ -x "$cand" ]]; then
+        exec "$cand" "$@"
+    fi
+done
+echo "llama-server: no Vulkan or HIP build found — run build-llamacpp" >&2
+exit 127

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-design-language — guarantee #6 (ownership): every render target binds to the
 # token cascade / semantic ROLES, never to raw hues. Fail if a HAND-WRITTEN render-
 # target source carries a raw 6-digit hex colour. The generated/ outputs (Theme.qml,
@@ -39,8 +40,9 @@ for extra in slicedlabs-team/slicedlabs_team/warden docs; do
     fi
 done
 
-# Tooling configs (Track 9) — hand-written .tmpl sources bind to {{tokens}}, never raw
-# hex. The rendered .kdl/.yml/.toml ARE the token bake (exempt, like /generated/).
+# Tooling configs (Track 9 + Liquid Retina v3) — hand-written .tmpl sources bind to
+# {{tokens}}, never raw hex. The rendered .kdl/.yml/.toml ARE the token bake (exempt,
+# like /generated/).
 while IFS= read -r f; do
     [[ -z "$f" ]] && continue
     hits=$(grep -noE '#[0-9a-fA-F]{6}\b' "$f" 2>/dev/null || true)
@@ -50,7 +52,54 @@ while IFS= read -r f; do
         fail=1
     fi
 done < <(find zellij/.config/zellij/layouts lazygit gh-dash git cava spotify-player \
-              fish/.config/fish/conf.d -name '*.tmpl' 2>/dev/null)
+              fish/.config/fish/conf.d \
+              qt6ct obs fastfetch nvim vim gtk mako wofi swaylock wlogout ghostty \
+              system/brand-assets/surface system/wallpapers/templates \
+              -name '*.tmpl' 2>/dev/null)
+
+# Liquid Retina v3 invariants:
+# (a) tmpl'd GLSL carries no literal colour vec3s — colours arrive as {{vec3.*}}.
+while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    if ! grep -q 'vec3({{' "$f"; then
+        echo "design-language: $f has no {{vec3.*}} injection (tokenize its colours)" >&2
+        fail=1
+    fi
+    # colour literals = comma-form RGB (vec3(r, g, b)) or all-white scalars;
+    # zero-inits (vec3(0)/vec3(0.0)) are accumulators, not colours.
+    hits=$(grep -nE 'vec3\( *[0-9.]+ *,|vec3\( *1(\.0*)? *\)' "$f" \
+        | grep -viE '(uv|pos|coord|normal|dir)' || true)
+    if [[ -n "$hits" ]]; then
+        echo "design-language: literal colour vec3 in shader tmpl $f:" >&2
+        echo "$hits" >&2
+        fail=1
+    fi
+done < <(find cava/.config/cava/shaders -name '*.frag.tmpl' 2>/dev/null)
+# (b) the v3 token vocabulary exists: [family] section + oklch identity anchors.
+if ! grep -q '^\[family\]' system/tokens.toml; then
+    echo "design-language: tokens.toml lost the [family] accent section (v3)" >&2
+    fail=1
+fi
+if ! grep -qE '^coding *= *"oklch\(' system/tokens.toml; then
+    echo "design-language: identity anchors no longer stored as oklch() (v3 law)" >&2
+    fail=1
+fi
+
+# Powerline caps regression guard — the zjstatus/tide/lualine bars draw their capsule
+# from [powerline] in tokens.toml (Nerd-Font U+E0B6/E0B4). If those SSOT glyphs are ever
+# emptied, every bar goes flat silently and render-templates would still pass. Assert the
+# glyphs survive in the SSOT and (when rendered) in the baked zjstatus layout.
+cap_l=$''; cap_r=$''
+if ! grep -qF -- "$cap_l" system/tokens.toml || ! grep -qF -- "$cap_r" system/tokens.toml; then
+    echo "design-language: tokens.toml [powerline] lost its capsule caps (U+E0B6/E0B4) — bars would go flat" >&2
+    fail=1
+fi
+if [[ -f zellij/.config/zellij/layouts/coding.kdl ]] \
+   && ! { grep -qF -- "$cap_l" zellij/.config/zellij/layouts/coding.kdl \
+       && grep -qF -- "$cap_r" zellij/.config/zellij/layouts/coding.kdl; }; then
+    echo "design-language: rendered coding.kdl is missing powerline caps — re-run render-templates" >&2
+    fail=1
+fi
 
 [[ $fail -eq 0 ]] && echo "design-language: all render targets bind to tokens, no raw hex ✓"
 exit $fail

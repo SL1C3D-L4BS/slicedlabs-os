@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · sl-convert
+# Convert an OWNED document (pdf/docx/html/epub/odt/tex/rst…) to clean markdown —
+# the format the system learns from and teaches in. pandoc handles office/web fast;
+# PDFs default to pdftotext (instant) with `--marker` for layout-faithful ML extraction.
+# © 2026 SlicedLabs · Canon §IX (forkable knowledge) · §VII (corpus = reference) · MIT
+#
+# Usage:
+#   sl-convert <input> [-o out.md]    # auto: pandoc for office/web; pdftotext for pdf
+#   sl-convert <input.pdf> --marker   # datalab marker (layout-faithful, ML, slow on CPU)
+#
+# NOTE: the borrowed 93-book corpus stays REFERENCE (Canon §VII) — convert OUR docs,
+# not copyrighted books, into datasets. Personal-study conversion of a book you own is
+# fine on demand, but never bulk and never as training data.
+set -euo pipefail
+die(){ printf 'sl-convert: %s\n' "$*" >&2; exit 1; }
+[ $# -ge 1 ] || die "usage: sl-convert <input> [-o out.md] [--marker]"
+IN=""; OUT=""; MARKER=0
+while [ $# -gt 0 ]; do case "$1" in
+  -o) OUT="${2:-}"; shift 2 ;;
+  --marker) MARKER=1; shift ;;
+  -*) die "unknown flag: $1" ;;
+  *) IN="$1"; shift ;;
+esac; done
+[ -f "$IN" ] || die "no such file: $IN"
+[ -n "$OUT" ] || OUT="${IN%.*}.md"
+ext="${IN##*.}"; ext="${ext,,}"
+case "$ext" in
+  pdf)
+    if [ "$MARKER" = 1 ]; then
+      command -v marker_single >/dev/null 2>&1 || die "marker_single not on PATH (pip install marker-pdf)"
+      tmp=$(mktemp -d)
+      marker_single "$IN" --output_dir "$tmp" >/dev/null 2>&1 \
+        || marker_single "$IN" --output_format markdown --output_dir "$tmp" >/dev/null 2>&1 \
+        || { rm -rf "$tmp"; die "marker failed (check its CLI: marker_single --help)"; }
+      f=$(find "$tmp" -name '*.md' | head -1); [ -n "$f" ] && cp "$f" "$OUT" || { rm -rf "$tmp"; die "marker produced no markdown"; }
+      rm -rf "$tmp"
+    else
+      command -v pdftotext >/dev/null 2>&1 || die "pdftotext not installed (pacman -S poppler)"
+      pdftotext -layout -nopgbrk "$IN" "$OUT"
+    fi ;;
+  docx|odt|html|htm|epub|rtf|tex|latex|org|rst|textile|mediawiki)
+    command -v pandoc >/dev/null 2>&1 || die "pandoc not installed"
+    pandoc "$IN" -t gfm --wrap=none -o "$OUT" ;;
+  md|markdown) cp "$IN" "$OUT" ;;
+  *) die "unsupported extension: .$ext" ;;
+esac
+echo "sl-convert: $IN → $OUT ($(wc -l < "$OUT" 2>/dev/null || echo '?') lines)"

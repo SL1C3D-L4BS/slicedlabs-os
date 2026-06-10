@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # snapshot-packages — refresh system/packages.txt + system/aur-packages.txt
 # from the live pacman db. Tracks every package the user has explicitly
 # installed so a fresh-install bootstrap can reproduce exactly.

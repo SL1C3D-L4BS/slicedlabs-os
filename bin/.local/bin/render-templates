@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SlicedLabs · tools · © 2026 SlicedLabs
 """Render `.tmpl` files in the dotfiles tree against system/tokens.toml.
 
 Convention:
@@ -7,10 +8,25 @@ Convention:
   Rendered outputs are gitignored; the .tmpl is the tracked source.
 
 Variants:
-  Pass `--variant=light` to substitute [color_light] / [color_raw_light] /
-  [color_css_light] / [color_rgba_light] in place of their dark counterparts.
+  Pass `--variant=light` to substitute [color_light] / [family_light] /
+  [semantic_light] / [glass_light] / etc. in place of their dark counterparts.
   Templates always reference `{{color.bg}}` — the renderer chooses which
   source block to bind that placeholder to. Default variant is `dark`.
+
+Looks (Liquid Retina v3):
+  Pass `--look=clear` to overlay [glass_clear] / [opacity_clear] — the
+  see-through material variant. Default look is `standard`.
+
+Derived namespaces (v3 — anchors are the only stored truth):
+  {{ramp.<hue>_<step>}}  — 10-step OKLCH tonal ramps (50…900) derived at
+                           render time from [color]/[family] anchors via
+                           lib/color.ramp(); e.g. {{ramp.coding_300}}.
+  {{vec3.<key>}}         — "r, g, b" floats (0–1 sRGB) for GLSL injection;
+                           every [color]/[family]/ramp hue; e.g. {{vec3.media}}.
+  {{rgb.<key>}}          — "R;G;B" decimal bytes for ANSI truecolor escapes
+                           (\\e[38;2;{{rgb.coding}}m); same key set as vec3.
+  [color]/[family] oklch() anchors are baked to sRGB hex before substitution,
+  so {{color.coding}} always lands as "#RRGGBB" in any target syntax.
 
 Idempotent: rerunning produces identical output. Exits non-zero on any
 unresolved placeholder so silent token drift can't ship.
@@ -24,12 +40,31 @@ import sys
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import color  # noqa: E402 — local OKLCH→sRGB lib alongside this script
+
 ROOT = Path(os.environ.get("DOTFILES_ROOT") or (Path.home() / ".dotfiles"))
 TOKENS_FILE = ROOT / "system" / "tokens.toml"
-PLACEHOLDER = re.compile(r"\{\{\s*([a-z_]+)\.([a-z_]+)\s*\}\}")
+PLACEHOLDER = re.compile(r"\{\{\s*([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\s*\}\}")
 
 # Sections that have a `_light` companion for the light variant.
-VARIANT_SECTIONS = ("color", "color_css", "color_raw", "color_rgba")
+VARIANT_SECTIONS = (
+    "color",
+    "color_css",
+    "color_raw",
+    "color_rgba",
+    "family",
+    "semantic",
+    "glass",
+    "opacity",
+)
+
+# [color] hue anchors that derive tonal ramps (every [family] key does too).
+RAMP_HUES = (
+    "coding", "research", "engine", "browser",
+    "monitoring", "streaming", "gaming", "media",
+    "primary", "secondary", "tertiary", "error", "success",
+)
 
 
 def load_tokens() -> dict[str, dict[str, object]]:
@@ -38,7 +73,7 @@ def load_tokens() -> dict[str, dict[str, object]]:
 
 
 def apply_variant(tokens: dict[str, dict[str, object]], variant: str) -> dict[str, dict[str, object]]:
-    """For variant=light, overlay [color_light]/[color_raw_light]/etc on the
+    """For variant=light, overlay [color_light]/[family_light]/etc on the
     dark default keys so templates see the same `{{color.bg}}` placeholder."""
     if variant == "dark":
         return tokens
@@ -48,6 +83,71 @@ def apply_variant(tokens: dict[str, dict[str, object]], variant: str) -> dict[st
         if light:
             merged[section] = {**tokens.get(section, {}), **light}
     return merged
+
+
+def apply_look(tokens: dict[str, dict[str, object]], look: str) -> dict[str, dict[str, object]]:
+    """For look=clear, overlay [glass_clear]/[opacity_clear] (the see-through
+    Liquid Retina material) and record the active look for downstream chrome."""
+    if look != "clear":
+        return tokens
+    merged = dict(tokens)
+    for section, overlay in (("glass", "glass_clear"), ("opacity", "opacity_clear")):
+        extra = tokens.get(overlay)
+        if extra:
+            merged[section] = {**tokens.get(section, {}), **extra, "look": "clear"}
+    return merged
+
+
+def _vec3(hexed: str) -> str:
+    h = hexed.lstrip("#")
+    r, g, b = (int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    return f"{r:.4f}, {g:.4f}, {b:.4f}"
+
+
+def _rgb(hexed: str) -> str:
+    h = hexed.lstrip("#")
+    r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+    return f"{r};{g};{b}"
+
+
+def bake_and_derive(tokens: dict[str, dict[str, object]]) -> None:
+    """Bake oklch() anchors in [color]/[family] to sRGB hex, then synthesize the
+    virtual {{ramp.*}} / {{vec3.*}} namespaces (the v3 ramp law: anchors are the
+    only stored truth; lib/color.ramp() is the one shared implementation)."""
+    for section in ("color", "family"):
+        sec = tokens.get(section)
+        if not isinstance(sec, dict):
+            continue
+        for k, v in list(sec.items()):
+            hexed = color.to_hex(v)
+            if hexed:
+                sec[k] = hexed
+
+    ramp: dict[str, object] = {}
+    vec3: dict[str, object] = {}
+    rgb: dict[str, object] = {}
+    color_sec = tokens.get("color", {})
+    anchors: dict[str, object] = {
+        k: color_sec[k] for k in RAMP_HUES if k in color_sec
+    }
+    anchors.update(tokens.get("family", {}))
+    for name, value in anchors.items():
+        hexed = color.to_hex(value)
+        if not hexed:
+            continue
+        for step, hx in color.ramp_for_hex(hexed).items():
+            ramp[f"{name}_{step}"] = hx
+            vec3[f"{name}_{step}"] = _vec3(hx)
+            rgb[f"{name}_{step}"] = _rgb(hx)
+    for section in ("color", "family"):
+        for k, v in tokens.get(section, {}).items():
+            hexed = color.to_hex(v)
+            if hexed:
+                vec3.setdefault(k, _vec3(hexed))
+                rgb.setdefault(k, _rgb(hexed))
+    tokens["ramp"] = ramp
+    tokens["vec3"] = vec3
+    tokens["rgb"] = rgb
 
 
 def render(text: str, tokens: dict[str, dict[str, object]], path: Path) -> str:
@@ -77,13 +177,20 @@ def main() -> int:
         default="dark",
         help="Color variant (default: dark)",
     )
+    parser.add_argument(
+        "--look",
+        choices=("standard", "clear"),
+        default="standard",
+        help="Material look (clear = see-through Liquid Retina overlay)",
+    )
     args = parser.parse_args()
 
     if not TOKENS_FILE.is_file():
         print(f"render-templates: tokens file missing: {TOKENS_FILE}", file=sys.stderr)
         return 2
 
-    tokens = apply_variant(load_tokens(), args.variant)
+    tokens = apply_look(apply_variant(load_tokens(), args.variant), args.look)
+    bake_and_derive(tokens)
     # _retired/ is a graveyard of decommissioned configs and snapshots/ is inert —
     # never render templates living there (they'd resurrect as stray byproducts).
     skip = {"_retired", "snapshots", ".git"}
@@ -102,7 +209,7 @@ def main() -> int:
         out.write_text(new)
         rendered_count += 1
         print(f"  rendered  {out.relative_to(ROOT)}")
-    print(f"render-templates: variant={args.variant}, {rendered_count} file(s) updated, {len(templates)} scanned")
+    print(f"render-templates: variant={args.variant}, look={args.look}, {rendered_count} file(s) updated, {len(templates)} scanned")
     return 0
 
 

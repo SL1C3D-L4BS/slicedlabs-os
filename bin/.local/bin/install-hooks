@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # install-hooks: symlink dotfiles-tracked git hooks into a target repo.
 #
 # Usage:
-#   install-hooks                 # pre-commit into $PWD
-#   install-hooks <repo>          # pre-commit into <repo>
-#   install-hooks <repo> <hook>…  # named hooks (pre-commit, post-merge, pre-push)
+#   install-hooks                 # pre-commit + commit-msg into $PWD
+#   install-hooks <repo>          # pre-commit + commit-msg into <repo>
+#   install-hooks <repo> <hook>…  # named hooks (pre-commit, commit-msg, post-merge, pre-push)
 #
 # Hooks live under ~/.dotfiles/system/git-hooks/<hook-name>.
 set -euo pipefail
@@ -14,7 +15,7 @@ shift || true
 HOOK_DIR_SRC="${HOME}/.dotfiles/system/git-hooks"
 
 if [ "$#" -eq 0 ]; then
-    set -- pre-commit
+    set -- pre-commit commit-msg
 fi
 
 if [ ! -e "$TARGET_REPO/.git" ]; then

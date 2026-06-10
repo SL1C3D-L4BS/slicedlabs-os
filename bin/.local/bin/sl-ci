@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-ci — GitHub/CI console for the `ci` cockpit: a live snapshot of Actions runs + your PRs,
+# then a shell primed with the gh commands. gh-dash (the full TUI) is the suspended pane beside it.
+#
+#   sl-ci         snapshot: latest runs + your PRs, then a shell
+#   sl-ci runs    list recent Actions runs (+ `gh run watch` hint)
+#   sl-ci prs     list / status your PRs (+ `gh pr checks` hint)
+#
+# Never dies — if gh is missing/unauthed or there's no GitHub remote here, prints the fix + a shell.
+set -uo pipefail
+shell="${SHELL:-/usr/bin/fish}"
+have() { command -v "$1" >/dev/null 2>&1; }
+
+case "${1:-}" in -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;; esac
+
+have gh || { echo "sl-ci: gh not installed (pacman -S github-cli)"; exec "$shell"; }
+if ! gh auth status >/dev/null 2>&1; then
+  echo '⏿ sl-ci — not signed in.  Run:  gh auth login'; exec "$shell"
+fi
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || ! gh repo view >/dev/null 2>&1; then
+  echo '⏿ sl-ci — no GitHub repo here (cd into a repo with a github remote).'; exec "$shell"
+fi
+
+case "${1:-snapshot}" in
+  runs) echo '⏿ sl-ci runs'; gh run list -L 15
+        echo '   watch:  gh run watch <run-id>  ·  logs: gh run view <id> --log' ;;
+  prs)  echo '⏿ sl-ci prs'; gh pr list -L 15; echo '   ─'; gh pr status
+        echo '   checks:  gh pr checks  ·  view: gh pr view --web' ;;
+  *)    printf '⏿ sl-ci — %s\n' "$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)"
+        echo '   ── recent runs'; gh run list -L 5
+        echo '   ── your PRs';    gh pr status
+        echo '   more:  sl-ci runs  ·  sl-ci prs  ·  gh run watch <id>' ;;
+esac
+exec "$shell"

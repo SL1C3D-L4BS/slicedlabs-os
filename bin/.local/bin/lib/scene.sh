@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # lib/scene.sh — registry-driven niri workspace "scene" realization.
 #
 # Sourced by `niri-workspace-launcher` (auto, on first focus) and `cockpit`
@@ -81,6 +82,27 @@ for s in d.get("workspaces", {}).get(sys.argv[2], {}).get("services", []):
 PY
 }
 
+# Resolve the project a workspace is bound to (project-scoped cockpits). Explicit
+# per-ws binding (set by `cockpit <ws> [project]` via sl-project) wins; else the
+# registry's default_project (relative to $HOME, or absolute); else ~/SlicedLabs. THIS
+# is the hook that makes the whole cockpit attach to one project: SL_PROJECT becomes
+# every deck pane's cwd via the scene's --working-directory. Backward-compatible — a
+# workspace with no binding + no default_project just gets ~/SlicedLabs (and its cmds,
+# if they don't reference $SL_PROJECT, are unaffected).
+_scene_project() {  # $1=ws -> absolute project dir
+    local ws="$1" p=""
+    p="$(sl-project bound "$ws" 2>/dev/null || true)"
+    if [[ -z "$p" ]]; then
+        p="$(_scene_field "$ws" default_project)"
+        case "$p" in /*) ;; "~"*) p="${p/#\~/$HOME}" ;; "") ;; *) p="$HOME/$p" ;; esac
+    fi
+    [[ -n "$p" && -d "$p" ]] || p="$HOME/SlicedLabs"
+    printf '%s\n' "$p"
+}
+
+# True iff the workspace declares project_scoped=true (TOML bool → python prints "True").
+_scene_is_project_scoped() { case "$(_scene_field "$1" project_scoped)" in True | true | 1) return 0 ;; *) return 1 ;; esac; }
+
 _ws_id()     { niri msg --json workspaces | jq -r --arg n "$1" 'first(.[]|select(.name==$n))|.id // empty'; }
 _win_id()    { niri msg --json windows    | jq -r --arg a "$1" 'first(.[]|select(.app_id==$a))|.id // empty'; }
 _win_on_ws() { niri msg --json windows    | jq -e --arg a "$1" --argjson w "$2" 'any(.[]; .app_id==$a and .workspace_id==$w)' >/dev/null 2>&1; }
@@ -95,7 +117,9 @@ realize_scene() {
     local svc
     while IFS= read -r svc; do
         [[ -z "$svc" ]] && continue
-        if [[ "$SCENE_DRYRUN" == 1 ]]; then
+        if [[ "${SCENE_NO_SERVICES:-0}" == 1 ]]; then
+            scene_log "scene[$ws]: skip service $svc (SCENE_NO_SERVICES — validation run)"
+        elif [[ "$SCENE_DRYRUN" == 1 ]]; then
             scene_log "scene[$ws]: would start service $svc"
         else
             # --no-block: never let a slow oneshot (dev-stack-data's ~80s podman
@@ -117,6 +141,11 @@ realize_scene() {
     local wsid; wsid="$(_ws_id "$ws")"
     if [[ -z "$wsid" ]]; then scene_log "scene[$ws]: no such niri workspace"; return 1; fi
 
+    # The project this workspace attaches to (exported into every spawned terminal so
+    # the deck + its sl-* tools scope to it). Harmless ~/SlicedLabs for non-project scenes.
+    local proj; proj="$(_scene_project "$ws")"
+    scene_log "scene[$ws]: project = $proj"
+
     local app_id cmd width height id t
     while IFS='|' read -r app_id cmd width height; do
         [[ -z "$app_id" ]] && continue
@@ -124,8 +153,13 @@ realize_scene() {
             scene_log "scene[$ws]: $app_id already present — skip"
             continue
         fi
+        # SL_CAPTURE: bump the ghostty deck font for on-camera legibility (recording) — a
+        # capture profile (sl-capture), not a token change. New summons during capture read big.
+        if [[ -f "${XDG_STATE_HOME:-$HOME/.local/state}/sliced/capture" ]]; then
+            cmd="${cmd/ghostty /ghostty --font-size=$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/sliced/capture" 2>/dev/null || echo 17) }"
+        fi
         if [[ "$SCENE_DRYRUN" == 1 ]]; then
-            scene_log "scene[$ws]: would spawn $app_id  width=${width:-auto}  → $cmd"
+            scene_log "scene[$ws]: would spawn $app_id  width=${width:-auto} height=${height:-auto}  proj=$proj → $cmd"
             continue
         fi
         # Strip ZELLIJ* so cockpit terminals (ghostty -e zj <layout>) never think
@@ -139,7 +173,9 @@ realize_scene() {
         # first made env try to RUN "-u" ("env: '-u': No such file or directory") and
         # NOTHING spawned — the silent bug (since Track 8 / 88620a3) that broke every
         # scene's app staging at login. Order is load-bearing: -u … first, assignment last.
-        setsid -f env -u ZELLIJ -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID SL_IDENTITY="$(sl-identity "$ws")" sh -c "$cmd" >/dev/null 2>&1 || true
+        setsid -f env -u ZELLIJ -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID \
+            SL_IDENTITY="$(sl-identity "$ws")" SL_PROJECT="$proj" SL_PROJECT_NAME="$(basename "$proj")" \
+            sh -c "$cmd" >/dev/null 2>&1 || true
         # Wait up to ~25s (100 × 0.25s) for the window to register. This MUST exceed
         # ff-scene's REGISTER_TIMEOUT (20s) — a cold dedicated-profile Firefox (research-web,
         # coding-web) needs more than the old 10s, and giving up early is what triggered the

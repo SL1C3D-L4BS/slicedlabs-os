@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # mako-workspace-mode — toggle Mako's "do-not-disturb" mode based on focused
 # Niri workspace.
 #

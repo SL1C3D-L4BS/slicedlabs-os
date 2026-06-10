@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # cockpitctl — drive the Cockpit (Quickshell HUD) from niri keybinds.
 # NOTE: distinct from `cockpit` (the workspace-scene realizer). Modal toggles go
 # over Quickshell IPC; theme toggle regenerates Theme.qml (the cockpit hot-reloads).
@@ -8,14 +9,24 @@ cmd="${1:-}"; arg="${2:-}"
 
 case "$cmd" in
     modal)
-        [ -n "$arg" ] || { echo "cockpitctl modal <context|media|net|ai|agenda|system>" >&2; exit 2; }
-        exec qs -c cockpit ipc call cockpit toggle "$arg" ;;
-    open)
-        exec qs -c cockpit ipc call cockpit open "$arg" ;;
+        # legacy alias — the inspector domains now live under `cockpitctl inspect`
+        [ -n "$arg" ] || { echo "cockpitctl inspect <context|net|ai|agenda>" >&2; exit 2; }
+        exec qs -c cockpit ipc call cockpit inspect "$arg" ;;
     close)
         exec qs -c cockpit ipc call cockpit close ;;
     control)
         exec qs -c cockpit ipc call cockpit control ;;
+    hermes)
+        exec qs -c cockpit ipc call cockpit hermes ;;
+    system)
+        # `cockpitctl system [tab]` — tab ∈ controls|bluetooth|media|keys|governance|power
+        if [ -n "$arg" ]; then exec qs -c cockpit ipc call cockpit systemTab "$arg"
+        else exec qs -c cockpit ipc call cockpit system; fi ;;
+    market)
+        exec qs -c cockpit ipc call cockpit market ;;
+    inspect)
+        # `cockpitctl inspect <domain>` — domain ∈ context|net|ai|agenda
+        exec qs -c cockpit ipc call cockpit inspect "$arg" ;;
     media)
         # Actionable MPRIS transport for the media HUD (P9) — drives whatever is playing
         # (spotify_player/mpd/browser) via playerctl. The cockpit pill reflects it live.
@@ -41,6 +52,6 @@ case "$cmd" in
         printf %s "$new" > "${XDG_CACHE_HOME:-$HOME/.cache}/waybar-theme" 2>/dev/null || true
         exec render-quickshell --variant="$new" ;;
     *)
-        echo "usage: cockpitctl {modal <name>|open <name>|close|control|media <transport>|theme [toggle|dark|light]}" >&2
+        echo "usage: cockpitctl {modal <name>|open <name>|close|control|hermes|system|market|media <transport>|theme [toggle|dark|light]}" >&2
         exit 2 ;;
 esac

@@ -1,3 +1,4 @@
+// SlicedLabs · body · © 2026 SlicedLabs
 pragma Singleton
 import QtQuick
 import Quickshell

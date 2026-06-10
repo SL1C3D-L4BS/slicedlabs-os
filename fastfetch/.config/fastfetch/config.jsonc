@@ -1,0 +1,38 @@
+// SlicedLabs — fastfetch greeting. Module colours ride the [ansi] SSOT (named
+// ANSI = the terminal palette = tokens.toml [ansi]) so info stays in sync with
+// zero render steps — the same way bat/eza/rmpc do. The LOGO is the one branded
+// surface: slicedlabs-logo.txt is rendered from its .tmpl ({{rgb.*}} identity
+// truecolor escapes — chrome rides identity, content rides [ansi]).
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "file-raw",
+    "source": "~/.config/fastfetch/slicedlabs-logo.txt",
+    "padding": { "top": 1, "right": 4, "left": 1 }
+  },
+  "display": { "separator": "  " },
+  "modules": [
+    { "type": "custom", "format": "{#1}SlicedLabs{#} · Liquid Retina" },
+    "separator",
+    { "type": "title", "keyColor": "blue" },
+    { "type": "host", "key": "  host", "keyColor": "blue" },
+    { "type": "os", "key": "  os", "keyColor": "blue" },
+    { "type": "kernel", "key": "  kernel", "keyColor": "blue" },
+    { "type": "packages", "key": "  pkgs", "keyColor": "magenta" },
+    { "type": "wm", "key": "  wm", "keyColor": "cyan" },
+    { "type": "de", "key": "  de", "keyColor": "cyan" },
+    { "type": "shell", "key": "  shell", "keyColor": "cyan" },
+    { "type": "terminal", "key": "  term", "keyColor": "cyan" },
+    { "type": "display", "key": "  display", "keyColor": "magenta" },
+    "break",
+    { "type": "cpu", "key": "  cpu", "keyColor": "green" },
+    { "type": "gpu", "key": "  gpu", "keyColor": "green" },
+    { "type": "memory", "key": "  mem", "keyColor": "yellow" },
+    { "type": "disk", "key": "  disk", "keyColor": "yellow", "folders": "/" },
+    { "type": "uptime", "key": "  up", "keyColor": "yellow" },
+    { "type": "localip", "key": "  ip", "keyColor": "red", "showIpv6": false, "compact": true },
+    { "type": "media", "key": "  media", "keyColor": "magenta" },
+    "break",
+    { "type": "colors", "paddingLeft": 2, "symbol": "circle" }
+  ]
+}

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# verify-reproducible — L1 reproducible-system gate (TOOLING-ARCHITECTURE-2026
+# §GAP3, Canon §I.2 design-for-the-machine). Assert the workstation is rebuildable
+# from source: the bootstrap installer + the package manifest exist, every declared
+# package (or group) is installed (no drift from the declaration), and the dotfiles
+# stow symlinks all resolve. Own the infra down to a reconstructible machine.
+set -uo pipefail
+DOT="${DOTFILES_ROOT:-$HOME/.dotfiles}"
+rc=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+no(){ rc=1; printf '  \033[31m✗\033[0m %s\n' "$1" >&2; }
+
+[ -f "$DOT/bootstrap.sh" ] && ok "bootstrap.sh (rebuild entrypoint) present" || no "bootstrap.sh missing"
+
+MAN="$DOT/system/packages.txt"
+if [ -f "$MAN" ]; then
+    ok "package manifest present ($(grep -cve '^[[:space:]]*$' "$MAN") declared)"
+    # Every declared package or group must be installed (no drift from the declaration).
+    installed=$(pacman -Qq 2>/dev/null | sort -u)
+    miss=0
+    while IFS= read -r p; do
+        [ -z "$p" ] && continue
+        case "$p" in \#*) continue ;; esac
+        grep -qxF -- "$p" <<<"$installed" && continue   # installed package
+        pacman -Qg -- "$p" >/dev/null 2>&1 && continue  # installed group (e.g. base-devel)
+        miss=$((miss + 1)); [ "$miss" -le 8 ] && printf '      missing: %s\n' "$p" >&2
+    done < "$MAN"
+    [ "$miss" -eq 0 ] && ok "every declared package/group installed (no drift)" \
+        || no "$miss declared package(s) NOT installed — reconcile manifest or install"
+else
+    no "packages.txt manifest missing"
+fi
+
+# Stow integrity: dotfiles-managed symlinks resolve (broken links pointing INTO
+# ~/.dotfiles = stow breakage; transient app locks elsewhere are ignored).
+broken=$(find "$HOME/.config" "$HOME/.local" -maxdepth 5 -xtype l -lname '*dotfiles*' 2>/dev/null | wc -l)
+[ "${broken:-0}" -eq 0 ] && ok "dotfiles stow symlinks resolve (no broken links)" \
+    || { no "$broken broken dotfiles symlink(s)"; find "$HOME/.config" "$HOME/.local" -maxdepth 5 -xtype l -lname '*dotfiles*' 2>/dev/null | head -5 >&2; }
+
+# Pinned shader toolchain: the slangc on PATH must match the engine's SLANGC_PIN
+# (ADR-038 byte-reproducibility). Provisioned from source by sl-slangc-build, which
+# shadows the drifting/SIGSEGV-ing system package. Only checked where the engine lives.
+eng=""; for d in "$HOME/SlicedLabs/tools/slicedengine" "$HOME/Code/engine"; do
+    [ -f "$d/tools/engine-shader/src/slangc.rs" ] && eng="$d"
+done
+if [ -n "$eng" ] && command -v sl-slangc-build >/dev/null 2>&1; then
+    sl-slangc-build --check >/dev/null 2>&1 \
+        && ok "slangc matches engine SLANGC_PIN (reproducible shader toolchain)" \
+        || no "slangc drifted from engine SLANGC_PIN — run: sl-slangc-build"
+fi
+
+echo
+if [ $rc -eq 0 ]; then echo "reproducible: bootstrap + manifest satisfied + stow intact ✓"
+else echo "reproducible: drift above" >&2; fi
+exit $rc

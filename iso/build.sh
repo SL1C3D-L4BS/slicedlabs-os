@@ -29,6 +29,16 @@ cp -a "$RELENG" "$PROFILE"
 cp -a "$HERE/profiledef.sh" "$PROFILE/profiledef.sh"
 cp -a "$HERE/airootfs/." "$PROFILE/airootfs/"
 
+# Always-on boot logs: send the kernel console to ttyS1 (the serial-file device that
+# `sl-vm-serial` attaches under qemu:///session) AND keep the on-screen tty0, so
+# `sl-log --vm slicedlabs-iso` shows the live ISO boot. Appended to the FRESH releng
+# bootloader configs each build (idempotent — $WORK is wiped above; runs as plain root,
+# before mkarchiso's fakeroot stage, so no fakeroot sed segfault).
+SLCON='console=ttyS1,115200 console=tty0'
+find "$PROFILE/syslinux" -name '*.cfg' -exec sed -i "/archisobasedir/ s/\$/ $SLCON/" {} + 2>/dev/null || true
+find "$PROFILE/efiboot" -name '*.conf' -exec sed -i "/^options/ s/\$/ $SLCON/" {} + 2>/dev/null || true
+echo "→ boot console: kernel logs → ttyS1 (serial-file) + tty0 (screen)"
+
 # packages.x86_64 = packages.base ∩ ARCH-official repos (core/extra/multilib). This
 # host is CachyOS, but the ISO builds on the stock archiso/releng pacman.conf, so
 # cachyos-repo + AUR packages (quickshell-git, swaylock-effects, …) are dropped here

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# teleprompter — scroll a lesson script hands-free (DP-3 portrait panel) while you face the
+# camera. Defaults to SCRIPT.md in the bound studio lesson. Big current line + dim upcoming.
+#   SPACE pause/resume · j slower · k faster · g restart · q quit
+# Env: SL_PROMPT_DELAY (seconds/line, default 1.4).
+set -uo pipefail
+
+file="${1:-}"
+if [ -z "$file" ]; then
+    lesson="$(sl-project bound streaming 2>/dev/null || true)"
+    [ -n "$lesson" ] && file="$lesson/SCRIPT.md"
+fi
+[ -n "$file" ] && [ -f "$file" ] || { echo "teleprompter: no script (pass a file, or bind a studio lesson with sl-teach)"; exit 1; }
+
+mapfile -t lines < <(sed 's/^#\+[[:space:]]*//; s/[*_`>]//g' "$file")
+[ "${#lines[@]}" -gt 0 ] || { echo "teleprompter: empty script"; exit 1; }
+
+delay="${SL_PROMPT_DELAY:-1.4}"
+paused=0; i=0
+tput civis 2>/dev/null || true
+trap 'tput cnorm 2>/dev/null || true; clear' EXIT
+
+while :; do
+    clear
+    printf '\033[1;36m▌ teleprompter\033[0m  (SPACE pause · j/k speed · g top · q quit)   %d/%d\n\n' "$i" "${#lines[@]}"
+    for off in 0 1 2 3 4 5 6 7; do
+        n=$((i + off)); [ "$n" -ge "${#lines[@]}" ] && break
+        if [ "$off" -eq 0 ]; then printf '\033[1;97m  %s\033[0m\n\n' "${lines[$n]}"
+        else printf '\033[2m  %s\033[0m\n' "${lines[$n]}"; fi
+    done
+    [ "$i" -ge "${#lines[@]}" ] && { printf '\n\033[2m— end —\033[0m\n'; paused=1; }
+
+    if [ "$paused" = 1 ]; then to=3600; else to="$delay"; fi
+    key=""; read -rsn1 -t "$to" key || true
+    case "$key" in
+        ' ') paused=$((1 - paused)) ;;
+        j) delay="$(awk "BEGIN{print $delay + 0.2}")" ;;
+        k) delay="$(awk "BEGIN{d=$delay - 0.2; if (d < 0.2) d = 0.2; print d}")" ;;
+        g) i=0; paused=0 ;;
+        q) break ;;
+        '') { [ "$paused" = 0 ] && [ "$i" -lt "${#lines[@]}" ]; } && i=$((i + 1)) ;;
+    esac
+done

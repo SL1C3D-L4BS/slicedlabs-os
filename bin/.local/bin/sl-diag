@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-diag — the project "Problems" panel. Aggregates diagnostics from every language present
+# (Rust cargo check/clippy · Python ruff · shell shellcheck · TS tsc) into one sectioned,
+# counted view. Runs in $SL_PROJECT / cwd — the owned, terminal-native VS Code Problems panel.
+# Reuses the toolchain LazyVim's LSP already speaks; this is the project-WIDE batch view.
+#   sl-diag            check every detected language, tally errors/warnings
+#   sl-diag --clippy   use clippy (stricter) for Rust
+#   sl-diag --watch    re-run on file change (entr/bacon)
+set -uo pipefail
+B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'; CY=$'\033[36m'; R=$'\033[31m'; G=$'\033[32m'
+have() { command -v "$1" >/dev/null 2>&1; }
+clippy=0; watch=0
+for a in "$@"; do case "$a" in --clippy) clippy=1 ;; --watch) watch=1 ;; -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;; esac; done
+
+if [ "$watch" = 1 ]; then
+    have entr || { echo "sl-diag: --watch needs entr"; exit 1; }
+    fd -e rs -e py -e sh -e ts -e tsx 2>/dev/null | entr -c "$0" "${clippy:+--clippy}"; exit
+fi
+
+TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
+section() { printf '\n%s▸ %s%s\n' "$B" "$1" "$N"; }
+emit() { tee -a "$TMP"; }   # show live + accumulate for the tally
+none() { printf '  %sclean%s\n' "$D" "$N"; }
+
+printf '%s⏿ sl-diag — %s%s\n' "$B" "${SL_PROJECT_NAME:-$(basename "$PWD")}" "$N"
+
+if [ -f Cargo.toml ] && have cargo; then
+    section "Rust — cargo $([ "$clippy" = 1 ] && echo clippy || echo check)"
+    out="$([ "$clippy" = 1 ] && cargo clippy -q --message-format=short 2>&1 || cargo check -q --message-format=short 2>&1 | grep -E ': (warning|error)')" || true
+    [ -n "$out" ] && printf '%s\n' "$out" | emit || none
+fi
+if { [ -f pyproject.toml ] || compgen -G '*.py' >/dev/null 2>&1; } && have ruff; then
+    section "Python — ruff"
+    out="$(ruff check --output-format=concise 2>/dev/null | grep -E ':[0-9]+:')" || true
+    [ -n "$out" ] && printf '%s\n' "$out" | emit || none
+fi
+if have shellcheck; then
+    mapfile -t shfiles < <(grep -rlsE '^#!.*(bash|/sh)' --include='*' . 2>/dev/null | grep -vE '/(\.git|node_modules|target|\.venv)/' | head -80)
+    if [ "${#shfiles[@]}" -gt 0 ]; then
+        section "Shell — shellcheck (${#shfiles[@]} scripts)"
+        out="$(shellcheck -f gcc -S warning "${shfiles[@]}" 2>/dev/null)" || true
+        [ -n "$out" ] && printf '%s\n' "$out" | emit || none
+    fi
+fi
+if [ -f tsconfig.json ] && have tsc; then
+    section "TypeScript — tsc --noEmit"
+    out="$(tsc --noEmit --pretty false 2>&1 | grep -E '\([0-9]+,[0-9]+\):')" || true
+    [ -n "$out" ] && printf '%s\n' "$out" | emit || none
+fi
+
+e=$(grep -cEi 'error(\[|:| )' "$TMP" 2>/dev/null); e=${e:-0}
+w=$(grep -cEi 'warning(:| )' "$TMP" 2>/dev/null); w=${w:-0}
+if [ "$e" -eq 0 ] && [ "$w" -eq 0 ]; then printf '\n%s✓ no problems%s\n' "$G" "$N"
+else printf '\n%s%s%d error(s)%s · %s%d warning(s)%s\n' "$R" "$B" "$e" "$N" "$CY" "$w" "$N"; fi
+[ "$e" -eq 0 ]

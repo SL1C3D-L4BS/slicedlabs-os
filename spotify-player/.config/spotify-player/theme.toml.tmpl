@@ -1,0 +1,41 @@
+# SlicedLabs — spotify_player theme (media workspace `tunes`). GENERATED from
+# system/tokens.toml by render-templates. Selected via app.toml `theme = "slicedlabs"`.
+# Palette rides the [ansi] SSOT (the 16 terminal colours); component accents ride
+# identity/[semantic] chrome.
+[[themes]]
+name = "slicedlabs"
+
+[themes.palette]
+background = "{{color.bg}}"
+foreground = "{{color.fg}}"
+black = "{{ansi.black}}"
+red = "{{ansi.red}}"
+green = "{{ansi.green}}"
+yellow = "{{ansi.yellow}}"
+blue = "{{ansi.blue}}"
+magenta = "{{ansi.magenta}}"
+cyan = "{{ansi.cyan}}"
+white = "{{ansi.white}}"
+bright_black = "{{ansi_bright.bright_black}}"
+bright_red = "{{ansi_bright.bright_red}}"
+bright_green = "{{ansi_bright.bright_green}}"
+bright_yellow = "{{ansi_bright.bright_yellow}}"
+bright_blue = "{{ansi_bright.bright_blue}}"
+bright_magenta = "{{ansi_bright.bright_magenta}}"
+bright_cyan = "{{ansi_bright.bright_cyan}}"
+bright_white = "{{ansi_bright.bright_white}}"
+selection_background = "{{color.selection}}"
+selection_foreground = "{{color.fg}}"
+
+[themes.component_style]
+block_title = { fg = "Blue" }
+border = { fg = "BrightBlack" }
+playback_track = { fg = "White", modifiers = ["Bold"] }
+playback_album = { fg = "Yellow" }
+playback_artists = { fg = "Cyan" }
+playback_metadata = { fg = "BrightBlack" }
+playback_progress_bar = { bg = "BrightBlack", fg = "Green" }
+current_playing = { fg = "Green", modifiers = ["Bold"] }
+page_desc = { fg = "Cyan", modifiers = ["Bold"] }
+table_header = { fg = "Blue" }
+selection = { fg = "Green", modifiers = ["Bold", "Reversed"] }

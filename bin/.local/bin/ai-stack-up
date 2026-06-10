@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # ai-stack-up — bring up the personal AI team mesh (Mem0/Neo4j, Langfuse,
 # Phoenix, n8n, Cognee).
 #
@@ -12,10 +13,13 @@
 # Pass extra args (e.g. --profile memory) to enable Mem0 + Neo4j.
 set -euo pipefail
 
-export POSTGRES_PASSWORD="$(cat "$HOME/.config/postgres/dev.password" 2>/dev/null || true)"
-export NEXTAUTH_SECRET="$(cat "$HOME/.config/langfuse/nextauth_secret" 2>/dev/null || true)"
-export LANGFUSE_SALT="$(cat "$HOME/.config/langfuse/salt"           2>/dev/null || true)"
-export NEO4J_AUTH="$(cat "$HOME/.config/neo4j/auth"                 2>/dev/null || true)"
+# Assign then export (SC2155: don't let `export` mask the read's exit status; the
+# `|| true` already makes a missing secret file non-fatal).
+POSTGRES_PASSWORD="$(cat "$HOME/.config/postgres/dev.password" 2>/dev/null || true)"
+NEXTAUTH_SECRET="$(cat "$HOME/.config/langfuse/nextauth_secret" 2>/dev/null || true)"
+LANGFUSE_SALT="$(cat "$HOME/.config/langfuse/salt" 2>/dev/null || true)"
+NEO4J_AUTH="$(cat "$HOME/.config/neo4j/auth" 2>/dev/null || true)"
+export POSTGRES_PASSWORD NEXTAUTH_SECRET LANGFUSE_SALT NEO4J_AUTH
 
 if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
     echo "ai-stack-up: $HOME/.config/postgres/dev.password is missing — run dev-stack-up first" >&2

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-task — the project Task Runner. Discovers tasks from the justfile + npm scripts + Makefile +
+# sl-run actions, lists or runs them. Runs in $SL_PROJECT / cwd. Owned terminal-native VS Code Tasks.
+#   sl-task            list every discovered task
+#   sl-task <task...>  run a task (e.g. `sl-task just test`, `sl-task npm run build`)
+#   sl-task pick       choose + run via the owned wofi/fzf picker
+set -uo pipefail
+B=$'\033[1m'; N=$'\033[0m'
+have() { command -v "$1" >/dev/null 2>&1; }
+
+list_tasks() {
+    if have just && { [ -f justfile ] || [ -f Justfile ]; }; then
+        just --summary 2>/dev/null | tr ' ' '\n' | sed '/^$/d; s/^/just /'
+    fi
+    if [ -f package.json ] && have jq; then
+        jq -r '.scripts // {} | keys[]' package.json 2>/dev/null | sed 's/^/npm run /'
+    fi
+    if [ -f Makefile ] || [ -f makefile ]; then
+        grep -hoE '^[a-zA-Z0-9_.-]+:' Makefile makefile 2>/dev/null | sed 's/:$//; s/^/make /' | sort -u
+    fi
+    printf 'sl-run build\nsl-run test\nsl-run run\nsl-run watch\n'
+}
+run_task() { printf '%s▸ %s%s\n' "$B" "$*" "$N"; eval "$*"; }
+
+case "${1:-list}" in
+    list) printf '%s⏿ tasks — %s%s\n' "$B" "${SL_PROJECT_NAME:-$(basename "$PWD")}" "$N"
+          list_tasks | sed "s/^/  /" ;;
+    pick) sel=""
+          if [ -t 0 ] && have fzf; then sel="$(list_tasks | fzf --prompt='task › ')"
+          elif have wofi; then sel="$(list_tasks | wofi --dmenu --insensitive --prompt 'task › ' 2>/dev/null)"
+          else echo "sl-task: no picker (fzf/wofi)"; exit 1; fi
+          [ -n "$sel" ] && run_task "$sel" ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *) run_task "$@" ;;
+esac

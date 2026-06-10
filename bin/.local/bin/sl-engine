@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
+# sl-engine — the [ENGINE] render-dev orchestrator. A navigable runner over the engine's justfile
+# (read LIVE via `just --summary` — never hardcoded, so it can't drift) plus running the engine
+# itself. Runs in $SL_PROJECT (bind the engine: `cockpit engine`).
+#   sl-engine            list the recipes (build/test/determinism/<subsystem>-oracle/bench/…)
+#   sl-engine run        cargo run -p engine — the live render window
+#   sl-engine oracles    show the determinism + golden/oracle/parity suite (run one with <recipe>)
+#   sl-engine <recipe>   just <recipe>
+#   sl-engine pick       pick a recipe via the owned wofi/fzf picker
+set -uo pipefail
+B=$'\033[1m'; N=$'\033[0m'; D=$'\033[2m'
+have() { command -v "$1" >/dev/null 2>&1; }
+{ [ -f justfile ] || [ -f Justfile ]; } || { echo "sl-engine: no justfile here — bind the engine: cockpit engine"; exit 1; }
+recipes() { just --summary 2>/dev/null | tr ' ' '\n' | sed '/^$/d'; }
+
+case "${1:-list}" in
+    run)     printf '%s▸ cargo run -p engine — live render%s\n' "$B" "$N"; exec cargo run -p engine ;;
+    oracles) printf '%s⏿ determinism + golden/oracle/parity suite:%s\n' "$B" "$N"
+             recipes | grep -E 'oracle$|golden$|parity$|^determinism$|baseline$' | sed 's/^/  just /'
+             printf '%s  run one: sl-engine <recipe> · headline: sl-engine determinism%s\n' "$D" "$N" ;;
+    list)    printf '%s⏿ engine recipes (just · %s total):%s\n' "$B" "$(recipes | wc -l)" "$N"
+             recipes | sed 's/^/  /' | head -60
+             printf '%s  run engine: sl-engine run · oracles: sl-engine oracles · pick: sl-engine pick%s\n' "$D" "$N" ;;
+    pick)    sel="$(recipes | { if [ -t 0 ] && have fzf; then fzf --prompt='just › '; else have wofi && wofi --dmenu --insensitive --prompt 'just › ' 2>/dev/null; fi; })"
+             [ -n "${sel:-}" ] && { printf '%s▸ just %s%s\n' "$B" "$sel" "$N"; exec just "$sel"; } ;;
+    -h | --help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//' ;;
+    *)       printf '%s▸ just %s%s\n' "$B" "$*" "$N"; exec just "$@" ;;
+esac

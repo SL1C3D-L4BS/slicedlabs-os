@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SlicedLabs · tools · © 2026 SlicedLabs
 # verify-public-clean — guarantee #4 (ownership): nothing secret or proprietary can
 # reach the PUBLIC showcase repo. Run as the public repo's prepublish gate + in its
 # CI. Scans a target tree (default $DOTFILES) for:

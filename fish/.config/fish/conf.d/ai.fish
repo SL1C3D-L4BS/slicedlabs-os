@@ -1,18 +1,21 @@
 # ai.fish — local AI environment (Phase H)
 #
-# Default backend is Vulkan (stable on Polaris). ROCm is installed alongside
-# and gated behind `with-rocm <cmd>` or `systemctl --user start ollama-rocm`.
+# Backend = auto-detect: CPU today (the RX580/gfx803 has no working ROCm on
+# ROCm 7.2, and the current ollama binary's Vulkan discovery doesn't see
+# Polaris). The OLLAMA_VULKAN + GPU vars stay set so a stronger GPU / a
+# Vulkan-capable ollama lights up automatically — deferred, not removed.
 # CPU fallback always works.
 
-# === slicedlabs (extracted to ~/Projects/slicedlabs) ===
+# === slicedlabs (folded into ~/SlicedLabs/tools/surface/crews) ===
 # The package now resolves its team registry from $SLICEDLABS_CONFIG first, so
 # the workstation keeps using the dotfiles team.toml (the SSOT) rather than the
 # bundled default that ships with the standalone repo.
 set -gx SLICEDLABS_CONFIG $HOME/.dotfiles/sliced-engine/.config/sliced-engine/team.toml
 
-# === Vulkan (primary) ===
+# === ollama GPU (auto-detect; ready for a future Vulkan-capable GPU) ===
+# Do NOT set OLLAMA_LLM_LIBRARY — forcing a backend breaks auto-detect and pins
+# CPU through a failed lookup. These stay so Vulkan engages automatically later.
 set -gx GGML_VK_VISIBLE_DEVICES 0
-set -gx OLLAMA_LLM_LIBRARY vulkan
 set -gx OLLAMA_VULKAN 1
 set -gx OLLAMA_HOST 127.0.0.1:11434
 set -gx OLLAMA_NUM_GPU 1
